@@ -383,16 +383,22 @@ export class ReportBuilderController {
    */
   @Get(':id/download')
   async downloadReport(@Param('id') id: string, @Res() res: Response) {
+    this.logger.log(`Download request for report: ${id}`);
+
     const report = await this.reportBuilderService.getReportStatus(id);
 
     if (!report) {
+      this.logger.warn(`Report not found: ${id}`);
       return res.status(404).json({
         success: false,
         message: 'Report not found',
       });
     }
 
+    this.logger.log(`Report status: ${report.status}, format: ${report.format}`);
+
     if (report.status !== 'completed') {
+      this.logger.warn(`Report not ready: ${id}, status: ${report.status}`);
       return res.status(400).json({
         success: false,
         message: 'Report is not ready for download',
@@ -401,6 +407,7 @@ export class ReportBuilderController {
     }
 
     if (!report.fileUrl) {
+      this.logger.warn(`Report has no file URL: ${id}`);
       return res.status(400).json({
         success: false,
         message: 'Report file not available',
@@ -412,18 +419,37 @@ export class ReportBuilderController {
       // URL format: http://localhost:9000/bucket-name/path/to/file.xlsx
       this.logger.log(`Processing download for fileUrl: ${report.fileUrl}`);
 
-      const url = new URL(report.fileUrl);
-      const pathParts = url.pathname.split('/');
-      this.logger.log(`URL pathname: ${url.pathname}`);
-      this.logger.log(`Path parts: ${JSON.stringify(pathParts)}`);
+      let fileKey: string;
 
-      // Remove empty first element and bucket name
-      const fileKey = pathParts.slice(2).join('/');
+      try {
+        const url = new URL(report.fileUrl);
+        const pathParts = url.pathname.split('/');
+        this.logger.log(`URL pathname: ${url.pathname}`);
+        this.logger.log(`Path parts: ${JSON.stringify(pathParts)}`);
+
+        // Remove empty first element and bucket name
+        // Path: /bucket-name/reports/type/filename.xlsx -> reports/type/filename.xlsx
+        fileKey = pathParts.slice(2).join('/');
+      } catch {
+        // If URL parsing fails, treat fileUrl as the key directly
+        this.logger.warn(`Could not parse fileUrl as URL, using as key directly`);
+        fileKey = report.fileUrl;
+      }
+
+      if (!fileKey) {
+        throw new Error('Could not extract file key from URL');
+      }
+
       this.logger.log(`Extracted file key: ${fileKey}`);
       this.logger.log(`MinIO connected: ${this.fileStorageService.isMinioConnected()}`);
 
       // Get file from MinIO
       const fileBuffer = await this.fileStorageService.getFile(fileKey);
+      this.logger.log(`Retrieved file buffer: ${fileBuffer.length} bytes`);
+
+      if (!fileBuffer || fileBuffer.length === 0) {
+        throw new Error('Retrieved file is empty');
+      }
 
       // Determine content type and filename
       const extension = report.format === 'excel' ? 'xlsx' : report.format;
@@ -431,19 +457,24 @@ export class ReportBuilderController {
         xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         pdf: 'application/pdf',
         csv: 'text/csv',
+        json: 'application/json',
       };
       const contentType = contentTypes[extension] || 'application/octet-stream';
       const filename = `${report.type}_${new Date().toISOString().split('T')[0]}.${extension}`;
+
+      this.logger.log(`Sending file: ${filename}, type: ${contentType}, size: ${fileBuffer.length}`);
 
       // Set headers for file download
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', fileBuffer.length);
+      res.setHeader('Cache-Control', 'no-cache');
 
-      // Send the file
-      return res.send(fileBuffer);
+      // Send the file buffer
+      return res.end(fileBuffer);
     } catch (error) {
-      this.logger.error(`Failed to download report: ${error.message}`);
+      this.logger.error(`Failed to download report ${id}: ${error.message}`);
+      this.logger.error(error.stack);
       return res.status(500).json({
         success: false,
         message: 'Failed to download report file',

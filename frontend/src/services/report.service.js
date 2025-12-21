@@ -47,30 +47,57 @@ export const reportService = {
 
   async downloadReport(id) {
     try {
+      console.log(`[ReportService] Downloading report: ${id}`);
+
       const response = await API.get(`${API_PATH}/${id}/download`, {
         responseType: 'blob',
+        timeout: 60000, // 60 second timeout for large files
       });
+
+      console.log(`[ReportService] Response received, type: ${response.data.type}, size: ${response.data.size}`);
 
       // Check if the response is an error (JSON instead of file)
       if (response.data.type === 'application/json') {
         const text = await response.data.text();
-        const error = JSON.parse(text);
-        throw new Error(error.message || 'Failed to download report');
+        console.error(`[ReportService] Received JSON error:`, text);
+        try {
+          const error = JSON.parse(text);
+          throw new Error(error.message || 'Failed to download report');
+        } catch {
+          throw new Error(text || 'Failed to download report');
+        }
+      }
+
+      // Validate we got actual file content
+      if (!response.data || response.data.size === 0) {
+        throw new Error('Downloaded file is empty');
       }
 
       return response.data;
     } catch (error) {
+      console.error(`[ReportService] Download error:`, error);
+
       // Handle axios error with blob response
       if (error.response?.data instanceof Blob) {
         try {
           const text = await error.response.data.text();
+          console.error(`[ReportService] Error blob content:`, text);
           const errorData = JSON.parse(text);
           throw new Error(errorData.message || errorData.error || 'Failed to download report');
         } catch (parseError) {
+          if (parseError.message && !parseError.message.includes('JSON')) {
+            throw parseError;
+          }
           // If parsing fails, use original error
           throw new Error(error.message || 'Failed to download report');
         }
       }
+
+      // Handle network errors
+      if (!error.response) {
+        throw new Error('Unable to connect to server. Please try again later.');
+      }
+
       throw error;
     }
   },

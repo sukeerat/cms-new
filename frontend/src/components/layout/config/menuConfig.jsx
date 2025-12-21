@@ -35,6 +35,7 @@ import {
   FileAddOutlined,
   UploadOutlined,
   SettingOutlined,
+  CarOutlined,
 } from '@ant-design/icons';
 import React from 'react';
 
@@ -107,6 +108,7 @@ export const menuConfig = {
     items: [
       { key: 'internship-analytics', label: 'Analytics & Reports', icon: <PieChartOutlined />, path: '/analytics' },
       { key: 'student-progress', label: 'Student Progress', icon: <LineChartOutlined />, path: '/student-progress' },
+      { key: 'faculty-progress', label: 'Faculty Progress', icon: <CarOutlined />, path: '/faculty-progress' },
       { key: 'faculty-visit-reports', label: 'Faculty Reports', icon: <FileDoneOutlined />, path: '/faculty-reports' },
       { key: 'student-grievances', label: 'Grievances', icon: <AlertOutlined />, path: '/grievances' },
     ],

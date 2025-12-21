@@ -38,6 +38,18 @@ export const analyticsService = {
     const response = await API.get(`/principal/placements/stats?institutionId=${institutionId}`);
     return response.data;
   },
+
+  // Faculty progress tracking
+  async getFacultyProgressList(params = {}) {
+    const queryParams = new URLSearchParams(params).toString();
+    const response = await API.get(`/principal/faculty/progress?${queryParams}`);
+    return response.data;
+  },
+
+  async getFacultyProgressDetails(facultyId) {
+    const response = await API.get(`/principal/faculty/progress/${facultyId}`);
+    return response.data;
+  },
 };
 
 export default analyticsService;

@@ -347,9 +347,8 @@ export class PrincipalService {
                       companyDescription: true,
                       industryType: true,
                       website: true,
-                      logoUrl: true,
-                      contactEmail: true,
-                      contactPhone: true,
+                      primaryEmail: true,
+                      primaryPhone: true,
                       address: true,
                       city: true,
                       state: true,
@@ -364,7 +363,6 @@ export class PrincipalService {
                   reportYear: true,
                   status: true,
                   submittedAt: true,
-                  summary: true,
                   reportFileUrl: true,
                 },
                 orderBy: [{ reportYear: 'asc' }, { reportMonth: 'asc' }],
@@ -507,9 +505,9 @@ export class PrincipalService {
             description: application.internship.industry.companyDescription,
             type: application.internship.industry.industryType,
             website: application.internship.industry.website,
-            logo: application.internship.industry.logoUrl,
-            email: application.internship.industry.contactEmail,
-            phone: application.internship.industry.contactPhone,
+            logo: null,
+            email: application.internship.industry.primaryEmail,
+            phone: application.internship.industry.primaryPhone,
             address: application.internship.industry.address,
             city: application.internship.industry.city,
             state: application.internship.industry.state,
@@ -534,7 +532,7 @@ export class PrincipalService {
           monthName: new Date(report.reportYear, report.reportMonth - 1).toLocaleString('default', { month: 'long' }),
           status: report.status,
           submittedAt: report.submittedAt,
-          summary: report.summary,
+          summary: null,
           reportFileUrl: report.reportFileUrl,
         })),
       };
@@ -569,7 +567,7 @@ export class PrincipalService {
         name: true,
         _count: {
           select: {
-            assignedMentees: { where: { isActive: true } },
+            mentorAssignments: { where: { isActive: true } },
           },
         },
       },
@@ -587,7 +585,7 @@ export class PrincipalService {
       mentors: mentors.map((m) => ({
         id: m.id,
         name: m.name,
-        assignedCount: m._count.assignedMentees,
+        assignedCount: m._count.mentorAssignments,
       })),
     };
   }
@@ -2461,6 +2459,284 @@ export class PrincipalService {
         mentorName: m.name,
         studentCount: m.count,
       })),
+    };
+  }
+
+  /**
+   * Get faculty progress list with assigned students count
+   */
+  async getFacultyProgressList(principalId: string, query: any) {
+    const principal = await this.prisma.user.findUnique({
+      where: { id: principalId },
+    });
+
+    if (!principal || !principal.institutionId) {
+      throw new NotFoundException('Institution not found');
+    }
+
+    const { search } = query;
+
+    const where: any = {
+      institutionId: principal.institutionId,
+      role: { in: ['FACULTY_SUPERVISOR', 'TEACHER'] },
+      active: true,
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { employeeId: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const faculty = await this.prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNo: true,
+        _count: {
+          select: {
+            mentorAssignments: { where: { isActive: true } },
+            facultyVisitLogs: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return {
+      faculty: faculty.map((f) => ({
+        id: f.id,
+        name: f.name,
+        email: f.email,
+        phone: f.phoneNo,
+        employeeId: null,
+        assignedCount: f._count.mentorAssignments,
+        totalVisits: f._count.facultyVisitLogs,
+      })),
+    };
+  }
+
+  /**
+   * Get detailed faculty progress with students and visits
+   */
+  async getFacultyProgressDetails(principalId: string, facultyId: string) {
+    const principal = await this.prisma.user.findUnique({
+      where: { id: principalId },
+    });
+
+    if (!principal || !principal.institutionId) {
+      throw new NotFoundException('Institution not found');
+    }
+
+    // Get faculty details
+    const faculty = await this.prisma.user.findFirst({
+      where: {
+        id: facultyId,
+        institutionId: principal.institutionId,
+        role: { in: ['FACULTY_SUPERVISOR', 'TEACHER'] },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNo: true,
+      },
+    });
+
+    if (!faculty) {
+      throw new NotFoundException('Faculty not found');
+    }
+
+    // Get assigned students with their internship details
+    const mentorAssignments = await this.prisma.mentorAssignment.findMany({
+      where: {
+        mentorId: facultyId,
+        isActive: true,
+      },
+      include: {
+        student: {
+          include: {
+            batch: { select: { id: true, name: true } },
+            branch: { select: { id: true, name: true } },
+            internshipApplications: {
+              where: {
+                status: { in: ['JOINED', 'COMPLETED', 'SELECTED'] },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                internship: {
+                  select: {
+                    id: true,
+                    title: true,
+                    industry: {
+                      select: { companyName: true },
+                    },
+                  },
+                },
+                facultyVisitLogs: {
+                  where: { facultyId },
+                  orderBy: { visitDate: 'desc' },
+                  take: 1,
+                  select: { visitDate: true },
+                },
+                _count: {
+                  select: { facultyVisitLogs: { where: { facultyId } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Get all visits by this faculty
+    const visits = await this.prisma.facultyVisitLog.findMany({
+      where: {
+        facultyId,
+        application: {
+          student: {
+            institutionId: principal.institutionId,
+          },
+        },
+      },
+      orderBy: { visitDate: 'desc' },
+      include: {
+        application: {
+          include: {
+            student: {
+              select: { id: true, name: true, rollNumber: true },
+            },
+            internship: {
+              select: {
+                title: true,
+                industry: { select: { companyName: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Calculate stats
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
+    const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
+    const nextMonth = thisMonth === 11 ? 0 : thisMonth + 1;
+    const nextMonthYear = thisMonth === 11 ? thisYear + 1 : thisYear;
+
+    const visitsThisMonth = visits.filter((v) => {
+      const vDate = new Date(v.visitDate);
+      return vDate.getMonth() === thisMonth && vDate.getFullYear() === thisYear;
+    }).length;
+
+    const visitsLastMonth = visits.filter((v) => {
+      const vDate = new Date(v.visitDate);
+      return vDate.getMonth() === lastMonth && vDate.getFullYear() === lastMonthYear;
+    }).length;
+
+    // For scheduled visits, we count future visits
+    const scheduledNextMonth = visits.filter((v) => {
+      const vDate = new Date(v.visitDate);
+      return vDate > now && vDate.getMonth() === nextMonth && vDate.getFullYear() === nextMonthYear;
+    }).length;
+
+    // Calculate missed visits (months with active students but no visits)
+    let missedVisits = 0;
+    const studentsWithActiveInternships = mentorAssignments.filter(
+      (a) => a.student.internshipApplications.length > 0 &&
+        a.student.internshipApplications[0].status === 'JOINED'
+    );
+
+    // Simple heuristic: if a student has been on internship for a month and no visit, it's missed
+    for (const assignment of studentsWithActiveInternships) {
+      const app = assignment.student.internshipApplications[0];
+      const lastVisit = app.facultyVisitLogs?.[0]?.visitDate;
+      if (!lastVisit) {
+        missedVisits++;
+      } else {
+        const daysSinceVisit = Math.floor((now.getTime() - new Date(lastVisit).getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSinceVisit > 30) {
+          missedVisits++;
+        }
+      }
+    }
+
+    // Build visit summary for past 6 months
+    const visitSummary = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(thisYear, thisMonth - i, 1);
+      const monthVisits = visits.filter((v) => {
+        const vDate = new Date(v.visitDate);
+        return vDate.getMonth() === d.getMonth() && vDate.getFullYear() === d.getFullYear();
+      }).length;
+      visitSummary.push({
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+        monthName: d.toLocaleString('default', { month: 'short' }),
+        visits: monthVisits,
+        isPast: d < now,
+      });
+    }
+
+    // Transform students data
+    const students = mentorAssignments.map((a) => {
+      const app = a.student.internshipApplications[0];
+      return {
+        id: a.student.id,
+        name: a.student.name,
+        rollNumber: a.student.rollNumber,
+        batch: a.student.batch?.name || 'N/A',
+        department: a.student.branch?.name || 'N/A',
+        internshipTitle: app?.internship?.title || null,
+        companyName: app?.internship?.industry?.companyName || null,
+        internshipStatus: app?.status === 'JOINED' ? 'In Progress' :
+          app?.status === 'COMPLETED' ? 'Completed' :
+          app?.status === 'SELECTED' ? 'Pending' : 'Not Started',
+        totalVisits: app?._count?.facultyVisitLogs || 0,
+        lastVisitDate: app?.facultyVisitLogs?.[0]?.visitDate || null,
+      };
+    });
+
+    // Transform visits data
+    const transformedVisits = visits.map((v) => ({
+      id: v.id,
+      visitDate: v.visitDate,
+      visitType: v.visitType,
+      visitDuration: v.visitDuration,
+      visitLocation: v.visitLocation,
+      studentName: v.application.student.name,
+      studentRollNumber: v.application.student.rollNumber,
+      companyName: v.application.internship?.industry?.companyName || 'Self-identified',
+      internshipTitle: v.application.internship?.title || 'N/A',
+      studentPerformance: v.studentPerformance,
+      workEnvironment: v.workEnvironment,
+      industrySupport: v.industrySupport,
+      skillsDevelopment: v.skillsDevelopment,
+      overallRating: v.studentProgressRating,
+      remarks: v.recommendations,
+      status: 'COMPLETED',
+    }));
+
+    return {
+      faculty,
+      stats: {
+        totalStudents: mentorAssignments.length,
+        totalVisits: visits.length,
+        visitsLastMonth,
+        visitsThisMonth,
+        scheduledNextMonth,
+        missedVisits,
+      },
+      students,
+      visits: transformedVisits,
+      visitSummary,
     };
   }
 }

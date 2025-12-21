@@ -63,6 +63,7 @@ import MentorAssignment from '../../features/principal/mentors/MentorAssignment'
 import BulkUpload from '../../features/principal/bulk/BulkUpload';
 import Analytics from '../../features/principal/analytics/Analytics';
 import FacultyReports from '../../features/principal/reports/FacultyReports';
+import FacultyProgress from '../../features/principal/faculty/FacultyProgress';
 
 // Faculty
 import FacultyDashboard from '../../features/faculty/dashboard/FacultyDashboard';
@@ -368,6 +369,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
               <FacultyReports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="faculty-progress"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
+              <FacultyProgress />
             </ProtectedRoute>
           }
         />

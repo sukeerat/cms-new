@@ -256,4 +256,17 @@ export class PrincipalController {
   async getPlacementStats(@Request() req) {
     return this.principalService.getPlacementStats(req.user.userId);
   }
+
+  // Faculty Progress Tracking
+  @Get('faculty/progress')
+  @ApiOperation({ summary: 'Get faculty progress list with assigned students count' })
+  async getFacultyProgressList(@Request() req, @Query() query: any) {
+    return this.principalService.getFacultyProgressList(req.user.userId, query);
+  }
+
+  @Get('faculty/progress/:facultyId')
+  @ApiOperation({ summary: 'Get detailed faculty progress with students and visits' })
+  async getFacultyProgressDetails(@Request() req, @Param('facultyId') facultyId: string) {
+    return this.principalService.getFacultyProgressDetails(req.user.userId, facultyId);
+  }
 }

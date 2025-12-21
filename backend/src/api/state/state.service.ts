@@ -1729,7 +1729,7 @@ export class StateService {
       where: {
         institutionId,
         role: { in: [Role.FACULTY_SUPERVISOR, Role.TEACHER] },
-        isActive: true,
+        active: true,
       },
       select: {
         id: true,
@@ -1817,9 +1817,9 @@ export class StateService {
 
     // Invalidate cache
     await Promise.all([
-      this.cache.del(`mentor:assignments:${mentorId}`),
-      this.cache.del(`mentor:student:${studentId}`),
-      this.cache.del(`state:institute:${student.institutionId}:students`),
+      this.cache.mdel(`mentor:assignments:${mentorId}`),
+      this.cache.mdel(`mentor:student:${studentId}`),
+      this.cache.mdel(`state:institute:${student.institutionId}:students`),
     ]);
 
     return {
@@ -1853,8 +1853,8 @@ export class StateService {
     });
 
     // Invalidate cache
-    await this.cache.del(`mentor:student:${studentId}`);
-    await this.cache.del(`state:institute:${student.institutionId}:students`);
+    await this.cache.mdel(`mentor:student:${studentId}`);
+    await this.cache.mdel(`state:institute:${student.institutionId}:students`);
 
     return {
       success: true,

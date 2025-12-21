@@ -448,20 +448,37 @@ const ReportBuilder = () => {
   };
 
   const handleDownload = async (reportId, format) => {
+    const toastId = toast.loading('Downloading report...');
     try {
+      console.log(`[ReportBuilder] Starting download for report: ${reportId}, format: ${format}`);
       const blob = await reportService.downloadReport(reportId);
+
+      if (!blob || blob.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
+
+      console.log(`[ReportBuilder] Blob received, size: ${blob.size}, type: ${blob.type}`);
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       const extension = format === 'excel' ? 'xlsx' : format;
       link.download = `report_${dayjs().format('YYYY-MM-DD_HHmmss')}.${extension}`;
+      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      toast.dismiss(toastId);
       toast.success('Report downloaded successfully!');
     } catch (err) {
-      console.error('Download error:', err);
+      console.error('[ReportBuilder] Download error:', err);
+      toast.dismiss(toastId);
       toast.error(err.message || 'Failed to download report');
     }
   };

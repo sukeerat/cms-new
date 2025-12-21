@@ -10,12 +10,14 @@ import { LookupService } from './lookup.service';
 import { PrismaModule } from '../../core/database/prisma.module';
 import { CloudinaryModule } from '../../infrastructure/cloudinary/cloudinary.module';
 import { ReportBuilderModule } from '../../domain/report/builder/report-builder.module';
+import { FileStorageModule } from '../../infrastructure/file-storage/file-storage.module';
 
 @Module({
   imports: [
     PrismaModule,
     CloudinaryModule,
     ReportBuilderModule,
+    FileStorageModule,
   ],
   controllers: [
     NotificationsController,

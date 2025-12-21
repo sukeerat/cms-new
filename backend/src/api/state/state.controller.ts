@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { StateService } from './state.service';
@@ -82,6 +83,14 @@ export class StateController {
     return this.stateService.getInstitutionCompanies(id, {
       limit: Number(limit) || 50,
     });
+  }
+
+  // Note: Specific routes must come BEFORE generic :id routes
+  @Get('institutions/:id/mentors')
+  @ApiOperation({ summary: 'Get mentors/faculty from an institution' })
+  async getInstitutionMentors(@Param('id') institutionId: string) {
+    const mentors = await this.stateService.getInstitutionMentors(institutionId);
+    return { success: true, data: mentors };
   }
 
   @Get('institutions/:id')
@@ -358,19 +367,12 @@ export class StateController {
 
   // ==================== Mentor Management ====================
 
-  @Get('institutions/:id/mentors')
-  @ApiOperation({ summary: 'Get mentors/faculty from an institution' })
-  async getInstitutionMentors(@Param('id') institutionId: string) {
-    const mentors = await this.stateService.getInstitutionMentors(institutionId);
-    return { success: true, data: mentors };
-  }
-
   @Post('students/:id/assign-mentor')
   @ApiOperation({ summary: 'Assign mentor to student' })
   async assignMentorToStudent(
     @Param('id') studentId: string,
     @Body('mentorId') mentorId: string,
-    @Request() req,
+    @Req() req,
   ) {
     const assignedBy = req.user?.userId || 'state-admin';
     return this.stateService.assignMentorToStudent(studentId, mentorId, assignedBy);
@@ -380,7 +382,7 @@ export class StateController {
   @ApiOperation({ summary: 'Remove mentor from student' })
   async removeMentorFromStudent(
     @Param('id') studentId: string,
-    @Request() req,
+    @Req() req,
   ) {
     const removedBy = req.user?.userId || 'state-admin';
     return this.stateService.removeMentorFromStudent(studentId, removedBy);

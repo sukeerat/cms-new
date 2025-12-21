@@ -342,412 +342,371 @@ const ManageInternships = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
-      {/* Stale data indicator */}
-      {isStale && (
-        <Alert
-          message="Data may be outdated"
-          description="Your internship data might not reflect the latest changes. Click refresh to update."
-          type="warning"
-          showIcon
-          action={
-            <Button
-              size="small"
-              type="primary"
-              onClick={forceRefresh}
-              icon={<ReloadOutlined />}
-              className="rounded-md"
-            >
-              Refresh
-            </Button>
-          }
-          className="mb-6 rounded-2xl border-warning/20 bg-warning-50/50 shadow-sm"
-        />
-      )}
-
-      {/* Header Section */}
-      <div className="flex flex-wrap justify-between items-center mb-6">
-        <Title level={3} className="text-primary mb-0">
-          Internship Management
-        </Title>
-      </div>
-
-      <Row gutter={[24, 24]}>
-        {/* Internships List - Left Column */}
-        <Col
-          xs={24}
-          md={8}
-          lg={7}
-          xl={6}
-        >
-          <Card
-            title={
-              <div className="flex items-center text-primary font-semibold">
-                <ShopOutlined className="mr-2" /> Internships Directory
-              </div>
-            }
-            className="shadow-sm rounded-xl border-border h-[calc(100vh-200px)] flex flex-col"
-            styles={{
-              header: { borderBottom: "1px solid rgba(var(--color-border), 0.5)" },
-              body: { padding: "12px", overflowY: "auto", flex: 1 },
-            }}
-          >
-            <div className="mb-4 space-y-3">
-              <Search
-                placeholder="Search internships..."
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen overflow-hidden flex flex-col">
+      <div className="max-w-[1600px] mx-auto w-full space-y-6 flex flex-col flex-1">
+        {/* Stale data indicator */}
+        {isStale && (
+          <Alert
+            message="Data update recommended"
+            description="Your internship data might be outdated. Click refresh to sync latest changes."
+            type="warning"
+            showIcon
+            action={
+              <Button
+                size="small"
+                type="primary"
+                onClick={forceRefresh}
                 className="rounded-lg"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                prefix={<SearchOutlined className="text-text-tertiary" />}
-                allowClear
-              />
+              >
+                Refresh
+              </Button>
+            }
+            className="rounded-xl border-warning/20 bg-warning-50/50 shadow-sm shrink-0"
+          />
+        )}
 
-              <div className="flex justify-between items-center gap-2">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shrink-0">
+          <div className="flex items-center">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+              <ShopOutlined className="text-lg" />
+            </div>
+            <div>
+              <Title level={2} className="mb-0 text-text-primary text-2xl">
+                Manage Internships
+              </Title>
+              <Paragraph className="text-text-secondary text-sm mb-0">
+                Oversee your internship postings and track applicant engagement
+              </Paragraph>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link to="/industry/post-internship">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                className="h-10 rounded-xl font-bold bg-primary border-0 shadow-lg shadow-primary/20"
+              >
+                New Posting
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        <Row gutter={[24, 24]} className="flex-1 overflow-hidden">
+          {/* Internships List - Left Column */}
+          <Col
+            xs={24}
+            md={8}
+            lg={7}
+            xl={6}
+            className="h-full flex flex-col min-h-[400px]"
+          >
+            <Card
+              title={
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <BankOutlined className="text-primary text-xs" />
+                  </div>
+                  <span className="text-text-primary font-bold text-base">Postings Directory</span>
+                </div>
+              }
+              className="rounded-2xl border-border shadow-sm flex flex-col h-full overflow-hidden"
+              styles={{ 
+                body: { padding: '16px', flex: 1, overflowY: 'auto' },
+                header: { padding: '16px', borderBottom: '1px solid var(--color-border)' }
+              }}
+            >
+              <div className="space-y-3 mb-4">
+                <Search
+                  placeholder="Search role or field..."
+                  className="rounded-xl h-11 bg-background border-border"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  prefix={<SearchOutlined className="text-text-tertiary" />}
+                  allowClear
+                />
+
                 <Select
                   value={statusFilter}
                   onChange={setStatusFilter}
-                  className="flex-1 rounded-lg"
+                  className="w-full h-11"
                   placeholder="Filter by status"
                 >
-                  <Option value="all">All Status</Option>
+                  <Option value="all">All Postings</Option>
                   <Option value="ACTIVE">Active</Option>
                   <Option value="INACTIVE">Inactive</Option>
                   <Option value="COMPLETED">Completed</Option>
-                  <Option value="CANCELLED">Cancelled</Option>
                 </Select>
-
-                <Link to="/industry/post-internship">
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    className="rounded-lg shadow-md shadow-primary/20"
-                  >
-                    New
-                  </Button>
-                </Link>
               </div>
-            </div>
 
-            {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <Spin size="small" />
-              </div>
-            ) : (
-              <List
-                itemLayout="horizontal"
-                dataSource={filteredData}
-                locale={{ emptyText: "No internships found" }}
-                renderItem={(internship) => (
-                  <List.Item
-                    onClick={() => setSelectedInternship(internship)}
-                    className={`
-                      cursor-pointer my-2 px-3 py-3 rounded-xl transition-all duration-200
-                      ${
-                        selectedInternship?.id === internship.id
-                          ? "bg-primary-50 border border-primary/30 shadow-sm"
-                          : "hover:bg-background-tertiary/50 border border-transparent"
-                      }
-                    `}
-                  >
-                    <List.Item.Meta
-                      avatar={
-                        <Avatar
-                          size={40}
-                          icon={<BankOutlined />}
-                          className={`${
-                            selectedInternship?.id === internship.id
-                              ? "bg-primary text-white"
-                              : "bg-background-tertiary text-text-tertiary"
-                          } rounded-lg`}
-                        />
-                      }
-                      title={
-                        <Text strong className={`text-sm block line-clamp-1 ${
-                          selectedInternship?.id === internship.id ? "text-primary" : "text-text-primary"
-                        }`}>
+              <div className="space-y-2">
+                {loading ? (
+                  <div className="py-12 flex justify-center"><Spin size="small" /></div>
+                ) : filteredData.length > 0 ? (
+                  filteredData.map((internship) => (
+                    <div
+                      key={internship.id}
+                      onClick={() => setSelectedInternship(internship)}
+                      className={`
+                        group cursor-pointer p-3 rounded-xl transition-all duration-200 border
+                        ${selectedInternship?.id === internship.id
+                          ? 'bg-primary/5 border-primary/20 shadow-sm'
+                          : 'bg-surface border-transparent hover:bg-background-tertiary hover:border-border'
+                        }
+                      `}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <Text className={`font-bold block truncate leading-tight flex-1 mr-2 ${selectedInternship?.id === internship.id ? 'text-primary' : 'text-text-primary'}`}>
                           {internship.title}
                         </Text>
-                      }
-                      description={
-                        <div className="space-y-1 mt-1">
-                          <div className="flex flex-wrap gap-1">
-                            <Tag color={getStatusColor(internship.status)} className="text-[10px] px-1.5 leading-tight m-0 rounded-md">
-                              {internship.status}
-                            </Tag>
-                            <Tag className="text-[10px] px-1.5 leading-tight m-0 rounded-md bg-background-tertiary border-0">
-                              {internship.numberOfPositions} Pos
-                            </Tag>
-                          </div>
-                          <div className="text-[10px] text-text-tertiary flex items-center gap-1 font-medium">
-                            <ContactsOutlined className="text-[9px]" />
-                            {internship.applications?.length || 0} Applicants
-                          </div>
-                        </div>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            )}
-          </Card>
-        </Col>
-
-        {/* Internship Details - Right Column */}
-        <Col
-          xs={24}
-          md={16}
-          lg={17}
-          xl={18}
-        >
-          {selectedInternship ? (
-            <div className="space-y-6">
-              {/* Header Info */}
-              <Card className="shadow-sm rounded-xl border-border bg-background overflow-hidden">
-                <div className="flex flex-col md:flex-row items-center gap-6 p-2">
-                  <Avatar
-                    size={80}
-                    icon={<BankOutlined />}
-                    className="shadow-lg bg-primary text-white rounded-2xl"
-                  />
-                  <div className="flex-grow text-center md:text-left">
-                    <Title level={3} className="mb-1 text-text-primary">
-                      {selectedInternship.title}
-                    </Title>
-                    <div className="flex justify-center md:justify-start items-center text-text-secondary text-base mb-3 font-medium">
-                      <ShopOutlined className="mr-2 text-text-tertiary" />
-                      {selectedInternship.fieldOfWork} •{" "}
-                      {selectedInternship.duration}
-                    </div>
-                    <div className="flex flex-wrap justify-center md:justify-start gap-2">
-                      <Tag
-                        color={getStatusColor(selectedInternship.status)}
-                        className="px-3 py-0.5 rounded-full font-medium"
-                      >
-                        {selectedInternship.status}
-                      </Tag>
-                      <Tag className="px-3 py-0.5 rounded-full border-border bg-background-tertiary text-text-primary font-medium">
-                        {selectedInternship.numberOfPositions} Positions
-                      </Tag>
-                      <Tag className="px-3 py-0.5 rounded-full border-border bg-background-tertiary text-text-primary font-medium">
-                        {selectedInternship.workLocation?.replace("_", " ") || "On-site"}
-                      </Tag>
-                      {selectedInternship.isStipendProvided && (
-                        <Tag color="success" className="px-3 py-0.5 rounded-full font-medium">
-                          ₹{selectedInternship.stipendAmount?.toLocaleString()}/mo
+                        <Tag 
+                          color={getStatusColor(internship.status)}
+                          className="m-0 px-1.5 py-0 rounded-md border-0 text-[9px] font-black uppercase tracking-tighter shrink-0"
+                        >
+                          {internship.status}
                         </Tag>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions Dropdown */}
-                  <div className="shrink-0">
-                    <Dropdown
-                      menu={getActionsMenu(selectedInternship)}
-                      trigger={["click"]}
-                      placement="bottomRight"
-                    >
-                      <Button
-                        type="text"
-                        icon={<MoreOutlined className="text-xl" />}
-                        className="hover:bg-background-tertiary rounded-xl w-10 h-10 flex items-center justify-center"
-                      />
-                    </Dropdown>
-                  </div>
-                </div>
-
-                {/* Quick Stats Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 p-4 bg-background-tertiary/30 rounded-2xl border border-border/50">
-                  <div className="flex items-center p-2">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mr-3">
-                      <ContactsOutlined className="text-lg" />
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase font-bold text-text-tertiary">Applications</div>
-                      <div className="text-base font-bold text-text-primary">
-                        {selectedInternship.applications?.length || 0}
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center p-2">
-                    <div className="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center mr-3">
-                      <CheckCircleOutlined className="text-lg" />
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase font-bold text-text-tertiary">Selected</div>
-                      <div className="text-base font-bold text-text-primary">
-                        {stats?.selectedCount || 0}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center p-2">
-                    <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center mr-3">
-                      <CalendarOutlined className="text-lg" />
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase font-bold text-text-tertiary">Deadline</div>
-                      <div className="text-sm font-bold text-text-primary">
-                        {dayjs(selectedInternship.applicationDeadline).format("DD MMM YYYY")}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center p-2">
-                    <div className="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center mr-3">
-                      <ClockCircleOutlined className="text-lg" />
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase font-bold text-text-tertiary">Start Date</div>
-                      <div className="text-sm font-bold text-text-primary">
-                        {dayjs(selectedInternship.startDate).format("DD MMM YYYY")}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Tabs Content */}
-              <Card className="shadow-sm rounded-xl border-border" styles={{ body: { padding: 0 } }}>
-                <Tabs
-                  activeKey={activeTab}
-                  onChange={setActiveTab}
-                  className="px-6"
-                >
-                  <TabPane
-                    tab={
-                      <span className="flex items-center gap-2 py-2">
-                        <InfoCircleOutlined /> Basic Information
-                      </span>
-                    }
-                    key="1"
-                  >
-                    <div className="py-6 space-y-8">
-                      {/* Description */}
-                      <div className="bg-background-tertiary/30 p-6 rounded-2xl border border-border/50">
-                        <Title level={5} className="mb-4 flex items-center text-text-primary uppercase text-xs tracking-widest font-bold">
-                          <FileTextOutlined className="mr-2 text-primary" />
-                          About Internship
-                        </Title>
-                        <div className="space-y-4">
-                          <Text className="text-text-primary text-base leading-relaxed block">
-                            {selectedInternship.description}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <ContactsOutlined className="text-[10px] text-text-tertiary" />
+                          <Text className="text-[10px] text-text-tertiary font-bold uppercase tracking-wider">
+                            {internship.applications?.length || 0} Applicants
                           </Text>
-                          {selectedInternship.detailedDescription && (
-                            <div className="pt-4 border-t border-border/50">
-                              <Text className="text-text-secondary leading-relaxed block">
-                                {selectedInternship.detailedDescription}
-                              </Text>
-                            </div>
-                          )}
                         </div>
-                      </div>
-
-                      {/* Details Row */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="rounded-2xl border-border bg-background shadow-sm" size="small" title={<Text className="text-xs uppercase font-bold text-text-tertiary">Work Information</Text>}>
-                          <Descriptions column={1} size="small" className="mt-2">
-                            <Descriptions.Item label="Field">{selectedInternship.fieldOfWork}</Descriptions.Item>
-                            <Descriptions.Item label="Location">{selectedInternship.workLocation?.replace("_", " ")}</Descriptions.Item>
-                            <Descriptions.Item label="Positions">{selectedInternship.numberOfPositions}</Descriptions.Item>
-                          </Descriptions>
-                        </Card>
-                        <Card className="rounded-2xl border-border bg-background shadow-sm" size="small" title={<Text className="text-xs uppercase font-bold text-text-tertiary">Compensation</Text>}>
-                          <Descriptions column={1} size="small" className="mt-2">
-                            <Descriptions.Item label="Stipend">
-                              {selectedInternship.isStipendProvided ? (
-                                <Tag color="success" className="rounded-md m-0">₹{selectedInternship.stipendAmount}/mo</Tag>
-                              ) : (
-                                <Tag className="rounded-md m-0">Unpaid</Tag>
-                              )}
-                            </Descriptions.Item>
-                            {selectedInternship.stipendDetails && (
-                              <Descriptions.Item label="Details">{selectedInternship.stipendDetails}</Descriptions.Item>
-                            )}
-                          </Descriptions>
-                        </Card>
+                        <Text className="text-[10px] text-text-tertiary font-bold uppercase tracking-wider">
+                          {internship.numberOfPositions} Pos
+                        </Text>
                       </div>
                     </div>
-                  </TabPane>
+                  ))
+                ) : (
+                  <div className="py-12 text-center opacity-50">
+                    <Empty description={false} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    <Text className="text-text-tertiary text-xs mt-2 block">No results found</Text>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </Col>
 
-                  <TabPane
-                    tab={
-                      <span className="flex items-center gap-2 py-2">
-                        <SafetyCertificateOutlined /> Eligibility & Skills
-                      </span>
-                    }
-                    key="2"
-                  >
-                    <div className="py-6 space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="rounded-2xl border-border shadow-sm" size="small" title={<Text className="text-xs uppercase font-bold text-text-tertiary">Criteria</Text>}>
-                          <div className="space-y-4 py-2">
-                            <div className="flex justify-between items-center">
-                              <Text className="text-text-secondary">Min Percentage</Text>
-                              <Text strong className="text-primary">{selectedInternship.minimumPercentage || "N/A"}%</Text>
+          {/* Internship Details - Right Column */}
+          <Col
+            xs={24}
+            md={16}
+            lg={17}
+            xl={18}
+            className="h-full"
+          >
+            {selectedInternship ? (
+              <div className="h-full flex flex-col space-y-6 overflow-y-auto hide-scrollbar pb-6">
+                {/* Profile Header Card */}
+                <Card 
+                  className="rounded-2xl border-border shadow-sm bg-surface overflow-hidden shrink-0"
+                  styles={{ body: { padding: '24px' } }}
+                >
+                  <div className="flex flex-col md:flex-row items-center gap-6">
+                    <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                      <BankOutlined className="text-4xl text-primary" />
+                    </div>
+                    
+                    <div className="flex-grow text-center md:text-left">
+                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
+                        <Title level={3} className="!mb-0 !text-text-primary text-2xl font-black">
+                          {selectedInternship.title}
+                        </Title>
+                        <Tag className="rounded-full px-3 py-0.5 bg-primary/10 text-primary border-primary/20 font-bold uppercase tracking-wider text-[10px]">
+                          {selectedInternship.fieldOfWork}
+                        </Tag>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-text-secondary text-sm">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <ClockCircleOutlined className="text-text-tertiary" /> {selectedInternship.duration}
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-text-tertiary opacity-30" />
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <EnvironmentOutlined className="text-text-tertiary" /> {selectedInternship.workLocation?.replace("_", " ") || "On-site"}
+                        </span>
+                        {selectedInternship.isStipendProvided && (
+                          <>
+                            <span className="w-1 h-1 rounded-full bg-text-tertiary opacity-30" />
+                            <span className="flex items-center gap-1.5 font-bold text-success-600">
+                              <DollarOutlined /> ₹{selectedInternship.stipendAmount?.toLocaleString()}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      <Dropdown
+                        menu={getActionsMenu(selectedInternship)}
+                        trigger={["click"]}
+                        placement="bottomRight"
+                      >
+                        <Button
+                          type="text"
+                          icon={<MoreOutlined className="text-xl" />}
+                          className="hover:bg-background-tertiary rounded-xl w-10 h-10 flex items-center justify-center border border-transparent hover:border-border"
+                        />
+                      </Dropdown>
+                    </div>
+                  </div>
+
+                  {/* Quick Stats Grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+                    <div className="p-4 rounded-2xl bg-background-tertiary/50 border border-border/50 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                        <ContactsOutlined />
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase font-black text-text-tertiary tracking-widest leading-none mb-1">Apps</div>
+                        <div className="text-lg font-black text-text-primary leading-none">{selectedInternship.applications?.length || 0}</div>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-background-tertiary/50 border border-border/50 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center">
+                        <CheckCircleOutlined />
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase font-black text-text-tertiary tracking-widest leading-none mb-1">Selected</div>
+                        <div className="text-lg font-black text-text-primary leading-none">{stats?.selectedCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-background-tertiary/50 border border-border/50 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center">
+                        <CalendarOutlined />
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase font-black text-text-tertiary tracking-widest leading-none mb-1">Deadline</div>
+                        <div className="text-sm font-bold text-text-primary leading-none">{dayjs(selectedInternship.applicationDeadline).format("DD MMM")}</div>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-background-tertiary/50 border border-border/50 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                        <TeamOutlined />
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase font-black text-text-tertiary tracking-widest leading-none mb-1">Positions</div>
+                        <div className="text-lg font-black text-text-primary leading-none">{selectedInternship.numberOfPositions}</div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Main Content Area */}
+                <Card 
+                  className="rounded-2xl border-border shadow-sm flex-1 overflow-hidden" 
+                  styles={{ body: { padding: 0 } }}
+                >
+                  <Tabs
+                    activeKey={activeTab}
+                    onChange={setActiveTab}
+                    className="custom-tabs"
+                    items={[
+                      {
+                        key: "1",
+                        label: (
+                          <span className="flex items-center px-4 py-3 font-bold text-xs uppercase tracking-widest">
+                            <InfoCircleOutlined className="mr-2" /> Details
+                          </span>
+                        ),
+                        children: (
+                          <div className="p-6 space-y-8">
+                            <div className="bg-background-tertiary/30 p-6 rounded-2xl border border-border/50">
+                              <Title level={5} className="!mb-4 text-[10px] uppercase font-black text-text-tertiary tracking-widest flex items-center gap-2">
+                                <FileTextOutlined className="text-primary" /> Internship Description
+                              </Title>
+                              <Paragraph className="text-text-primary text-base leading-relaxed mb-0">
+                                {selectedInternship.description}
+                              </Paragraph>
+                              {selectedInternship.detailedDescription && (
+                                <div className="mt-6 pt-6 border-t border-border/50">
+                                  <Paragraph className="text-text-secondary text-sm leading-relaxed mb-0">
+                                    {selectedInternship.detailedDescription}
+                                  </Paragraph>
+                                </div>
+                              )}
                             </div>
-                            <Divider className="my-2" />
-                            <div>
-                              <Text className="text-text-secondary block mb-2">Target Branches</Text>
-                              <div className="flex flex-wrap gap-1.5">
-                                {selectedInternship.eligibleBranches?.map(b => <Tag key={b} className="rounded-md bg-background-tertiary border-border m-0">{b}</Tag>)}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm">
+                                <Title level={5} className="!mb-4 text-[10px] uppercase font-black text-text-tertiary tracking-widest">Work Information</Title>
+                                <Descriptions column={1} size="small" colon={false}>
+                                  <Descriptions.Item label={<Text className="text-text-tertiary font-medium w-24 block">Field</Text>}>
+                                    <Text className="text-text-primary font-semibold">{selectedInternship.fieldOfWork}</Text>
+                                  </Descriptions.Item>
+                                  <Descriptions.Item label={<Text className="text-text-tertiary font-medium w-24 block">Location</Text>}>
+                                    <Text className="text-text-primary font-semibold">{selectedInternship.workLocation?.replace("_", " ")}</Text>
+                                  </Descriptions.Item>
+                                </Descriptions>
+                              </div>
+                              <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm">
+                                <Title level={5} className="!mb-4 text-[10px] uppercase font-black text-text-tertiary tracking-widest">Compensation</Title>
+                                <div className="flex items-center gap-3">
+                                  {selectedInternship.isStipendProvided ? (
+                                    <div className="px-4 py-2 rounded-xl bg-success/10 text-success-700 font-black text-lg">
+                                      ₹{selectedInternship.stipendAmount}
+                                      <span className="text-[10px] ml-1 font-bold">/ MONTH</span>
+                                    </div>
+                                  ) : (
+                                    <Tag className="rounded-lg px-4 py-1.5 font-bold uppercase tracking-widest border-0 bg-background-tertiary text-text-tertiary">UNPAID</Tag>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </Card>
-                        <Card className="rounded-2xl border-border shadow-sm" size="small" title={<Text className="text-xs uppercase font-bold text-text-tertiary">Required Skills</Text>}>
-                          <div className="py-2 flex flex-wrap gap-2">
-                            {selectedInternship.requiredSkills?.map(s => <Tag key={s} color="error" className="rounded-md m-0">{s}</Tag>)}
-                            {selectedInternship.preferredSkills?.map(s => <Tag key={s} color="processing" className="rounded-md m-0">{s}</Tag>)}
+                        ),
+                      },
+                      {
+                        key: "3",
+                        label: (
+                          <span className="flex items-center px-4 py-3 font-bold text-xs uppercase tracking-widest">
+                            <UserOutlined className="mr-2" /> Applicants ({selectedInternship.applications?.length || 0})
+                          </span>
+                        ),
+                        children: (
+                          <div className="p-12 text-center max-w-lg mx-auto">
+                            <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center mx-auto mb-6">
+                              <ContactsOutlined className="text-3xl text-primary opacity-40" />
+                            </div>
+                            <Title level={4} className="text-text-primary !mb-2">Application Management</Title>
+                            <Text className="text-text-tertiary block mb-10">
+                              Review all {selectedInternship.applications?.length} applications received for this position. Filter, rate, and select the best candidates.
+                            </Text>
+                            <Button
+                              type="primary"
+                              size="large"
+                              icon={<EyeOutlined />}
+                              onClick={() => navigate(`/industry/internships?tab=applicants&internshipId=${selectedInternship.id}`)}
+                              className="h-12 rounded-xl px-10 font-bold bg-primary border-0 shadow-lg shadow-primary/20"
+                            >
+                              Go to Applicants Hub
+                            </Button>
                           </div>
-                        </Card>
-                      </div>
-                    </div>
-                  </TabPane>
+                        ),
+                      },
+                    ]}
+                  />
+                </Card>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center bg-surface rounded-2xl border border-dashed border-border p-12">
+                <div className="w-20 h-20 rounded-3xl bg-primary/5 flex items-center justify-center mb-6">
+                  <ShopOutlined className="text-4xl text-primary opacity-20" />
+                </div>
+                <Title level={3} className="text-text-secondary !mb-2">Select Internship</Title>
+                <Text className="text-text-tertiary text-center max-w-sm">
+                  Choose an internship from the directory on the left to manage applicants and view engagement metrics.
+                </Text>
+              </div>
+            )}
+          </Col>
+        </Row>
+      </div>
 
-                  <TabPane
-                    tab={
-                      <span className="flex items-center gap-2 py-2">
-                        <UserOutlined /> Applications
-                      </span>
-                    }
-                    key="3"
-                  >
-                    <div className="py-8 text-center max-w-lg mx-auto">
-                      <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-                        <ContactsOutlined className="text-2xl" />
-                      </div>
-                      <Title level={4} className="text-text-primary mb-2">Manage Applicants</Title>
-                      <Text className="text-text-secondary block mb-8">
-                        View profiles, review cover letters, and select candidates for your internship program.
-                      </Text>
-                      <Button
-                        type="primary"
-                        size="large"
-                        icon={<EyeOutlined />}
-                        onClick={() => navigate(`/industry/internships?tab=applicants&internshipId=${selectedInternship.id}`)}
-                        className="rounded-xl px-10 h-12 shadow-lg shadow-primary/20"
-                      >
-                        View Applicants ({selectedInternship.applications?.length || 0})
-                      </Button>
-                    </div>
-                  </TabPane>
-                </Tabs>
-              </Card>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center py-20">
-              <Empty
-                image={<div className="text-6xl mb-4 opacity-20"><ShopOutlined /></div>}
-                description={
-                  <div className="max-w-xs mx-auto">
-                    <Title level={4} className="text-text-tertiary">Select Internship</Title>
-                    <Text className="text-text-tertiary">Choose an internship from the directory to view details and manage applicants.</Text>
-                  </div>
-                }
-              />
-            </div>
-          )}
-        </Col>
-      </Row>
-      
       <EditInternshipModal
         visible={editModalVisible}
         onClose={() => setEditModalVisible(false)}
@@ -757,16 +716,7 @@ const ManageInternships = () => {
     </div>
   );
 };
-      <EditInternshipModal
-        visible={editModalVisible}
-        onClose={() => setEditModalVisible(false)}
-        internship={selectedInternship}
-        onSuccess={handleEditSuccess}
-      />
-    </div>
 
-    // </Layouts>
-  );
-};
+export default ManageInternships;
 
 export default ManageInternships;

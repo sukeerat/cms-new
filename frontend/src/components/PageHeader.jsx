@@ -13,33 +13,33 @@ const PageHeader = ({
   const { token } = theme.useToken();
 
   return (
-    <Card className="shadow-sm mb-6" styles={{ body: { padding: token.sizePaddingLG } }}>
-      <div className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
+    <Card className="rounded-2xl border-border shadow-sm mb-6 overflow-hidden" styles={{ body: { padding: '24px' } }}>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
             {Icon ? (
               <div
-                className="flex items-center justify-center rounded-lg w-10 h-10 bg-surface border border-border text-primary"
+                className="flex items-center justify-center rounded-xl w-12 h-12 bg-surface border border-border text-primary shadow-sm shrink-0"
               >
-                <Icon />
+                <Icon className="text-xl" />
               </div>
             ) : null}
             <div>
-              <Title level={4} className="!m-0">
+              <Title level={2} className="!m-0 !text-text-primary text-2xl">
                 {title}
               </Title>
               {description ? (
-                <Text type="secondary">{description}</Text>
+                <Text className="text-text-secondary text-sm">{description}</Text>
               ) : null}
             </div>
           </div>
 
           {actions?.length ? (
-            <Space wrap>{actions.filter(Boolean)}</Space>
+            <Space wrap className="flex-shrink-0">{actions.filter(Boolean)}</Space>
           ) : null}
         </div>
 
-        {children}
+        {children && <div className="mt-2">{children}</div>}
       </div>
     </Card>
   );

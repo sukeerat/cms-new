@@ -139,53 +139,84 @@ const VisitLogList = () => {
   ];
 
   return (
-    <div className="p-6">
-      <Card
-        title="Visit Logs"
-        extra={
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex items-center">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+              <CalendarOutlined className="text-lg" />
+            </div>
+            <div>
+              <Title level={2} className="mb-0 text-text-primary text-2xl">
+                Visit Logs
+              </Title>
+              <Paragraph className="text-text-secondary text-sm mb-0">
+                Track and manage industrial visits for assigned students
+              </Paragraph>
+            </div>
+          </div>
+
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => navigate('/visit-logs/new')}
+            className="h-10 rounded-xl font-bold shadow-lg shadow-primary/20"
           >
             Add Visit Log
           </Button>
-        }
-        variant="borderless"
-      >
-        <Space className="mb-4" size="middle" wrap>
-          <Input
-            placeholder="Search by student, company, or purpose..."
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 300 }}
-            allowClear
-          />
-          <RangePicker
-            value={dateRange}
-            onChange={setDateRange}
-            format="DD/MM/YYYY"
-            placeholder={['Start Date', 'End Date']}
-          />
-        </Space>
+        </div>
 
-        <Table
-          columns={columns}
-          dataSource={filteredLogs}
-          loading={loading}
-          rowKey="id"
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} visit logs`,
-          }}
-        />
-      </Card>
+        {/* Filters */}
+        <Card className="rounded-xl border-border shadow-sm" styles={{ body: { padding: '16px' } }}>
+          <div className="flex flex-wrap items-center gap-4">
+            <Input
+              placeholder="Search by student, company..."
+              prefix={<SearchOutlined className="text-text-tertiary" />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="max-w-md rounded-lg h-10 bg-background border-border"
+              allowClear
+            />
+            <RangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              format="DD/MM/YYYY"
+              placeholder={['Start Date', 'End Date']}
+              className="rounded-lg h-10 border-border"
+            />
+          </div>
+        </Card>
+
+        {/* Table Container */}
+        <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>
+          <Table
+            columns={columns}
+            dataSource={filteredLogs}
+            loading={loading}
+            rowKey="id"
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              className: "px-6 py-4",
+              showTotal: (total) => `Total ${total} visit logs`,
+            }}
+            size="middle"
+            className="custom-table"
+          />
+        </Card>
+      </div>
 
       {/* Detail Drawer */}
       <Drawer
-        title="Visit Log Details"
+        title={
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+              <EyeOutlined className="text-primary" />
+            </div>
+            <span className="font-bold text-text-primary">Visit Log Details</span>
+          </div>
+        }
         placement="right"
         width={600}
         onClose={() => {
@@ -193,82 +224,87 @@ const VisitLogList = () => {
           setSelectedLog(null);
         }}
         open={detailDrawer}
+        styles={{ mask: { backdropFilter: 'blur(4px)' } }}
+        className="rounded-l-2xl overflow-hidden"
       >
         {selectedLog && (
-          <div>
-            <Descriptions bordered column={1} size="small">
-              <Descriptions.Item label="Visit Date">
-                {dayjs(selectedLog.visitDate).format('DD/MM/YYYY')}
-              </Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color={
-                  selectedLog.status === 'completed' ? 'green' :
-                  selectedLog.status === 'scheduled' ? 'blue' : 'red'
-                }>
-                  {selectedLog.status?.toUpperCase()}
-                </Tag>
-              </Descriptions.Item>
-            </Descriptions>
+          <div className="space-y-8">
+            <div className="bg-surface rounded-xl border border-border p-4 flex justify-between items-center shadow-sm">
+              <div className="flex items-center gap-3">
+                <CalendarOutlined className="text-primary" />
+                <span className="font-bold text-text-primary">{dayjs(selectedLog.visitDate).format('MMMM DD, YYYY')}</span>
+              </div>
+              <Tag 
+                color={selectedLog.status === 'completed' ? 'success' : 'processing'}
+                className="rounded-full px-3 font-bold uppercase tracking-widest text-[10px] border-0"
+              >
+                {selectedLog.status}
+              </Tag>
+            </div>
 
-            <h3 className="text-lg font-semibold mt-6 mb-3">Student Information</h3>
-            <Descriptions bordered column={1} size="small">
-              <Descriptions.Item label="Name">{selectedLog.student?.name}</Descriptions.Item>
-              <Descriptions.Item label="Roll Number">{selectedLog.student?.rollNumber}</Descriptions.Item>
-              <Descriptions.Item label="Department">{selectedLog.student?.department?.name}</Descriptions.Item>
-              <Descriptions.Item label="Email">{selectedLog.student?.email}</Descriptions.Item>
-              <Descriptions.Item label="Phone">{selectedLog.student?.phone}</Descriptions.Item>
-            </Descriptions>
+            <section>
+              <Title level={5} className="!mb-4 text-xs uppercase tracking-widest text-text-tertiary font-bold">Student Information</Title>
+              <div className="bg-background-tertiary/30 rounded-xl border border-border overflow-hidden">
+                <Descriptions column={1} size="small" bordered className="custom-descriptions">
+                  <Descriptions.Item label={<span className="text-text-tertiary font-medium">Name</span>}>
+                    <Text strong className="text-text-primary">{selectedLog.student?.name}</Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-text-tertiary font-medium">Roll Number</span>}>
+                    {selectedLog.student?.rollNumber}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-text-tertiary font-medium">Email</span>}>
+                    {selectedLog.student?.email}
+                  </Descriptions.Item>
+                </Descriptions>
+              </div>
+            </section>
 
-            <h3 className="text-lg font-semibold mt-6 mb-3">Company Information</h3>
-            <Descriptions bordered column={1} size="small">
-              <Descriptions.Item label="Company Name">{selectedLog.company?.name || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Location">{selectedLog.company?.location || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Contact Person">{selectedLog.contactPerson || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Contact Number">{selectedLog.contactNumber || 'N/A'}</Descriptions.Item>
-            </Descriptions>
+            <section>
+              <Title level={5} className="!mb-4 text-xs uppercase tracking-widest text-text-tertiary font-bold">Company Information</Title>
+              <div className="bg-background-tertiary/30 rounded-xl border border-border overflow-hidden">
+                <Descriptions column={1} size="small" bordered className="custom-descriptions">
+                  <Descriptions.Item label={<span className="text-text-tertiary font-medium">Company</span>}>
+                    <Text strong className="text-text-primary">{selectedLog.company?.name || 'N/A'}</Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-text-tertiary font-medium">Contact Person</span>}>
+                    {selectedLog.contactPerson || 'N/A'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </div>
+            </section>
 
-            <h3 className="text-lg font-semibold mt-6 mb-3">Visit Details</h3>
-            <Descriptions bordered column={1} size="small">
-              <Descriptions.Item label="Purpose">{selectedLog.purpose}</Descriptions.Item>
-              <Descriptions.Item label="Duration">{selectedLog.duration || 'N/A'}</Descriptions.Item>
-              <Descriptions.Item label="Observations">
-                {selectedLog.observations || 'No observations recorded'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Feedback">
-                {selectedLog.feedback || 'No feedback provided'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Action Items">
-                {selectedLog.actionItems || 'No action items'}
-              </Descriptions.Item>
-            </Descriptions>
+            <section>
+              <Title level={5} className="!mb-4 text-xs uppercase tracking-widest text-text-tertiary font-bold">Visit Findings</Title>
+              <div className="space-y-4">
+                <div className="bg-surface p-4 rounded-xl border border-border">
+                  <Text className="text-xs uppercase font-bold text-text-tertiary block mb-2">Observations</Text>
+                  <Paragraph className="text-text-primary text-sm mb-0">{selectedLog.observations || 'No observations recorded'}</Paragraph>
+                </div>
+                <div className="bg-surface p-4 rounded-xl border border-border">
+                  <Text className="text-xs uppercase font-bold text-text-tertiary block mb-2">Feedback</Text>
+                  <Paragraph className="text-text-primary text-sm mb-0">{selectedLog.feedback || 'No feedback provided'}</Paragraph>
+                </div>
+              </div>
+            </section>
 
-            {selectedLog.attachments && selectedLog.attachments.length > 0 && (
-              <>
-                <h3 className="text-lg font-semibold mt-6 mb-3">Attachments</h3>
-                <Space direction="vertical">
-                  {selectedLog.attachments.map((file, idx) => (
-                    <a key={idx} href={file.url} target="_blank" rel="noopener noreferrer">
-                      {file.name}
-                    </a>
-                  ))}
-                </Space>
-              </>
-            )}
-
-            <div className="mt-6">
-              <Space>
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={() => {
-                    setDetailDrawer(false);
-                    navigate(`/visit-logs/${selectedLog.id}/edit`);
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button onClick={() => setDetailDrawer(false)}>Close</Button>
-              </Space>
+            <div className="pt-6 flex justify-end gap-3 border-t border-border">
+              <Button 
+                onClick={() => setDetailDrawer(false)}
+                className="rounded-xl px-6 h-10 font-medium"
+              >
+                Close
+              </Button>
+              <Button
+                type="primary"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setDetailDrawer(false);
+                  navigate(`/visit-logs/${selectedLog.id}/edit`);
+                }}
+                className="rounded-xl px-6 h-10 font-bold bg-primary border-0"
+              >
+                Edit Log
+              </Button>
             </div>
           </div>
         )}

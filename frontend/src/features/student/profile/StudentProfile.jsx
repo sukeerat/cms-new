@@ -191,9 +191,10 @@ export default function StudentProfile() {
   const fetchSemesters = async () => {
     try {
       const res = await API.get("/semesters");
-      setSemesters(res.data);
+      setSemesters(res.data || []);
     } catch {
-      console.error("Failed to fetch semesters");
+      // Semesters endpoint may not exist - fail silently
+      setSemesters([]);
     }
   };
   useEffect(() => {
@@ -246,13 +247,32 @@ export default function StudentProfile() {
   const fetchStudent = async () => {
     const loginData = localStorage.getItem("loginResponse");
 
-    const parsed = JSON.parse(loginData);
-    // console.log(parsed.user.id)
-    // adjust these paths based on your actual response shape
-    setId(parsed.user.id);
+    if (!loginData) {
+      setError("Not logged in. Please log in again.");
+      setLoading(false);
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(loginData);
+    } catch (e) {
+      setError("Invalid session data. Please log in again.");
+      setLoading(false);
+      return;
+    }
+
+    const userId = parsed?.user?.id || parsed?.userId || parsed?.id;
+    if (!userId) {
+      setError("User ID not found. Please log in again.");
+      setLoading(false);
+      return;
+    }
+
+    setId(userId);
 
     try {
-      const res = await API.get(`/students/profile/${parsed.user.id}`);
+      const res = await API.get(`/students/profile/${userId}`);
       setStudent(res.data);
 
       // Check for missing required fields
@@ -484,604 +504,641 @@ export default function StudentProfile() {
     );
 
   return (
-    <div className="h-full overflow-y-auto py-4">
-        <div className="max-w-full mx-auto">
-          {/* Action Buttons */}
-          <div className="flex gap-2 justify-end mb-4 flex-wrap">
-            <Button icon={<EditOutlined />} onClick={openEditModal} className="rounded-lg">
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen overflow-y-auto hide-scrollbar">
+      <div className="max-w-7xl mx-auto space-y-6 pb-10">
+        {/* Action Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Title level={2} className="mb-0 text-text-primary text-2xl font-black">My Profile</Title>
+            <Text className="text-text-secondary text-sm">View and manage your personal and academic information</Text>
+          </div>
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button 
+              icon={<EditOutlined />} 
+              onClick={openEditModal} 
+              className="rounded-xl h-10 px-6 font-bold flex-1 sm:flex-none border-border hover:border-primary hover:text-primary"
+            >
               Edit Profile
             </Button>
             <Button
               type="primary"
               onClick={openUploadModal}
               icon={<UploadOutlined />}
-              className="rounded-lg shadow-md shadow-primary/20"
+              className="rounded-xl h-10 px-6 font-bold flex-1 sm:flex-none bg-primary border-0 shadow-lg shadow-primary/20"
             >
               Add Document
             </Button>
           </div>
+        </div>
 
-          {/* Profile Header Card */}
-          <Card className="mb-4 rounded-2xl border-border shadow-sm">
-            <Row gutter={[24, 24]}>
-              {/* Avatar and Basic Info */}
-              <Col xs={24} lg={18}>
-                <Row gutter={16} align="middle">
-                  <Col flex="none">
-                    <Avatar
-                      size={80}
-                      src={getImageUrl(student.profileImage)}
-                      icon={<UserOutlined />}
-                      className="border-2 border-background shadow-sm"
-                    />
-                  </Col>
-                  <Col flex="auto">
-                    <Title level={3} className="!mb-1 text-text-primary">
-                      {student.name}
-                    </Title>
-                    <div className="mb-3">
-                      <Text className="text-text-secondary">
-                        <IdcardOutlined className="mr-1" /> {student.rollNumber} 
-                      </Text>
-                    </div>
+        {/* Profile Header Card */}
+        <Card className="rounded-2xl border-border shadow-sm bg-surface overflow-hidden" styles={{ body: { padding: '24px' } }}>
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="relative">
+              <Avatar
+                size={110}
+                src={getImageUrl(student.profileImage)}
+                icon={<UserOutlined />}
+                className="rounded-2xl border-4 border-background shadow-soft ring-1 ring-border"
+              />
+              <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-lg flex items-center justify-center border-2 border-white shadow-sm ${student.isActive ? 'bg-success' : 'bg-error'}`}>
+                {student.isActive ? <CheckCircleOutlined className="text-white text-xs" /> : <StopOutlined className="text-white text-xs" />}
+              </div>
+            </div>
+            
+            <div className="flex-grow text-center md:text-left">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
+                <Title level={2} className="!mb-0 !text-text-primary text-2xl md:text-3xl font-black">
+                  {student.name}
+                </Title>
+                <Tag className="rounded-full px-3 py-0.5 bg-primary/10 text-primary border-0 font-bold uppercase tracking-wider text-[10px]">
+                  {student.branchName}
+                </Tag>
+              </div>
+              
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-text-secondary text-sm mb-6">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <IdcardOutlined className="text-text-tertiary" /> {student.rollNumber}
+                </span>
+                <span className="w-1 h-1 rounded-full bg-text-tertiary opacity-30" />
+                <span className="flex items-center gap-1.5 font-medium">
+                  <BankOutlined className="text-text-tertiary" /> Batch of {student.batch?.name || 'N/A'}
+                </span>
+              </div>
 
-                    {/* Tags */}
-                    <div className="flex gap-2 flex-wrap">
-                      <Tag className="rounded-md">{student.branchName}</Tag>
-                      <Tag color={getCategoryColor(student.category)} className="rounded-md">
-                        {student.category}
-                      </Tag>
-                      <Tag className="rounded-md">{student.admissionType}</Tag>
-                      {student.batch && <Tag className="rounded-md">{student.batch.name}</Tag>}
-                      <Tag color={student.isActive ? "success" : "error"} className="rounded-md">
-                        {student.isActive ? "Active" : "Inactive"}
-                      </Tag>
-                      {student.clearanceStatus && (
-                        <Tag
-                          color={
-                            student.clearanceStatus === "CLEARED"
-                              ? "success"
-                              : student.clearanceStatus === "PENDING"
-                              ? "processing"
-                              : "warning"
-                          }
-                          className="rounded-md"
-                        >
-                          {student.clearanceStatus}
-                        </Tag>
-                      )}
-                    </div>
-                  </Col>
-                </Row>
-              </Col>
-            </Row>
+              <div className="flex flex-wrap justify-center md:justify-start gap-2">
+                <Tag color={getCategoryColor(student.category)} className="rounded-md border-0 px-3 py-0.5 font-bold text-[10px] uppercase tracking-widest m-0">
+                  {student.category}
+                </Tag>
+                <Tag className="rounded-md border-0 bg-background-tertiary text-text-secondary px-3 py-0.5 font-bold text-[10px] uppercase tracking-widest m-0">
+                  {student.admissionType}
+                </Tag>
+                {student.clearanceStatus && (
+                  <Tag 
+                    className="rounded-md border-0 px-3 py-0.5 font-bold text-[10px] uppercase tracking-widest m-0"
+                    color={student.clearanceStatus === "CLEARED" ? "success" : "warning"}
+                  >
+                    {student.clearanceStatus}
+                  </Tag>
+                )}
+              </div>
+            </div>
 
-            {/* Contact Info */}
-            <Row
-              gutter={[16, 16]}
-              className="mt-6 pt-6 border-t border-border"
-            >
-              <Col xs={24} sm={8}>
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    size={32}
-                    icon={<MailOutlined />}
-                    className="bg-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <Text className="text-[10px] uppercase tracking-wider text-text-secondary font-bold block">
-                      Email
-                    </Text>
-                    <Text ellipsis className="text-sm font-medium text-text-primary">
-                      {student.email}
-                    </Text>
-                  </div>
-                </div>
-              </Col>
-              <Col xs={24} sm={8}>
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    size={32}
-                    icon={<PhoneOutlined />}
-                    className="bg-success"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <Text className="text-[10px] uppercase tracking-wider text-text-secondary font-bold block">
-                      Contact
-                    </Text>
-                    <Text className="text-sm font-medium text-text-primary">
-                      {student.contact || "N/A"}
-                    </Text>
-                  </div>
-                </div>
-              </Col>
-              <Col xs={24} sm={8}>
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    size={32}
-                    icon={<CalendarOutlined />}
-                    className="bg-warning"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <Text className="text-[10px] uppercase tracking-wider text-text-secondary font-bold block">
-                      Date of Birth
-                    </Text>
-                    <Text className="text-sm font-medium text-text-primary">
-                      {student.dob?.slice(0, 10) || "N/A"}
-                    </Text>
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          </Card>
+            <div className="hidden lg:flex items-center gap-8 pl-8 border-l border-border/60">
+              <div className="text-center">
+                <div className="text-2xl font-black text-text-primary">{stats?.passPercentage || 0}%</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Pass Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-black text-success">{stats?.feePercentage || 0}%</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Fees Paid</div>
+              </div>
+            </div>
+          </div>
 
-          {/* Detailed Tabs */}
-          <Card styles={{ body: { padding: 0 } }} className="rounded-2xl border-border shadow-sm overflow-hidden">
-            <Tabs defaultActiveKey="1" className="px-4">
-              {/* Personal Info */}
-              <TabPane
-                tab={
-                  <span className="flex items-center gap-2">
-                    <UserOutlined /> Personal Info
-                  </span>
-                }
-                key="1"
-              >
-                <div className="py-6 px-2">
-                  <Row gutter={[24, 24]}>
-                    {/* Basic Information */}
-                    <Col xs={24} lg={12}>
-                      <div>
-                        <Title
-                          level={5}
-                          className="pb-2 border-b border-border text-text-primary"
-                        >
-                          Basic Information
-                        </Title>
-                        <div className="mt-4 space-y-1">
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Gender</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">{student.gender || "N/A"}</Text>
-                            </Col>
-                          </Row>
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Category</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Tag color={getCategoryColor(student.category)} className="rounded-md">
-                                {student.category}
-                              </Tag>
-                            </Col>
-                          </Row>
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Admission Type</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">{student.admissionType}</Text>
-                            </Col>
-                          </Row>
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Roll Number</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">{student.rollNumber}</Text>
-                            </Col>
-                          </Row>
-                          <Row className="py-2">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Batch</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">{student.batch?.name || "N/A"}</Text>
-                            </Col>
-                          </Row>
-                        </div>
-                      </div>
-                    </Col>
+          {/* Quick Contact Info Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-8 border-t border-border/60">
+            <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-background-tertiary transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <MailOutlined className="text-lg" />
+              </div>
+              <div className="min-w-0">
+                <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest block leading-none mb-1.5">Email Address</Text>
+                <Text ellipsis className="text-sm font-bold text-text-primary block leading-none">{student.email}</Text>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-background-tertiary transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0">
+                <PhoneOutlined className="text-lg" />
+              </div>
+              <div className="min-w-0">
+                <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest block leading-none mb-1.5">Phone Number</Text>
+                <Text ellipsis className="text-sm font-bold text-text-primary block leading-none">{student.contact || "N/A"}</Text>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-background-tertiary transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center shrink-0">
+                <CalendarOutlined className="text-lg" />
+              </div>
+              <div className="min-w-0">
+                <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest block leading-none mb-1.5">Date of Birth</Text>
+                <Text ellipsis className="text-sm font-bold text-text-primary block leading-none">{student.dob?.slice(0, 10) || "N/A"}</Text>
+              </div>
+            </div>
+          </div>
+        </Card>
 
-                    {/* Contact Information */}
-                    <Col xs={24} lg={12}>
-                      <div>
-                        <Title
-                          level={5}
-                          className="pb-2 border-b border-border text-text-primary"
-                        >
-                          Contact Information
-                        </Title>
-                        <div className="mt-4 space-y-1">
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Email</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text ellipsis className="text-text-primary font-medium">
-                                {student.email}
-                              </Text>
-                            </Col>
-                          </Row>
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Contact</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">{student.contact || "N/A"}</Text>
-                            </Col>
-                          </Row>
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Address</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">{student.address || "N/A"}</Text>
-                            </Col>
-                          </Row>
-                          <Row className="py-2 border-b border-border/50">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Parent Name</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">{student.parentName || "N/A"}</Text>
-                            </Col>
-                          </Row>
-                          <Row className="py-2">
-                            <Col span={8}>
-                              <Text className="text-text-secondary">Parent Contact</Text>
-                            </Col>
-                            <Col span={16} className="text-right">
-                              <Text className="text-text-primary font-medium">
-                                {student.parentContact || "N/A"}
-                              </Text>
-                            </Col>
-                          </Row>
-                        </div>
-                      </div>
-                    </Col>
-                  </Row>
-                </div>
-              </TabPane>
+                  {/* Detailed Tabs Container */}
 
-              {/* Documents */}
-              <TabPane
-                tab={
-                  <span className="flex items-center gap-2">
-                    <FileTextOutlined /> Documents
-                  </span>
-                }
-                key="4"
-              >
-                <div className="p-6">
-                  {student.document?.length > 0 ? (
-                    <Row gutter={[16, 16]}>
-                      {student.document.map((doc, idx) => (
-                        <Col xs={24} sm={12} md={8} lg={6} key={idx}>
-                          <Card
-                            hoverable
-                            size="small"
-                            className="rounded-xl border-border overflow-hidden"
-                            onClick={() =>
-                              window.open(getImageUrl(doc.fileUrl), "_blank")
-                            }
-                            cover={
-                              <div className="h-40 flex items-center justify-center overflow-hidden p-2 bg-background-tertiary/30">
-                                <img
-                                  src={getImageUrl(doc.fileUrl)}
-                                  alt={doc.fileName}
-                                  className="max-h-full max-w-full object-contain"
-                                />
-                              </div>
-                            }
-                          >
-                            <Card.Meta
-                              title={
-                                <Text ellipsis className="text-text-primary font-medium">
-                                  {doc.type.replaceAll("_", " ")}
-                                </Text>
-                              }
-                              description={
-                                <Text
-                                  ellipsis
-                                  className="text-text-tertiary text-xs"
-                                >
-                                  {doc.fileName}
-                                </Text>
-                              }
-                            />
-                          </Card>
-                        </Col>
-                      ))}
-                    </Row>
-                  ) : (
-                    <Empty
-                      description="No documents uploaded"
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      className="py-10"
-                    >
-                      <Button type="primary" onClick={openUploadModal} className="rounded-lg">
-                        Add Document
-                      </Button>
-                    </Empty>
-                  )}
-                </div>
-              </TabPane>
+                  <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>
 
-              {/* Placements Tab */}
-              <TabPane
-                tab={
-                  <span className="flex items-center gap-2">
-                    <BulbOutlined /> Placements
-                  </span>
-                }
-                key="5"
-              >
-                <div className="p-6">
-                  {(student.placements || []).length > 0 ? (
-                    <Row gutter={[16, 16]}>
-                      {(student.placements || []).map((placement, index) => (
-                        <Col xs={24} md={12} lg={8} key={placement.id || index}>
-                          <Card
-                            size="small"
-                            className={`rounded-xl border-l-4 ${
-                              placement.status === "ACCEPTED" ||
-                              placement.status === "JOINED"
-                                ? "border-success bg-success-50"
-                                : placement.status === "OFFERED"
-                                ? "border-primary bg-primary-50"
-                                : "border-error bg-error-50"
-                            }`}
-                          >
-                            <div className="flex justify-between items-start mb-3">
-                              <Title level={5} className="!m-0 text-text-primary">
-                                {placement.companyName}
-                              </Title>
-                              <Tag
-                                color={getPlacementStatusColor(
-                                  placement.status
-                                )}
-                                className="rounded-md"
-                              >
-                                {placement.status}
-                              </Tag>
+                    <Tabs 
+
+                      defaultActiveKey="1" 
+
+                      className="custom-tabs"
+
+                      items={[
+
+                        {
+
+                          key: "1",
+
+                          label: (
+
+                            <span className="flex items-center px-4 py-3 font-bold text-xs uppercase tracking-widest">
+
+                              <UserOutlined className="mr-2" /> Personal Details
+
+                            </span>
+
+                          ),
+
+                          children: (
+
+                            <div className="p-8">
+
+                              <Row gutter={[48, 32]}>
+
+                                <Col xs={24} lg={12}>
+
+                                  <div className="space-y-6">
+
+                                    <div className="flex items-center gap-2 mb-2">
+
+                                      <div className="w-1 h-4 rounded-full bg-primary" />
+
+                                      <Title level={5} className="!mb-0 !text-text-primary text-sm uppercase tracking-widest font-black">Academic Profile</Title>
+
+                                    </div>
+
+                                    <div className="bg-background-tertiary/20 rounded-2xl border border-border/50 overflow-hidden">
+
+                                      <div className="p-4 flex justify-between items-center border-b border-border/50">
+
+                                        <Text className="text-text-tertiary font-medium">Roll Number</Text>
+
+                                        <Text className="text-text-primary font-bold">{student.rollNumber}</Text>
+
+                                      </div>
+
+                                      <div className="p-4 flex justify-between items-center border-b border-border/50">
+
+                                        <Text className="text-text-tertiary font-medium">Branch</Text>
+
+                                        <Tag className="m-0 px-3 py-0.5 rounded-full border-0 bg-primary text-white font-bold text-[10px] uppercase tracking-wider">
+
+                                          {student.branchName}
+
+                                        </Tag>
+
+                                      </div>
+
+                                      <div className="p-4 flex justify-between items-center border-b border-border/50">
+
+                                        <Text className="text-text-tertiary font-medium">Batch</Text>
+
+                                        <Text className="text-text-primary font-bold">{student.batch?.name || "N/A"}</Text>
+
+                                      </div>
+
+                                      <div className="p-4 flex justify-between items-center">
+
+                                        <Text className="text-text-tertiary font-medium">Admission Type</Text>
+
+                                        <Tag className="m-0 px-3 py-0.5 rounded-full border-0 bg-background-tertiary text-text-secondary font-bold text-[10px] uppercase tracking-wider">
+
+                                          {student.admissionType}
+
+                                        </Tag>
+
+                                      </div>
+
+                                    </div>
+
+                                  </div>
+
+                                </Col>
+
+          
+
+                                <Col xs={24} lg={12}>
+
+                                  <div className="space-y-6">
+
+                                    <div className="flex items-center gap-2 mb-2">
+
+                                      <div className="w-1 h-4 rounded-full bg-success" />
+
+                                      <Title level={5} className="!mb-0 !text-text-primary text-sm uppercase tracking-widest font-black">Contact & Address</Title>
+
+                                    </div>
+
+                                    <div className="bg-background-tertiary/20 rounded-2xl border border-border/50 overflow-hidden">
+
+                                      <div className="p-4 flex justify-between items-start border-b border-border/50">
+
+                                        <Text className="text-text-tertiary font-medium shrink-0 mr-4">Home Address</Text>
+
+                                        <Text className="text-text-primary font-bold text-right">{student.address || "N/A"}, {student.city}, {student.district}, {student.state} - {student.pinCode}</Text>
+
+                                      </div>
+
+                                      <div className="p-4 flex justify-between items-center border-b border-border/50">
+
+                                        <Text className="text-text-tertiary font-medium">Parent/Guardian</Text>
+
+                                        <Text className="text-text-primary font-bold">{student.parentName || "N/A"}</Text>
+
+                                      </div>
+
+                                      <div className="p-4 flex justify-between items-center">
+
+                                        <Text className="text-text-tertiary font-medium">Parent Contact</Text>
+
+                                        <Text className="text-text-primary font-bold">{student.parentContact || "N/A"}</Text>
+
+                                      </div>
+
+                                    </div>
+
+                                  </div>
+
+                                </Col>
+
+                              </Row>
+
                             </div>
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-start gap-2">
-                                <SolutionOutlined className="mt-1 text-text-tertiary" />
-                                <div>
-                                  <Text className="text-text-secondary text-xs">Job Role: </Text>
-                                  <Text className="text-text-primary text-sm font-medium">
-                                    {placement.jobRole || "N/A"}
-                                  </Text>
-                                </div>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <DollarCircleOutlined className="mt-1 text-text-tertiary" />
-                                <div>
-                                  <Text className="text-text-secondary text-xs">Salary: </Text>
-                                  <Text className="text-text-primary text-sm font-medium">
-                                    {placement.salary
-                                      ? `₹ ${placement.salary.toFixed(2)} LPA`
-                                      : "N/A"}
-                                  </Text>
-                                </div>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <CalendarOutlined className="mt-1 text-text-tertiary" />
-                                <div>
-                                  <Text className="text-text-secondary text-xs">Offer Date: </Text>
-                                  <Text className="text-text-primary text-sm font-medium">
-                                    {formatDate(placement.offerDate)}
-                                  </Text>
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        </Col>
-                      ))}
-                    </Row>
-                  ) : (
-                    <Empty
-                      description="No placement records available"
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      className="py-10"
-                    />
-                  )}
-                </div>
-              </TabPane>
 
-              {/* Internships Tab */}
-              <TabPane
-                tab={
-                  <span className="flex items-center gap-2">
-                    <LaptopOutlined />{" "}
-                    <span className="hidden sm:inline">Internships</span>
-                  </span>
-                }
-                key="6"
-              >
-                <div className="p-6">
-                  {(student.internshipApplications || []).length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {(student.internshipApplications || [])
-                        .sort(
-                          (a, b) =>
-                            new Date(b.appliedDate) - new Date(a.appliedDate)
-                        )
-                        .map((application, index) => {
-                          const isSelfIdentified =
-                            !application.internshipId ||
-                            !application.internship;
+                          ),
 
-                          return (
-                            <div
-                              key={application.id || index}
-                              className={`
-                                border-l-4 rounded-xl p-4 transition-shadow hover:shadow-md
-                                ${
-                                  isSelfIdentified
-                                    ? "border-secondary bg-secondary-50"
-                                    : application.status === "SELECTED" ||
-                                      application.status === "JOINED"
-                                    ? "border-success-200 bg-success-50"
-                                    : application.status === "COMPLETED"
-                                    ? "border-secondary-200 bg-secondary-50"
-                                    : application.status === "UNDER_REVIEW"
-                                    ? "border-warning-200 bg-warning-50"
-                                    : application.status === "APPLIED"
-                                    ? "border-primary-200 bg-primary-50"
-                                    : "border-error-200 bg-error-50"
-                                }
-                              `}
-                            >
-                              {/* Self-Identified Badge */}
-                              {isSelfIdentified && (
-                                <Tag
-                                  color="purple"
-                                  className="mb-3 rounded-md"
-                                  icon={<BankOutlined />}
-                                >
-                                  Self-Identified Internship
-                                </Tag>
+                        },
+
+                        {
+
+                          key: "4",
+
+                          label: (
+
+                            <span className="flex items-center px-4 py-3 font-bold text-xs uppercase tracking-widest">
+
+                              <FileTextOutlined className="mr-2" /> Academic Records
+
+                            </span>
+
+                          ),
+
+                          children: (
+
+                            <div className="p-8">
+
+                              {student.document?.length > 0 ? (
+
+                                <Row gutter={[20, 20]}>
+
+                                  {student.document.map((doc, idx) => (
+
+                                    <Col xs={24} sm={12} md={8} lg={6} key={idx}>
+
+                                      <Card
+
+                                        hoverable
+
+                                        className="rounded-2xl border-border shadow-sm overflow-hidden bg-surface group"
+
+                                        styles={{ body: { padding: '12px' } }}
+
+                                        onClick={() => window.open(getImageUrl(doc.fileUrl), "_blank")}
+
+                                      >
+
+                                        <div className="h-40 rounded-xl bg-background-tertiary/30 flex items-center justify-center p-4 mb-3 border border-border/50 overflow-hidden">
+
+                                          <img
+
+                                            src={getImageUrl(doc.fileUrl)}
+
+                                            alt={doc.fileName}
+
+                                            className="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-500"
+
+                                          />
+
+                                        </div>
+
+                                        <div className="px-1">
+
+                                          <Text className="text-xs uppercase font-black text-text-primary tracking-widest block truncate mb-1">
+
+                                            {doc.type.replaceAll("_", " ")}
+
+                                          </Text>
+
+                                          <Text className="text-[10px] text-text-tertiary truncate block font-medium">
+
+                                            {doc.fileName}
+
+                                          </Text>
+
+                                        </div>
+
+                                      </Card>
+
+                                    </Col>
+
+                                  ))}
+
+                                </Row>
+
+                              ) : (
+
+                                <div className="py-20 text-center bg-background-tertiary/30 rounded-2xl border border-dashed border-border flex flex-col items-center">
+
+                                  <Empty description={false} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+
+                                  <Title level={5} className="text-text-secondary mt-4">No documents found</Title>
+
+                                  <Button type="primary" onClick={openUploadModal} className="mt-6 rounded-xl font-bold bg-primary border-0 px-8">
+
+                                    Upload Document
+
+                                  </Button>
+
+                                </div>
+
                               )}
 
-                              {/* Header */}
-                              <div className="flex justify-between items-start mb-3">
-                                <div className="flex-1">
-                                  <div className="text-xs text-text-secondary mb-1">
-                                    {isSelfIdentified
-                                      ? "Self-Identified Position"
-                                      : application.internship?.title ||
-                                        "Internship Position"}
-                                  </div>
-                                  <div className="font-semibold text-base text-text-primary">
-                                    {isSelfIdentified
-                                      ? application.companyName ||
-                                        "Company Name Not Provided"
-                                      : application.internship?.industry
-                                          ?.companyName || "Unknown Company"}
-                                  </div>
-                                </div>
-                                <div className="flex flex-col gap-1 items-end">
-                                  <Tag
-                                    color={getInternshipStatusColor(
-                                      application.status
-                                    )}
-                                    className="!m-0 rounded-full"
-                                  >
-                                    {application.status?.replace("_", " ") ||
-                                      "UNKNOWN"}
-                                  </Tag>
-                                  {application.isApproved && (
-                                    <Tag color="green" className="!m-0 rounded-full">
-                                      Approved
-                                    </Tag>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Details */}
-                              <div className="space-y-2 text-sm">
-                                {!isSelfIdentified && (
-                                  <>
-                                    <div className="flex items-center gap-2">
-                                      <BankOutlined className="text-text-tertiary flex-shrink-0" />
-                                      <Text className="text-text-secondary text-xs">Field:</Text>
-                                      <Text className="text-text-primary font-medium">
-                                        {application.internship?.fieldOfWork || "N/A"}
-                                      </Text>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                      <ClockCircleOutlined className="text-text-tertiary flex-shrink-0" />
-                                      <Text className="text-text-secondary text-xs">Duration:</Text>
-                                      <Text className="text-text-primary font-medium">
-                                        {application.internship?.duration || "N/A"}
-                                      </Text>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                      <EnvironmentOutlined className="text-text-tertiary flex-shrink-0" />
-                                      <Text className="text-text-secondary text-xs">Location:</Text>
-                                      <Text className="text-text-primary font-medium text-xs">
-                                        {application.internship?.workLocation?.replace("_", " ") || "N/A"}
-                                      </Text>
-                                    </div>
-                                  </>
-                                )}
-
-                                {isSelfIdentified && (
-                                  <div className="bg-background-tertiary/50 border border-border p-3 rounded-lg">
-                                    <div className="flex items-center gap-2 text-text-primary mb-1">
-                                      <InfoCircleOutlined className="text-primary" />
-                                      <span className="font-medium text-xs uppercase tracking-wide">
-                                        Self-Identified
-                                      </span>
-                                    </div>
-                                    <div className="text-xs text-text-secondary">
-                                      Internship was self-identified by student.
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div className="flex items-center gap-2">
-                                  <CalendarOutlined className="text-text-tertiary flex-shrink-0" />
-                                  <Text className="text-text-secondary text-xs">Applied:</Text>
-                                  <Text className="text-text-primary font-medium">
-                                    {formatDate(application.appliedDate)}
-                                  </Text>
-                                </div>
-                              </div>
-
-                              {/* Progress indicator */}
-                              {(application.status === "JOINED" ||
-                                application.status === "COMPLETED") &&
-                                application.internship?.startDate &&
-                                application.internship?.endDate && (
-                                  <div className="mt-4 pt-3 border-t border-border">
-                                    <div className="flex justify-between text-[10px] uppercase text-text-secondary mb-1">
-                                      <span>Progress</span>
-                                      <span>
-                                        {getInternshipProgress(
-                                          application.internship.startDate,
-                                          application.internship.endDate
-                                        )}
-                                        %
-                                      </span>
-                                    </div>
-                                    <Progress
-                                      percent={getInternshipProgress(
-                                        application.internship.startDate,
-                                        application.internship.endDate
-                                      )}
-                                      size="small"
-                                      status={
-                                        application.status === "COMPLETED"
-                                          ? "success"
-                                          : "active"
-                                      }
-                                      showInfo={false}
-                                    />
-                                  </div>
-                                )}
                             </div>
-                          );
-                        })}
-                    </div>
-                  ) : (
-                    <Empty
-                      description="No internship applications yet"
-                      className="py-10"
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    />
-                  )}
-                </div>
-              </TabPane>
-            </Tabs>
-          </Card>
+
+                          ),
+
+                        },
+
+                                      {
+
+                                        key: "5",
+
+                                        label: (
+
+                                          <span className="flex items-center px-4 py-3 font-bold text-xs uppercase tracking-widest">
+
+                                            <BulbOutlined className="mr-2" /> Placements
+
+                                          </span>
+
+                                        ),
+
+                                        children: (
+
+                                          <div className="p-8">
+
+                                            {(student.placements || []).length > 0 ? (
+
+                                              <Row gutter={[20, 20]}>
+
+                                                {(student.placements || []).map((p, i) => (
+
+                                                  <Col xs={24} md={12} lg={8} key={i}>
+
+                                                    <div className="p-5 rounded-2xl border border-border bg-surface hover:border-success/30 transition-all shadow-sm">
+
+                                                      <div className="flex justify-between items-start mb-4">
+
+                                                        <Title level={5} className="!mb-0 !text-text-primary text-base leading-tight flex-1 mr-2">{p.companyName}</Title>
+
+                                                        <Tag color={getPlacementStatusColor(p.status)} className="m-0 px-2 py-0.5 rounded-md border-0 font-bold uppercase tracking-widest text-[9px]">
+
+                                                          {p.status}
+
+                                                        </Tag>
+
+                                                      </div>
+
+                                                      <div className="bg-success-50/50 p-3 rounded-xl border border-success-border/20 mb-4">
+
+                                                        <Text className="text-[10px] uppercase font-bold text-success-700 tracking-widest block mb-1">Annual CTC</Text>
+
+                                                        <Text className="text-xl font-black text-success-800 leading-none">
+
+                                                          ₹ {p.salary?.toFixed(2)} <span className="text-[10px] font-bold">LPA</span>
+
+                                                        </Text>
+
+                                                      </div>
+
+                                                      <div className="space-y-2">
+
+                                                        <div className="flex items-center gap-2">
+
+                                                          <SolutionOutlined className="text-text-tertiary text-xs" />
+
+                                                          <Text className="text-xs font-bold text-text-secondary truncate">{p.jobRole}</Text>
+
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2">
+
+                                                          <CalendarOutlined className="text-text-tertiary text-xs" />
+
+                                                          <Text className="text-xs font-bold text-text-secondary">{formatDate(p.offerDate)}</Text>
+
+                                                        </div>
+
+                                                      </div>
+
+                                                    </div>
+
+                                                  </Col>
+
+                                                ))}
+
+                                              </Row>
+
+                                            ) : (
+
+                                              <div className="py-20 text-center bg-background-tertiary/20 rounded-2xl border border-border/50 opacity-60">
+
+                                                <Empty description="No placement offers found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+
+                                              </div>
+
+                                            )}
+
+                                          </div>
+
+                                        ),
+
+                                      },
+
+                                      {
+
+                                        key: "6",
+
+                                        label: (
+
+                                          <span className="flex items-center px-4 py-3 font-bold text-xs uppercase tracking-widest">
+
+                                            <LaptopOutlined className="mr-2" /> Career Track
+
+                                          </span>
+
+                                        ),
+
+                                        children: (
+
+                                          <div className="p-8 space-y-10">
+
+                                            {/* Internship Section */}
+
+                                            <section>
+
+                                              <div className="flex items-center gap-2 mb-6">
+
+                                                <div className="w-1 h-4 rounded-full bg-indigo-500" />
+
+                                                <Title level={5} className="!mb-0 !text-text-primary text-sm uppercase tracking-widest font-black">Internship History</Title>
+
+                                              </div>
+
+                                              
+
+                                              {(student.internshipApplications || []).length > 0 ? (
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                                                  {(student.internshipApplications || [])
+
+                                                    .sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate))
+
+                                                    .map((app, i) => {
+
+                                                      const isSelf = !app.internshipId || !app.internship;
+
+                                                      return (
+
+                                                        <div key={i} className="p-5 rounded-2xl border border-border bg-surface hover:border-primary/30 transition-all shadow-sm">
+
+                                                          <div className="flex justify-between items-start mb-4">
+
+                                                            <div>
+
+                                                              {isSelf && (
+
+                                                                <Tag className="m-0 mb-2 px-2 py-0 rounded-md bg-purple-500/10 text-purple-600 border-0 text-[10px] font-black uppercase tracking-wider">
+
+                                                                  Self-Identified
+
+                                                                </Tag>
+
+                                                              )}
+
+                                                              <Title level={5} className="!mb-1 !text-text-primary text-base">
+
+                                                                {isSelf ? app.companyName : app.internship?.title}
+
+                                                              </Title>
+
+                                                              <Text className="text-primary font-bold text-xs uppercase tracking-wider">
+
+                                                                {!isSelf ? app.internship?.industry?.companyName : 'External Position'}
+
+                                                              </Text>
+
+                                                            </div>
+
+                                                            <Tag color={getInternshipStatusColor(app.status)} className="m-0 px-3 py-0.5 rounded-full border-0 font-bold uppercase tracking-widest text-[9px]">
+
+                                                              {app.status}
+
+                                                            </Tag>
+
+                                                          </div>
+
+                                                          
+
+                                                          <div className="grid grid-cols-2 gap-4 py-4 border-y border-border/50">
+
+                                                            <div>
+
+                                                              <Text className="text-[10px] uppercase font-bold text-text-tertiary block leading-none mb-1">Duration</Text>
+
+                                                              <Text className="text-text-primary font-bold text-xs">{app.internship?.duration || app.internshipDuration || 'N/A'}</Text>
+
+                                                            </div>
+
+                                                            <div>
+
+                                                              <Text className="text-[10px] uppercase font-bold text-text-tertiary block leading-none mb-1">Applied On</Text>
+
+                                                              <Text className="text-text-primary font-bold text-xs">{formatDate(app.appliedDate)}</Text>
+
+                                                            </div>
+
+                                                          </div>
+
+                                                          
+
+                                                          {(app.status === "JOINED" || app.status === "COMPLETED") && (
+
+                                                            <div className="mt-4">
+
+                                                              <div className="flex justify-between text-[9px] font-black text-text-tertiary uppercase tracking-widest mb-1.5">
+
+                                                                <span>Course Progress</span>
+
+                                                                <span>{getInternshipProgress(app.internship?.startDate, app.internship?.endDate)}%</span>
+
+                                                              </div>
+
+                                                              <Progress 
+
+                                                                percent={getInternshipProgress(app.internship?.startDate, app.internship?.endDate)} 
+
+                                                                size="small" 
+
+                                                                showInfo={false} 
+
+                                                                strokeColor="rgb(var(--color-primary))"
+
+                                                                trailColor="rgba(var(--color-border), 0.1)"
+
+                                                              />
+
+                                                            </div>
+
+                                                          )}
+
+                                                        </div>
+
+                                                      );
+
+                                                    })}
+
+                                                </div>
+
+                                              ) : (
+
+                                                <div className="py-12 text-center bg-background-tertiary/20 rounded-2xl border border-border/50 opacity-60">
+
+                                                  <Empty description="No internship history recorded" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+
+                                                </div>
+
+                                              )}
+
+                                            </section>
+
+                                          </div>
+
+                                        ),
+
+                                      },
+
+                                    ]}
+
+                                  />
+
+                                </Card>
         </div>
 
       {/* Modals */}

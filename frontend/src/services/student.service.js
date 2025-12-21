@@ -2,66 +2,71 @@ import API from './api';
 
 /**
  * Student Service
- * API methods for student operations
+ * API methods for student operations - synced with backend student.controller.ts
  */
 export const studentService = {
+  // =====================
   // Dashboard
+  // =====================
   async getDashboard() {
     const response = await API.get('/student/dashboard');
     return response.data;
   },
 
+  // =====================
   // Profile
+  // =====================
   async getProfile() {
     const response = await API.get('/student/profile');
     return response.data;
   },
 
-  async updateProfile(data, profileImage = null) {
+  async updateProfile(data) {
+    const response = await API.put('/student/profile', data);
+    return response.data;
+  },
+
+  async uploadProfileImage(file) {
     const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, value);
-      }
-    });
-    if (profileImage) {
-      formData.append('profileImage', profileImage);
-    }
-    const response = await API.put('/student/profile', formData, {
+    formData.append('file', file);
+    const response = await API.post('/student/profile/image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
+  // =====================
   // Internships
-  async getMyInternships(params = {}) {
+  // =====================
+  async getAvailableInternships(params = {}) {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/student/internships?${queryParams}` : '/student/internships';
     const response = await API.get(url);
     return response.data;
   },
 
-  async getAvailableInternships(params = {}) {
+  async getInternshipDetails(internshipId) {
+    const response = await API.get(`/student/internships/${internshipId}`);
+    return response.data;
+  },
+
+  async applyForInternship(internshipId, applicationData = {}) {
+    const response = await API.post(`/student/internships/${internshipId}/apply`, applicationData);
+    return response.data;
+  },
+
+  // =====================
+  // Applications
+  // =====================
+  async getApplications(params = {}) {
     const queryParams = new URLSearchParams(params).toString();
-    const url = queryParams ? `/student/internships/available?${queryParams}` : '/student/internships/available';
+    const url = queryParams ? `/student/applications?${queryParams}` : '/student/applications';
     const response = await API.get(url);
     return response.data;
   },
 
-  async applyForInternship(internshipId, data, resume = null) {
-    const formData = new FormData();
-    formData.append('internshipId', internshipId);
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, value);
-      }
-    });
-    if (resume) {
-      formData.append('resume', resume);
-    }
-    const response = await API.post('/student/applications', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  async getApplicationDetails(applicationId) {
+    const response = await API.get(`/student/applications/${applicationId}`);
     return response.data;
   },
 
@@ -70,81 +75,110 @@ export const studentService = {
     return response.data;
   },
 
-  // Applications
-  async getApplications(params = {}) {
+  // =====================
+  // Self-Identified Internships
+  // =====================
+  async submitSelfIdentified(data) {
+    const response = await API.post('/student/self-identified', data);
+    return response.data;
+  },
+
+  async getSelfIdentified(params = {}) {
     const queryParams = new URLSearchParams(params).toString();
-    const url = queryParams ? `/student/applications?${queryParams}` : '/student/applications';
+    const url = queryParams ? `/student/self-identified?${queryParams}` : '/student/self-identified';
     const response = await API.get(url);
     return response.data;
   },
 
-  // Reports
-  async getMyReports(params = {}) {
+  // =====================
+  // Monthly Reports
+  // =====================
+  async getMonthlyReports(params = {}) {
     const queryParams = new URLSearchParams(params).toString();
-    const url = queryParams ? `/student/reports?${queryParams}` : '/student/reports';
+    const url = queryParams ? `/student/monthly-reports?${queryParams}` : '/student/monthly-reports';
     const response = await API.get(url);
     return response.data;
   },
 
-  async getReportById(id) {
-    const response = await API.get(`/student/reports/${id}`);
+  async submitMonthlyReport(data) {
+    const response = await API.post('/student/monthly-reports', data);
     return response.data;
   },
 
-  async createReport(data, attachments = []) {
+  async updateMonthlyReport(reportId, data) {
+    const response = await API.put(`/student/monthly-reports/${reportId}`, data);
+    return response.data;
+  },
+
+  // =====================
+  // Documents
+  // =====================
+  async getDocuments(params = {}) {
+    const queryParams = new URLSearchParams(params).toString();
+    const url = queryParams ? `/student/documents?${queryParams}` : '/student/documents';
+    const response = await API.get(url);
+    return response.data;
+  },
+
+  async uploadDocument(file, documentData = {}) {
     const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
+    formData.append('file', file);
+    Object.entries(documentData).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         formData.append(key, value);
       }
     });
-    attachments.forEach((file) => {
-      formData.append('attachments', file);
-    });
-    const response = await API.post('/student/reports', formData, {
+    const response = await API.post('/student/documents', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
+  },
+
+  async deleteDocument(documentId) {
+    const response = await API.delete(`/student/documents/${documentId}`);
+    return response.data;
+  },
+
+  // =====================
+  // Grievances
+  // =====================
+  async submitGrievance(data) {
+    const response = await API.post('/student/grievances', data);
+    return response.data;
+  },
+
+  async getGrievances(params = {}) {
+    const queryParams = new URLSearchParams(params).toString();
+    const url = queryParams ? `/student/grievances?${queryParams}` : '/student/grievances';
+    const response = await API.get(url);
+    return response.data;
+  },
+
+  // =====================
+  // Technical Queries
+  // =====================
+  async submitTechnicalQuery(data) {
+    const response = await API.post('/student/technical-queries', data);
+    return response.data;
+  },
+
+  // =====================
+  // Legacy aliases (for backward compatibility)
+  // =====================
+  async getMyInternships(params = {}) {
+    return this.getAvailableInternships(params);
+  },
+
+  async getMyReports(params = {}) {
+    return this.getMonthlyReports(params);
+  },
+
+  async createReport(data) {
+    return this.submitMonthlyReport(data);
   },
 
   async updateReport(id, data) {
-    const response = await API.put(`/student/reports/${id}`, data);
-    return response.data;
-  },
-
-  // Enrollments
-  async getEnrollments() {
-    const response = await API.get('/student/enrollments');
-    return response.data;
-  },
-
-  async enrollInCourse(courseId) {
-    const response = await API.post('/student/enrollments', { courseId });
-    return response.data;
-  },
-
-  // Assignments
-  async getAssignments(params = {}) {
-    const queryParams = new URLSearchParams(params).toString();
-    const url = queryParams ? `/student/assignments?${queryParams}` : '/student/assignments';
-    const response = await API.get(url);
-    return response.data;
-  },
-
-  async submitAssignment(assignmentId, data, files = []) {
-    const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, value);
-      }
-    });
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-    const response = await API.post(`/student/assignments/${assignmentId}/submit`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
+    return this.updateMonthlyReport(id, data);
   },
 };
 

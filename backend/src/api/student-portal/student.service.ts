@@ -193,7 +193,7 @@ export class StudentService {
       },
     });
 
-    await this.cache.invalidateByTags(['student', `student:${studentId}`]);
+    await this.cache.invalidateByTags(['student', `student:${updated.id}`]);
 
     return updated;
   }
@@ -322,7 +322,7 @@ export class StudentService {
     const internshipIds = internships.map(i => i.id);
     const existingApplications = await this.prisma.internshipApplication.findMany({
       where: {
-        studentId,
+        studentId: student.id,
         internshipId: { in: internshipIds },
       },
       select: {
@@ -545,9 +545,18 @@ export class StudentService {
   }
 
   /**
-   * Get application details by ID
+   * Get application details by ID (with ownership verification)
    */
-  async getApplicationDetails(id: string) {
+  async getApplicationDetails(userId: string, id: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
     const application = await this.prisma.internshipApplication.findUnique({
       where: { id },
       include: {
@@ -566,7 +575,75 @@ export class StudentService {
       throw new NotFoundException('Application not found');
     }
 
+    // Verify ownership
+    if (application.studentId !== student.id) {
+      throw new NotFoundException('Application not found');
+    }
+
     return application;
+  }
+
+  /**
+   * Withdraw an application
+   */
+  async withdrawApplication(userId: string, applicationId: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const application = await this.prisma.internshipApplication.findUnique({
+      where: { id: applicationId },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Verify ownership
+    if (application.studentId !== student.id) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Check if application can be withdrawn
+    const nonWithdrawableStatuses: ApplicationStatus[] = [
+      ApplicationStatus.SELECTED,
+      ApplicationStatus.JOINED,
+      ApplicationStatus.COMPLETED,
+      ApplicationStatus.WITHDRAWN,
+    ];
+
+    if (nonWithdrawableStatuses.includes(application.status)) {
+      throw new BadRequestException(
+        `Cannot withdraw application with status: ${application.status}`
+      );
+    }
+
+    const updated = await this.prisma.internshipApplication.update({
+      where: { id: applicationId },
+      data: {
+        status: ApplicationStatus.WITHDRAWN,
+      },
+      include: {
+        internship: {
+          include: {
+            industry: true,
+          },
+        },
+      },
+    });
+
+    await this.cache.invalidateByTags(['applications', `student:${student.id}`]);
+
+    return {
+      success: true,
+      message: 'Application withdrawn successfully',
+      application: updated,
+    };
   }
 
   /**
@@ -628,12 +705,21 @@ export class StudentService {
   /**
    * Get self-identified internship applications
    */
-  async getSelfIdentified(studentId: string, params: { page?: number; limit?: number }) {
+  async getSelfIdentified(userId: string, params: { page?: number; limit?: number }) {
     const { page = 1, limit = 10 } = params;
     const skip = (page - 1) * limit;
 
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
     const where: Prisma.InternshipApplicationWhereInput = {
-      studentId,
+      studentId: student.id,
       isSelfIdentified: true,
     };
 
@@ -659,13 +745,24 @@ export class StudentService {
   /**
    * Submit monthly report
    */
-  async submitMonthlyReport(studentId: string, reportDto: {
+  async submitMonthlyReport(userId: string, reportDto: {
     applicationId: string;
     reportMonth: number;
     reportYear: number;
     reportFileUrl?: string;
     monthName?: string;
   }) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const studentId = student.id;
+
     // Verify application belongs to student
     const application = await this.prisma.internshipApplication.findFirst({
       where: {
@@ -712,12 +809,23 @@ export class StudentService {
   /**
    * Update a monthly report (student-owned)
    */
-  async updateMonthlyReport(studentId: string, id: string, reportDto: {
+  async updateMonthlyReport(userId: string, id: string, reportDto: {
     reportFileUrl?: string;
     monthName?: string;
     status?: MonthlyReportStatus;
     reviewComments?: string;
   }) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const studentId = student.id;
+
     const existing = await this.prisma.monthlyReport.findFirst({
       where: { id, studentId },
     });
@@ -744,12 +852,21 @@ export class StudentService {
   /**
    * Get student documents
    */
-  async getDocuments(studentId: string, params: { page?: number; limit?: number; type?: string }) {
+  async getDocuments(userId: string, params: { page?: number; limit?: number; type?: string }) {
     const { page = 1, limit = 10, type } = params;
     const skip = (page - 1) * limit;
 
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
     const where: Prisma.DocumentWhereInput = {
-      studentId,
+      studentId: student.id,
       ...(type ? { type: type as DocumentType } : {}),
     };
 
@@ -775,20 +892,29 @@ export class StudentService {
   /**
    * Upload a document
    */
-  async uploadDocument(studentId: string, file: any, documentDto: { type: string }) {
+  async uploadDocument(userId: string, file: any, documentDto: { type: string }) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
     const fileUrl = (file as any)?.path || (file as any)?.location || (file as any)?.url || '';
     const fileName = (file as any)?.originalname || (file as any)?.filename || 'document';
 
     const created = await this.prisma.document.create({
       data: {
-        studentId,
+        studentId: student.id,
         type: documentDto.type as DocumentType,
         fileName,
         fileUrl,
       },
     });
 
-    await this.cache.invalidateByTags(['documents', `student:${studentId}`]);
+    await this.cache.invalidateByTags(['documents', `student:${student.id}`]);
     return created;
   }
 
@@ -802,9 +928,20 @@ export class StudentService {
   /**
    * Get monthly reports
    */
-  async getMonthlyReports(studentId: string, params: { page?: number; limit?: number }) {
+  async getMonthlyReports(userId: string, params: { page?: number; limit?: number }) {
     const { page = 1, limit = 10 } = params;
     const skip = (page - 1) * limit;
+
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const studentId = student.id;
 
     const [reports, total] = await Promise.all([
       this.prisma.monthlyReport.findMany({
@@ -846,7 +983,7 @@ export class StudentService {
   /**
    * Submit grievance
    */
-  async submitGrievance(studentId: string, grievanceDto: {
+  async submitGrievance(userId: string, grievanceDto: {
     title: string;
     category: string;
     description: string;
@@ -858,12 +995,14 @@ export class StudentService {
     attachments?: string[];
   }) {
     const student = await this.prisma.student.findUnique({
-      where: { id: studentId },
+      where: { userId },
     });
 
     if (!student) {
       throw new NotFoundException('Student not found');
     }
+
+    const studentId = student.id;
 
     const grievance = await this.prisma.grievance.create({
       data: {
@@ -890,14 +1029,23 @@ export class StudentService {
    * Get grievances
    */
   async getGrievances(
-    studentId: string,
+    userId: string,
     params: { page?: number; limit?: number; status?: string },
   ) {
     const { page = 1, limit = 10, status } = params;
     const skip = (page - 1) * limit;
 
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
     const where: Prisma.GrievanceWhereInput = {
-      studentId,
+      studentId: student.id,
     };
 
     if (status) {
@@ -947,14 +1095,14 @@ export class StudentService {
   /**
    * Submit technical query
    */
-  async submitTechnicalQuery(studentId: string, queryDto: {
+  async submitTechnicalQuery(userId: string, queryDto: {
     title?: string;
     description?: string;
     priority?: string;
     attachments?: string[];
   }) {
     const student = await this.prisma.student.findUnique({
-      where: { id: studentId },
+      where: { userId },
       include: { user: true },
     });
 

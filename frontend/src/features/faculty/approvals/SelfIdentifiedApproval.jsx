@@ -423,83 +423,89 @@ export default function SelfIdentifiedApprovalPage() {
   ];
 
   return (
-    <>
-      <div className="min-h-screen ">
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-6">
-          <Title level={2} className="!mb-2">
-            Student Internships
-          </Title>
-          {/* <Text className="text-gray-600">
-            Review and approve self-identified internship applications from students
-          </Text> */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex items-center">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+              <CheckCircleOutlined className="text-lg" />
+            </div>
+            <div>
+              <Title level={2} className="mb-0 text-text-primary text-2xl">
+                Internship Approvals
+              </Title>
+              <Paragraph className="text-text-secondary text-sm mb-0">
+                Review and approve self-identified internship applications from students
+              </Paragraph>
+            </div>
+          </div>
         </div>
 
         {/* Statistics Cards */}
-        <Row gutter={[16, 16]} className="mb-6">
-          <Col xs={24} sm={8}>
-            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Text className="text-gray-600 text-sm block mb-1">
-                    Pending Approval
-                  </Text>
-                  <Title level={2} className="!mb-0 text-orange-600">
-                    {getPendingApplications().length}
-                  </Title>
-                </div>
-                <ClockCircleOutlined className="text-4xl text-orange-500" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-warning/10 text-warning">
+                <ClockCircleOutlined className="text-lg" />
               </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Text className="text-gray-600 text-sm block mb-1">
-                    Approved
-                  </Text>
-                  <Title level={2} className="!mb-0 text-green-600">
-                    {getApprovedApplications().length}
-                  </Title>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">
+                  {getPendingApplications().length}
                 </div>
-                <CheckCircleOutlined className="text-4xl text-green-500" />
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Pending Approval</div>
               </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Text className="text-gray-600 text-sm block mb-1">
-                    Total Applications
-                  </Text>
-                  <Title level={2} className="!mb-0 text-blue-600">
-                    {applications.length}
-                  </Title>
+            </div>
+          </Card>
+
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-success/10 text-success">
+                <CheckCircleOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">
+                  {getApprovedApplications().length}
                 </div>
-                <FileTextOutlined className="text-4xl text-blue-500" />
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Approved</div>
               </div>
-            </Card>
-          </Col>
-        </Row>
+            </div>
+          </Card>
+
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
+                <FileTextOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">
+                  {applications.length}
+                </div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Total Applications</div>
+              </div>
+            </div>
+          </Card>
+        </div>
 
         {/* Main Content */}
-        <Card className="shadow-sm">
+        <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
             items={tabItems}
             size="large"
+            className="px-6"
           />
         </Card>
 
         {/* Detail View Modal */}
         <Modal
           title={
-            <div className="flex items-center">
-              <FileTextOutlined className="mr-2 text-blue-600" />
-              <span>Self-Identified Internship Details</span>
+            <div className="flex items-center gap-3 py-1">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                <FileTextOutlined className="text-primary" />
+              </div>
+              <span className="font-bold text-text-primary text-lg">Internship Details</span>
             </div>
           }
           open={detailModalVisible}
@@ -510,6 +516,7 @@ export default function SelfIdentifiedApprovalPage() {
           footer={[
             <Button
               key="close"
+              className="rounded-xl px-6 font-medium"
               onClick={() => {
                 setDetailModalVisible(false);
                 setSelectedApplication(null);
@@ -522,6 +529,7 @@ export default function SelfIdentifiedApprovalPage() {
                 key="approve"
                 type="primary"
                 icon={<CheckCircleOutlined />}
+                className="rounded-xl px-6 font-bold bg-primary border-0"
                 onClick={() => {
                   setDetailModalVisible(false);
                   handleApprove(selectedApplication);
@@ -531,247 +539,128 @@ export default function SelfIdentifiedApprovalPage() {
               </Button>
             ),
           ]}
-          width={900}
+          width={800}
+          className="rounded-2xl overflow-hidden"
+          styles={{ mask: { backdropFilter: 'blur(4px)' } }}
         >
           {selectedApplication && (
-            <div className="!space-y-4">
+            <div className="py-2 space-y-4">
               {/* Student Information */}
-              <Card
-                title={
-                  <span className="text-blue-600 font-semibold">
-                    <UserOutlined className="mr-2" />
-                    Student Information
-                  </span>
-                }
-                size="small"
-              >
-                <Descriptions column={2} bordered size="small">
-                  <Descriptions.Item label="Name">
-                    {selectedApplication.student?.name}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Roll Number">
-                    {selectedApplication.student?.rollNumber}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Branch">
-                    {selectedApplication.student?.branchName}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Email">
-                    {selectedApplication.student?.email}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Contact">
-                    {selectedApplication.student?.contact}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Application Date">
-                    {dayjs(selectedApplication.applicationDate).format(
-                      "MMMM DD, YYYY"
-                    )}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
-
-              {/* Company Information */}
-              <Card
-                title={
-                  <span className="text-green-600 font-semibold">
-                    <BankOutlined className="mr-2" />
-                    Company Information
-                  </span>
-                }
-                size="small"
-              >
-                <Descriptions column={2} bordered size="small">
-                  <Descriptions.Item label="Company Name" span={2}>
-                    {selectedApplication.companyName || "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Address" span={2}>
-                    {selectedApplication.companyAddress || "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Job Profile" span={2}>
-                    {selectedApplication.jobProfile || "N/A"}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
-
-              {/* HR Contact Information */}
-              <Card
-                title={
-                  <span className="text-purple-600 font-semibold">
-                    <PhoneOutlined className="mr-2" />
-                    HR Contact Information
-                  </span>
-                }
-                size="small"
-              >
-                <Descriptions column={2} bordered size="small">
-                  <Descriptions.Item label="HR Name">
-                    {selectedApplication.hrName || "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="HR Contact">
-                    {selectedApplication.hrContact || "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="HR Email" span={2}>
-                    {selectedApplication.hrEmail || "N/A"}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
-
-              {/* Internship Details */}
-              <Card
-                title={
-                  <span className="text-orange-600 font-semibold">
-                    <CalendarOutlined className="mr-2" />
-                    Internship Details
-                  </span>
-                }
-                size="small"
-              >
-                <Descriptions column={2} bordered size="small">
-                  <Descriptions.Item label="Duration">
-                    {selectedApplication.internshipDuration || "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Stipend">
-                    {selectedApplication.stipend
-                      ? `₹${selectedApplication.stipend}`
-                      : "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Start Date">
-                    {selectedApplication.startDate
-                      ? dayjs(selectedApplication.startDate).format("MMM DD, YYYY")
-                      : "N/A"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="End Date">
-                    {selectedApplication.endDate
-                      ? dayjs(selectedApplication.endDate).format("MMM DD, YYYY")
-                      : "N/A"}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
-
-              {/* Faculty Mentor Information */}
-              {selectedApplication.facultyMentorName && (
-                <Card
-                  title={
-                    <span className="text-indigo-600 font-semibold">
-                      <UserOutlined className="mr-2" />
-                      Faculty Mentor Information
-                    </span>
-                  }
-                  size="small"
-                >
-                  <Descriptions column={2} bordered size="small">
-                    <Descriptions.Item label="Name">
-                      {selectedApplication.facultyMentorName}
+              <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                <div className="px-4 py-3 border-b border-border bg-background-tertiary/30">
+                  <Text className="text-xs uppercase font-bold text-text-tertiary flex items-center gap-2">
+                    <UserOutlined className="text-primary" /> Student Information
+                  </Text>
+                </div>
+                <div className="p-4">
+                  <Descriptions column={{ xs: 1, sm: 2 }} size="small">
+                    <Descriptions.Item label={<Text className="text-text-tertiary font-medium">Name</Text>}>
+                      <Text className="text-text-primary font-semibold">{selectedApplication.student?.name}</Text>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Designation">
-                      {selectedApplication.facultyMentorDesignation || "N/A"}
+                    <Descriptions.Item label={<Text className="text-text-tertiary font-medium">Roll Number</Text>}>
+                      <Text className="text-text-primary">{selectedApplication.student?.rollNumber}</Text>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Contact">
-                      {selectedApplication.facultyMentorContact || "N/A"}
+                    <Descriptions.Item label={<Text className="text-text-tertiary font-medium">Branch</Text>}>
+                      <Text className="text-text-primary">{selectedApplication.student?.branchName}</Text>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Email">
-                      {selectedApplication.facultyMentorEmail || "N/A"}
+                    <Descriptions.Item label={<Text className="text-text-tertiary font-medium">Email</Text>}>
+                      <Text className="text-text-primary">{selectedApplication.student?.email}</Text>
                     </Descriptions.Item>
                   </Descriptions>
-                </Card>
-              )}
+                </div>
+              </div>
+
+              {/* Company & Internship Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-background-tertiary/30">
+                    <Text className="text-xs uppercase font-bold text-text-tertiary flex items-center gap-2">
+                      <BankOutlined className="text-success" /> Company Information
+                    </Text>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <Text className="text-[10px] uppercase font-bold text-text-tertiary block leading-none mb-1">Company Name</Text>
+                      <Text className="text-text-primary font-medium">{selectedApplication.companyName || "N/A"}</Text>
+                    </div>
+                    <div>
+                      <Text className="text-[10px] uppercase font-bold text-text-tertiary block leading-none mb-1">Role</Text>
+                      <Text className="text-text-primary font-medium">{selectedApplication.jobProfile || "N/A"}</Text>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-background-tertiary/30">
+                    <Text className="text-xs uppercase font-bold text-text-tertiary flex items-center gap-2">
+                      <CalendarOutlined className="text-warning" /> Internship Period
+                    </Text>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex justify-between">
+                      <div>
+                        <Text className="text-[10px] uppercase font-bold text-text-tertiary block leading-none mb-1">Duration</Text>
+                        <Text className="text-text-primary font-medium">{selectedApplication.internshipDuration || "N/A"}</Text>
+                      </div>
+                      <div className="text-right">
+                        <Text className="text-[10px] uppercase font-bold text-text-tertiary block leading-none mb-1">Stipend</Text>
+                        <Text className="text-success font-bold">{selectedApplication.stipend ? `₹${selectedApplication.stipend}` : "N/A"}</Text>
+                      </div>
+                    </div>
+                    <div>
+                      <Text className="text-[10px] uppercase font-bold text-text-tertiary block leading-none mb-1">Dates</Text>
+                      <Text className="text-text-primary font-medium">
+                        {selectedApplication.startDate ? dayjs(selectedApplication.startDate).format("MMM DD") : "?"} - {selectedApplication.endDate ? dayjs(selectedApplication.endDate).format("MMM DD, YYYY") : "?"}
+                      </Text>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Joining Letter */}
               {selectedApplication.joiningLetterUrl && (
-                <Card
-                  title={
-                    <span className="text-pink-600 font-semibold">
-                      <FileTextOutlined className="mr-2" />
-                      Joining Letter
-                    </span>
-                  }
-                  size="small"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Text>Uploaded on:</Text>
-                      <Text strong className="ml-2">
-                        {dayjs(selectedApplication.joiningLetterUploadedAt).format(
-                          "MMM DD, YYYY HH:mm"
-                        )}
-                      </Text>
+                <div className="bg-primary-50/50 rounded-xl border border-primary-100 p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-sm">
+                      <FileTextOutlined className="text-primary text-xl" />
                     </div>
-                    <Button
-                      type="primary"
-                      icon={<EyeOutlined />}
-                      href={selectedApplication.joiningLetterUrl}
-                      target="_blank"
-                    >
-                      View
-                    </Button>
+                    <div>
+                      <Text className="text-text-primary font-bold block leading-none mb-1">Joining Letter</Text>
+                      <Text className="text-text-tertiary text-xs">Uploaded on {dayjs(selectedApplication.joiningLetterUploadedAt).format("MMM DD, YYYY")}</Text>
+                    </div>
                   </div>
-                </Card>
+                  <Button
+                    type="primary"
+                    icon={<EyeOutlined />}
+                    className="rounded-lg font-bold"
+                    href={selectedApplication.joiningLetterUrl}
+                    target="_blank"
+                  >
+                    View
+                  </Button>
+                </div>
               )}
 
               {/* Additional Information */}
-              {(selectedApplication.coverLetter ||
-                selectedApplication.additionalInfo) && (
-                <Card
-                  title={
-                    <span className="text-gray-600 font-semibold">
-                      Additional Information
-                    </span>
-                  }
-                  size="small"
-                >
-                  {selectedApplication.coverLetter && (
-                    <div className="mb-3">
-                      <Text strong>Cover Letter:</Text>
-                      <Paragraph className="mt-1 bg-gray-50 p-3 rounded">
-                        {selectedApplication.coverLetter}
-                      </Paragraph>
-                    </div>
-                  )}
-                  {selectedApplication.additionalInfo && (
-                    <div>
-                      <Text strong>Additional Info:</Text>
-                      <Paragraph className="mt-1 bg-gray-50 p-3 rounded">
-                        {selectedApplication.additionalInfo}
-                      </Paragraph>
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {/* Approval Status */}
-              <Card size="small">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Text strong>Approval Status:</Text>
-                    {selectedApplication.hasJoined ? (
-                      <Tag
-                        color="green"
-                        icon={<CheckCircleOutlined />}
-                        className="ml-3"
-                      >
-                        Approved
-                      </Tag>
-                    ) : (
-                      <Tag
-                        color="orange"
-                        icon={<ClockCircleOutlined />}
-                        className="ml-3"
-                      >
-                        Pending Approval
-                      </Tag>
+              {(selectedApplication.coverLetter || selectedApplication.additionalInfo) && (
+                <div className="bg-background-tertiary/30 p-5 rounded-2xl border border-border/60">
+                  <Title level={5} className="!mb-3 text-xs uppercase tracking-widest text-text-tertiary font-bold">Additional Information</Title>
+                  <div className="space-y-4">
+                    {selectedApplication.coverLetter && (
+                      <div>
+                        <Text className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Cover Letter</Text>
+                        <Paragraph className="text-text-primary text-sm mb-0 italic">{selectedApplication.coverLetter}</Paragraph>
+                      </div>
+                    )}
+                    {selectedApplication.additionalInfo && (
+                      <div>
+                        <Text className="text-[10px] uppercase font-bold text-text-tertiary block mb-1">Other Info</Text>
+                        <Paragraph className="text-text-primary text-sm mb-0">{selectedApplication.additionalInfo}</Paragraph>
+                      </div>
                     )}
                   </div>
-                  {selectedApplication.joiningDate && (
-                    <div>
-                      <Text type="secondary">Approved on: </Text>
-                      <Text strong>
-                        {dayjs(selectedApplication.joiningDate).format(
-                          "MMM DD, YYYY"
-                        )}
-                      </Text>
-                    </div>
-                  )}
                 </div>
-              </Card>
+              )}
             </div>
           )}
         </Modal>
@@ -779,9 +668,11 @@ export default function SelfIdentifiedApprovalPage() {
         {/* Approval Modal */}
         <Modal
           title={
-            <div className="flex items-center">
-              <CheckCircleOutlined className="mr-2 text-green-600" />
-              <span>Approve Self-Identified Internship</span>
+            <div className="flex items-center gap-3 py-1">
+              <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0 border border-success/20">
+                <CheckCircleOutlined className="text-success" />
+              </div>
+              <span className="font-bold text-text-primary text-lg">Approval Confirmation</span>
             </div>
           }
           open={approvalModalVisible}
@@ -791,33 +682,21 @@ export default function SelfIdentifiedApprovalPage() {
             form.resetFields();
           }}
           onOk={() => form.submit()}
-          okText="Approve"
-          okButtonProps={{ loading: actionLoading, icon: <CheckCircleOutlined /> }}
-          width={600}
+          okText="Confirm Approval"
+          okButtonProps={{ loading: actionLoading, className: "rounded-xl font-bold bg-success border-0 px-6 h-10" }}
+          cancelButtonProps={{ className: "rounded-xl" }}
+          width={500}
+          className="rounded-2xl overflow-hidden"
         >
           {selectedApplication && (
-            <div>
-              <Alert
-                title="Approval Confirmation"
-                description={
-                  <div>
-                    <p>
-                      You are about to approve the self-identified internship
-                      application for:
-                    </p>
-                    <p className="font-semibold mt-2">
-                      Student: {selectedApplication.student?.name} (
-                      {selectedApplication.student?.rollNumber})
-                    </p>
-                    <p className="font-semibold">
-                      Company: {selectedApplication.companyName}
-                    </p>
-                  </div>
-                }
-                type="info"
-                showIcon
-                className="mb-4"
-              />
+            <div className="space-y-4">
+              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mt-2">
+                <Text className="text-text-secondary text-sm">You are approving the internship for:</Text>
+                <div className="mt-2">
+                  <Text strong className="text-text-primary block">{selectedApplication.student?.name}</Text>
+                  <Text className="text-text-tertiary text-xs">{selectedApplication.companyName}</Text>
+                </div>
+              </div>
 
               <Form
                 form={form}
@@ -827,14 +706,15 @@ export default function SelfIdentifiedApprovalPage() {
                   hasJoined: true,
                   joiningDate: dayjs(),
                 }}
+                className="mt-4"
               >
                 <Form.Item
                   name="hasJoined"
-                  label="Approval Status"
+                  label={<span className="font-medium text-text-primary">Final Status</span>}
                   rules={[{ required: true }]}
                 >
-                  <Select>
-                    <Option value={true}>Approve - Student has joined</Option>
+                  <Select className="rounded-lg h-10">
+                    <Option value={true}>Approve - Student joined</Option>
                     <Option value={false}>Reject - Do not approve</Option>
                   </Select>
                 </Form.Item>
@@ -849,13 +729,13 @@ export default function SelfIdentifiedApprovalPage() {
                     getFieldValue("hasJoined") === true ? (
                       <Form.Item
                         name="joiningDate"
-                        label="Joining Date"
+                        label={<span className="font-medium text-text-primary">Joining Date</span>}
                         rules={[
                           { required: true, message: "Please select joining date" },
                         ]}
                       >
                         <DatePicker
-                          style={{ width: "100%" }}
+                          className="w-full rounded-lg h-10"
                           format="MMMM DD, YYYY"
                           placeholder="Select joining date"
                         />
@@ -868,6 +748,7 @@ export default function SelfIdentifiedApprovalPage() {
           )}
         </Modal>
       </div>
-    </>
+    </div>
   );
+}
 }

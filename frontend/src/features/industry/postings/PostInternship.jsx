@@ -190,566 +190,233 @@ const PostInternship = () => {
 
   return (
     <Layouts>
-      <div className="min-h-screen ">
-        <div className="max-w-5xl mx-auto">
-                    {/* Enhanced Header */}
-                    <Card className="mb-5 border-border shadow-sm rounded-2xl overflow-hidden">
-                      <div className="relative">
-                        {/* Gradient header with animations */}
-                        <div className="bg-gradient-to-r from-primary-600 via-secondary-600 to-primary-700 -mx-6 -mt-6 px-8 py-6 mb-6">
-                          <div className="relative z-10 text-center">
-                            <div className="inline-flex items-center justify-center w-14 h-14 bg-white/20 rounded-2xl mb-4 backdrop-blur-sm border border-white/30 shadow-lg">
-                              <PlusOutlined className="text-white text-3xl" />
-                            </div>
-                            <Title level={1} className="text-white mb-2">
-                              Post Internship Opportunity
-                            </Title>
-                            <Text className="text-white/80 text-base">
-                              Connect with talented students and build your future workforce
-                            </Text>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-          
-                    {/* Enhanced Internship Form */}
-                    <Card className="border-border shadow-sm rounded-2xl">
-                      <Form
-                        form={form}
-                        layout="vertical"
-                        onFinish={onFinish}
-                        requiredMark={false}
-                        className="p-2"
-                        initialValues={{
-                          isStipendProvided: false,
-                          isRemoteAllowed: false,
-                          workLocation: "ON_SITE",
-                          eligibleSemesters: [5, 6],
-                        }}
-                      >
-                        {/* Basic Information Section */}
-                        <div className="mb-10">
-                          <div className="flex items-center mb-6 pb-4 border-b border-border">
-                            <div className="flex items-center justify-center w-12 h-12 bg-primary rounded-xl mr-4 shadow-sm">
-                              <FileTextOutlined className="text-white text-xl" />
-                            </div>
-                            <div>
-                              <Title level={3} className="mb-0 text-text-primary">
-                                Basic Information
-                              </Title>
-                              <Text className="text-text-secondary">
-                                Tell us about this internship opportunity
-                              </Text>
-                            </div>
-                          </div>
-                          <Row gutter={[16, 16]}>
-                            <Col xs={24} md={16}>
-                              <Form.Item
-                                name="title"
-                                label="Internship Title"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please enter internship title",
-                                  },
-                                  {
-                                    min: 5,
-                                    message: "Title must be at least 5 characters",
-                                  },
-                                ]}
-                              >
-                                <Input
-                                  placeholder="e.g., Full Stack Developer Intern"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                />
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={8}>
-                              <Form.Item
-                                name="fieldOfWork"
-                                label="Field of Work"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please enter field of work",
-                                  },
-                                ]}
-                              >
-                                <Input
-                                  placeholder="e.g., Software Development"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                />
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24}>
-                              <Form.Item
-                                name="description"
-                                label="Short Description"
-                                rules={[
-                                  { required: true, message: "Please enter description" },
-                                  {
-                                    max: 200,
-                                    message: "Description cannot exceed 200 characters",
-                                  },
-                                ]}
-                              >
-                                <TextArea
-                                  rows={3}
-                                  placeholder="Brief description of the internship role..."
-                                  className="rounded-xl border-border"
-                                  showCount
-                                  maxLength={200}
-                                />
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24}>
-                              <Form.Item
-                                name="detailedDescription"
-                                label="Detailed Description"
-                                rules={[
-                                  {
-                                    max: 1000,
-                                    message: "Description cannot exceed 1000 characters",
-                                  },
-                                ]}
-                              >
-                                <TextArea
-                                  rows={6}
-                                  placeholder="Detailed description including responsibilities, learning outcomes, project details..."
-                                  className="rounded-xl border-border"
-                                  showCount
-                                  maxLength={1000}
-                                />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                        </div>
-          
-                        {/* Position & Duration Section */}
-                        <div className="mb-10">
-                          <div className="flex items-center mb-6 pb-4 border-b border-border">
-                            <div className="flex items-center justify-center w-12 h-12 bg-primary rounded-xl mr-4 shadow-sm">
-                              <TeamOutlined className="text-white text-xl" />
-                            </div>
-                            <div>
-                              <Title level={3} className="mb-0 text-text-primary">
-                                Position & Duration
-                              </Title>
-                              <Text className="text-text-secondary">
-                                Define the role requirements and timeline
-                              </Text>
-                            </div>
-                          </div>
-                          <Row gutter={[16, 16]}>
-                            <Col xs={24} md={8}>
-                              <Form.Item
-                                name="numberOfPositions"
-                                label="Number of Positions"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please enter number of positions",
-                                  },
-                                  {
-                                    type: "number",
-                                    min: 1,
-                                    max: 50,
-                                    message: "Positions must be between 1 and 50",
-                                  },
-                                ]}
-                              >
-                                <InputNumber
-                                  placeholder="Enter number of positions"
-                                  size="large"
-                                  className="w-full rounded-xl border-border"
-                                  min={1}
-                                  max={50}
-                                />
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={8}>
-                              <Form.Item
-                                name="duration"
-                                label="Duration"
-                                rules={[
-                                  { required: true, message: "Please enter duration" },
-                                ]}
-                              >
-                                <Select
-                                  placeholder="Select duration"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                >
-                                  <Option value="1 month">1 Month</Option>
-                                  <Option value="2 months">2 Months</Option>
-                                  <Option value="3 months">3 Months</Option>
-                                  <Option value="4 months">4 Months</Option>
-                                  <Option value="5 months">5 Months</Option>
-                                  <Option value="6 months">6 Months</Option>
-                                </Select>
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={8}>
-                              <Form.Item
-                                name="workLocation"
-                                label="Work Location"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please select work location",
-                                  },
-                                ]}
-                              >
-                                <Select
-                                  placeholder="Select work location"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                >
-                                  {workLocations.map((location) => (
-                                    <Option key={location.value} value={location.value}>
-                                      {location.label}
-                                    </Option>
-                                  ))}
-                                </Select>
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="startDate"
-                                label="Expected Start Date"
-                                rules={[
-                                  { required: true, message: "Please select start date" },
-                                ]}
-                              >
-                                <DatePicker
-                                  placeholder="Select start date"
-                                  size="large"
-                                  className="w-full rounded-xl border-border"
-                                  disabledDate={(current) =>
-                                    current && current < new Date()
-                                  }
-                                />
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="applicationDeadline"
-                                label="Application Deadline"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please select application deadline",
-                                  },
-                                ]}
-                              >
-                                <DatePicker
-                                  placeholder="Select deadline"
-                                  size="large"
-                                  className="w-full rounded-xl border-border"
-                                  disabledDate={(current) =>
-                                    current && current < new Date()
-                                  }
-                                />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                        </div>
-          
-                        {/* Eligibility Section */}
-                        <div className="mb-10">
-                          <div className="flex items-center mb-6 pb-4 border-b border-border">
-                            <div className="flex items-center justify-center w-12 h-12 bg-success rounded-xl mr-4 shadow-sm">
-                              <SafetyCertificateOutlined className="text-white text-xl" />
-                            </div>
-                            <div>
-                              <Title level={3} className="mb-0 text-text-primary">
-                                Eligibility Criteria
-                              </Title>
-                              <Text className="text-text-secondary">
-                                Set requirements for applicants
-                              </Text>
-                            </div>
-                          </div>
-                          <Row gutter={[16, 16]}>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="eligibleBranches"
-                                label="Eligible Branches"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please select eligible branches",
-                                  },
-                                ]}
-                              >
-                                <Select
-                                  mode="multiple"
-                                  placeholder="Select eligible branches"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                  options={branchOptions} // Use the new options array
-                                />
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="eligibleSemesters"
-                                label="Eligible Semesters"
-                                rules={[
-                                  {
-                                    required: true,
-                                    message: "Please select eligible semesters",
-                                  },
-                                ]}
-                              >
-                                <Select
-                                  mode="multiple"
-                                  placeholder="Select eligible semesters"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                >
-                                  {[1, 2, 3, 4, 5, 6].map((sem) => (
-                                    <Option key={sem} value={sem}>
-                                      Semester {sem}
-                                    </Option>
-                                  ))}
-                                </Select>
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="minimumPercentage"
-                                label="Minimum Percentage Required"
-                                rules={[
-                                  {
-                                    type: "number",
-                                    min: 50,
-                                    max: 100,
-                                    message: "Percentage must be between 50 and 100",
-                                  },
-                                ]}
-                              >
-                                <InputNumber
-                                  placeholder="Enter minimum percentage"
-                                  size="large"
-                                  className="w-full rounded-xl border-border"
-                                  min={50}
-                                  max={100}
-                                  step={0.1}
-                                  formatter={(value) => `${value}%`}
-                                  parser={(value) => value.replace("%", "")}
-                                />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-          
-                          {/* Skills */}
-                          <Title level={4} className="text-text-primary mt-6 mb-4">Skills Requirements</Title>
-                          <Row gutter={[16, 16]}>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="requiredSkills"
-                                label="Required Skills"
-                                tooltip="Skills that are mandatory for this internship"
-                              >
-                                <Select
-                                  mode="tags"
-                                  placeholder="Enter required skills"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                />
-                              </Form.Item>
-                            </Col>
-          
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="preferredSkills"
-                                label="Preferred Skills"
-                                tooltip="Skills that are good to have but not mandatory"
-                              >
-                                <Select
-                                  mode="tags"
-                                  placeholder="Enter preferred skills"
-                                  size="large"
-                                  className="rounded-xl border-border"
-                                />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                        </div>
-          
-                        {/* Stipend Section */}
-                        <div className="mb-10">
-                          <div className="flex items-center mb-6 pb-4 border-b border-border">
-                            <div className="flex items-center justify-center w-12 h-12 bg-secondary rounded-xl mr-4 shadow-sm">
-                              <DollarOutlined className="text-white text-xl" />
-                            </div>
-                            <div>
-                              <Title level={3} className="mb-0 text-text-primary">
-                                Stipend Information
-                              </Title>
-                              <Text className="text-text-secondary">
-                                Define compensation details
-                              </Text>
-                            </div>
-                          </div>
-                          <Row gutter={[16, 16]}>
-                            <Col xs={24}>
-                              <Form.Item name="isStipendProvided" valuePropName="checked">
-                                <Checkbox className="text-text-primary font-medium">This internship provides stipend</Checkbox>
-                              </Form.Item>
-                            </Col>
-          
-                            <Form.Item
-                              shouldUpdate={(prevValues, currentValues) =>
-                                prevValues.isStipendProvided !==
-                                currentValues.isStipendProvided
-                              }
-                              noStyle
-                            >
-                              {({ getFieldValue }) =>
-                                getFieldValue("isStipendProvided") ? (
-                                  <>
-                                    <Col xs={24} md={12}>
-                                      <Form.Item
-                                        name="stipendAmount"
-                                        label="Stipend Amount (₹)"
-                                        rules={[
-                                          {
-                                            required: true,
-                                            message: "Please enter stipend amount",
-                                          },
-                                          {
-                                            type: "number",
-                                            min: 1000,
-                                            message: "Minimum stipend should be ₹1000",
-                                          },
-                                        ]}
-                                      >
-                                        <InputNumber
-                                          placeholder="Enter stipend amount"
-                                          size="large"
-                                          className="w-full rounded-xl border-border"
-                                          min={1000}
-                                          formatter={(value) =>
-                                            `₹ ${value}`.replace(
-                                              /\B(?=(\d{3})+(?!\d))/g,
-                                              ","
-                                            )
-                                          }
-                                          parser={(value) =>
-                                            value.replace(/\₹\s?|(,*)/g, "")
-                                          }
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={24}>
-                                      <Form.Item
-                                        name="stipendDetails"
-                                        label="Stipend Details"
-                                        tooltip="Additional information about stipend, benefits, etc."
-                                      >
-                                        <TextArea
-                                          rows={3}
-                                          placeholder="Additional stipend details, frequency, benefits..."
-                                          className="rounded-xl border-border"
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                  </>
-                                ) : null
-                              }
-                            </Form.Item>
-                          </Row>
-                        </div>
-          
-                        {/* Enhanced Submit Section */}
-                        <div className="text-center mt-12 pt-8 border-t border-border">
-                          <Card className="rounded-2xl p-8 mb-8 bg-background-tertiary/20 border-border">
-                            <Title level={4} className="mb-3 text-text-primary">
-                              Ready to Post Your Internship? 🚀
-                            </Title>
-                            <Text className="text-text-secondary block mb-6">
-                              Your internship opportunity will be visible to thousands of
-                              talented students across various disciplines.
-                            </Text>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                              <Card className="rounded-xl p-4 border-border bg-background shadow-sm">
-                                <Text className="text-2xl block mb-1">📋</Text>
-                                <Text className="text-sm font-medium text-text-primary">
-                                  Review & Edit Anytime
-                                </Text>
-                              </Card>
-                              <Card className="rounded-xl p-4 border-border bg-background shadow-sm">
-                                <Text className="text-2xl block mb-1">📊</Text>
-                                <Text className="text-sm font-medium text-text-primary">
-                                  Track Applications
-                                </Text>
-                              </Card>
-                              <Card className="rounded-xl p-4 border-border bg-background shadow-sm">
-                                <Text className="text-2xl block mb-1">🎯</Text>
-                                <Text className="text-sm font-medium text-text-primary">
-                                  Find Top Talent
-                                </Text>
-                              </Card>
-                            </div>
-                          </Card>
-          
-                          <div className="flex flex-wrap justify-center gap-4">
-                            <Button
-                              size="large"
-                              onClick={() => navigate("/industry/dashboard")}
-                              className="h-14 px-10 rounded-2xl border-2 border-border text-text-secondary hover:text-text-primary font-medium transition-all duration-200"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              type="primary"
-                              htmlType="submit"
-                              loading={loading}
-                              size="large"
-                              icon={!loading && <SaveOutlined />}
-                              className="h-14 px-12 rounded-2xl bg-primary border-0 font-bold text-lg shadow-xl shadow-primary/20 hover:shadow-2xl transition-all duration-300"
-                            >
-                              {loading ? (
-                                <div className="flex items-center space-x-2">
-                                  <LoadingOutlined className="animate-spin" />
-                                  <span>Publishing Internship...</span>
-                                </div>
-                              ) : (
-                                "Publish Internship"
-                              )}
-                            </Button>
-                          </div>
-          
-                          <div className="mt-8 text-center">
-                            <Text className="text-text-tertiary text-sm italic">
-                              Your internship will be live immediately and visible to
-                              eligible students
-                            </Text>
-                          </div>
-                        </div>
-                      </Form>
-                    </Card>
-                  </div>
+      <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-2">
+            <div className="flex items-center">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+                <PlusOutlined className="text-lg" />
+              </div>
+              <div>
+                <Title level={2} className="mb-0 text-text-primary text-2xl">
+                  Post Internship
+                </Title>
+                <Paragraph className="text-text-secondary text-sm mb-0">
+                  Create a new opportunity to connect with talented students
+                </Paragraph>
+              </div>
+            </div>
+          </div>
+
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={onFinish}
+            requiredMark="optional"
+            initialValues={{
+              isStipendProvided: false,
+              isRemoteAllowed: false,
+              workLocation: "ON_SITE",
+              eligibleSemesters: [5, 6],
+            }}
+          >
+            {/* Basic Information Section */}
+            <Card className="rounded-2xl border-border shadow-sm mb-6" styles={{ body: { padding: '32px' } }}>
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                  <FileTextOutlined className="text-primary text-lg" />
                 </div>
-              </Layouts>
-            );
-          };        </div>
+                <div>
+                  <Title level={4} className="!mb-0 text-text-primary">Basic Information</Title>
+                  <Text className="text-text-tertiary text-xs uppercase font-bold tracking-widest">General Role Details</Text>
+                </div>
+              </div>
+
+              <Row gutter={24}>
+                <Col xs={24} md={16}>
+                  <Form.Item
+                    name="title"
+                    label={<span className="font-medium text-text-primary">Internship Title</span>}
+                    rules={[{ required: true, message: "Please enter internship title" }]}
+                  >
+                    <Input placeholder="e.g., Full Stack Developer Intern" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="fieldOfWork"
+                    label={<span className="font-medium text-text-primary">Field of Work</span>}
+                    rules={[{ required: true, message: "Please enter field of work" }]}
+                  >
+                    <Input placeholder="e.g., Software Development" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24}>
+                  <Form.Item
+                    name="description"
+                    label={<span className="font-medium text-text-primary">Short Summary</span>}
+                    rules={[{ required: true, message: "Please enter description" }]}
+                  >
+                    <TextArea rows={2} placeholder="Brief one-liner about the role..." className="rounded-lg bg-background border-border p-3" maxLength={200} showCount />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24}>
+                  <Form.Item
+                    name="detailedDescription"
+                    label={<span className="font-medium text-text-primary">Detailed Description</span>}
+                  >
+                    <TextArea rows={5} placeholder="Include responsibilities, requirements, and day-to-day tasks..." className="rounded-lg bg-background border-border p-4" maxLength={1000} showCount />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* Position & Timeline Section */}
+            <Card className="rounded-2xl border-border shadow-sm mb-6" styles={{ body: { padding: '32px' } }}>
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center border border-success/20 shrink-0">
+                  <TeamOutlined className="text-success text-lg" />
+                </div>
+                <div>
+                  <Title level={4} className="!mb-0 text-text-primary">Position & Timeline</Title>
+                  <Text className="text-text-tertiary text-xs uppercase font-bold tracking-widest">Requirements and Dates</Text>
+                </div>
+              </div>
+
+              <Row gutter={24}>
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="numberOfPositions"
+                    label={<span className="font-medium text-text-primary">Available Positions</span>}
+                    rules={[{ required: true, type: 'number', min: 1 }]}
+                  >
+                    <InputNumber className="w-full rounded-lg h-11 bg-background border-border flex items-center" min={1} />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="duration"
+                    label={<span className="font-medium text-text-primary">Duration</span>}
+                    rules={[{ required: true }]}
+                  >
+                    <Select className="rounded-lg h-11" placeholder="Select duration">
+                      <Option value="1 month">1 Month</Option>
+                      <Option value="2 months">2 Months</Option>
+                      <Option value="3 months">3 Months</Option>
+                      <Option value="6 months">6 Months</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={8}>
+                  <Form.Item
+                    name="workLocation"
+                    label={<span className="font-medium text-text-primary">Work Location</span>}
+                    rules={[{ required: true }]}
+                  >
+                    <Select className="rounded-lg h-11">
+                      {workLocations.map(loc => <Option key={loc.value} value={loc.value}>{loc.label}</Option>)}
+                    </Select>
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="startDate"
+                    label={<span className="font-medium text-text-primary">Expected Start Date</span>}
+                    rules={[{ required: true }]}
+                  >
+                    <DatePicker className="w-full rounded-lg h-11 bg-background border-border" disabledDate={c => c && c < dayjs().endOf('day')} />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="applicationDeadline"
+                    label={<span className="font-medium text-text-primary">Application Deadline</span>}
+                    rules={[{ required: true }]}
+                  >
+                    <DatePicker className="w-full rounded-lg h-11 bg-background border-border" disabledDate={c => c && c < dayjs().endOf('day')} />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* Compensation Section */}
+            <Card className="rounded-2xl border-border shadow-sm mb-10" styles={{ body: { padding: '32px' } }}>
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shrink-0">
+                  <DollarOutlined className="text-amber-600 text-lg" />
+                </div>
+                <div>
+                  <Title level={4} className="!mb-0 text-text-primary">Compensation</Title>
+                  <Text className="text-text-tertiary text-xs uppercase font-bold tracking-widest">Stipend and Benefits</Text>
+                </div>
+              </div>
+
+              <Form.Item name="isStipendProvided" valuePropName="checked">
+                <Checkbox className="text-text-primary font-bold">Provide monthly stipend</Checkbox>
+              </Form.Item>
+
+              <Form.Item
+                shouldUpdate={(p, c) => p.isStipendProvided !== c.isStipendProvided}
+                noStyle
+              >
+                {({ getFieldValue }) => getFieldValue('isStipendProvided') && (
+                  <div className="space-y-4 animate-fade-in">
+                    <Form.Item
+                      name="stipendAmount"
+                      label={<span className="font-medium text-text-primary">Stipend Amount (₹ per month)</span>}
+                      rules={[{ required: true, type: 'number', min: 0 }]}
+                    >
+                      <InputNumber 
+                        className="w-full md:w-1/2 rounded-lg h-11 bg-background border-border flex items-center" 
+                        formatter={v => `₹ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={v => v.replace(/\₹\s?|(,*)/g, '')}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name="stipendDetails"
+                      label={<span className="font-medium text-text-primary">Additional Benefits</span>}
+                    >
+                      <TextArea rows={2} placeholder="e.g. Travel allowance, performance bonus, etc." className="rounded-lg bg-background border-border p-3" />
+                    </Form.Item>
+                  </div>
+                )}
+              </Form.Item>
+            </Card>
+
+            <div className="flex justify-end gap-4 py-8 border-t border-border">
+              <Button 
+                size="large" 
+                onClick={() => navigate("/industry/dashboard")}
+                className="rounded-xl px-10 h-14 border-border text-text-secondary font-bold hover:text-text-primary"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                size="large"
+                icon={<SaveOutlined />}
+                className="rounded-xl px-12 h-14 bg-primary border-0 font-bold text-lg shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all"
+              >
+                Publish Opportunity
+              </Button>
+            </div>
+          </Form>
+        </div>
       </div>
     </Layouts>
   );
 };
+
+export default PostInternship;
 
 export default PostInternship;

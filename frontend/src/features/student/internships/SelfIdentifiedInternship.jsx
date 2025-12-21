@@ -282,502 +282,209 @@ const SelfIdentifiedInternship = () => {
     }
   };
 
-    return (
-      <div className="max-w-5xl mx-auto p-4 md:p-6 bg-background-secondary min-h-screen">
-
-        <h1 className="text-3xl font-bold text-text-primary mb-2">Submit Internship Details</h1>
-
-        <p className="text-text-secondary text-base mb-8">
-
-            Submit internships you found on your own or college provided. Fill in
-
-            the details below and upload your joining letter for approval.
-
-          </p>
-
-  
-
-          <Card className="rounded-xl border-border shadow-sm">
-
-            <Form
-
-              form={form}
-
-              layout="vertical"
-
-              onFinish={handleSubmit}
-
-              autoComplete="off"
-
-              className="mt-2"
-
-            >
-
-              <Divider plain className="!text-text-secondary uppercase text-[10px] tracking-widest font-bold">Company Details</Divider>
-
-              <Row gutter={24}>
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Company Name"
-
-                    name="companyName"
-
-                    rules={[
-
-                      { required: true, message: "Please enter company name" },
-
-                    ]}
-
-                  >
-
-                    <Input placeholder="e.g., Google India" className="rounded-lg h-10" />
-
-                  </Form.Item>
-
-                </Col>
-
-  
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Company Contact"
-
-                    name="companyContact"
-
-                    rules={[
-
-                      {
-
-                        required: true,
-
-                        message: "Please enter company contact number",
-
-                      },
-
-                    ]}
-
-                  >
-
-                    <Input placeholder="Phone number" className="rounded-lg h-10" />
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Row gutter={24}>
-
-                <Col xs={24}>
-
-                  <Form.Item
-
-                    label="Company Address"
-
-                    name="companyAddress"
-
-                    rules={[
-
-                      { required: true, message: "Please enter company address" },
-
-                    ]}
-
-                  >
-
-                    <TextArea
-
-                      rows={2}
-
-                      placeholder="Full address of the company"
-
-                      className="rounded-lg"
-
-                    />
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Row gutter={24}>
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Company Email"
-
-                    name="companyEmail"
-
-                    rules={[
-
-                      { type: "email", message: "Please enter a valid email" },
-
-                    ]}
-
-                  >
-
-                    <Input placeholder="company@example.com" className="rounded-lg h-10" />
-
-                  </Form.Item>
-
-                </Col>
-
-  
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Job Profile"
-
-                    name="jobProfile"
-
-                    rules={[
-
-                      { required: true, message: "Please enter job profile" },
-
-                    ]}
-
-                  >
-
-                    <Input placeholder="e.g., Software Development Intern" className="rounded-lg h-10" />
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Row gutter={24}>
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Start Date"
-
-                    name="startDate"
-
-                    rules={[
-
-                      { required: true, message: "Please select start date" },
-
-                    ]}
-
-                  >
-
-                    <DatePicker 
-
-                      className="w-full rounded-lg h-10"
-
-                      format="DD/MM/YYYY"
-
-                      onChange={handleStartDateChange}
-
-                    />
-
-                  </Form.Item>
-
-                </Col>
-
-  
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="End Date"
-
-                    name="endDate"
-
-                    rules={[
-
-                      { required: true, message: "Please select end date" },
-
-                    ]}
-
-                  >
-
-                    <DatePicker 
-
-                      className="w-full rounded-lg h-10"
-
-                      format="DD/MM/YYYY"
-
-                      onChange={handleEndDateChange}
-
-                    />
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Row gutter={24}>
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Internship Duration"
-
-                    name="internshipDuration"
-
-                    rules={[{ required: true, message: "Duration will be calculated automatically" }]}
-
-                    extra={<Text className="text-[10px] text-text-tertiary">Duration is calculated automatically based on dates</Text>}
-
-                  >
-
-                    <Input 
-
-                      placeholder="Auto-calculated duration" 
-
-                      disabled
-
-                      className="rounded-lg h-10"
-
-                      value={internshipDuration}
-
-                    />
-
-                  </Form.Item>
-
-                </Col>
-
-  
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item label="Stipend (₹ per month)" name="stipend">
-
-                    <InputNumber
-
-                      className="w-full rounded-lg h-10"
-
-                      placeholder="Enter amount (0 for unpaid)"
-
-                      min={0}
-
-                    />
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Divider plain className="!text-text-secondary uppercase text-[10px] tracking-widest font-bold mt-10">Industry Supervisor Details</Divider>
-
-              <Row gutter={24}>
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Industry Supervisor Name"
-
-                    name="hrName"
-
-                  >
-
-                    <Input placeholder="Full name of industry supervisor" className="rounded-lg h-10" />
-
-                  </Form.Item>
-
-                </Col>
-
-  
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Industry Supervisor Contact Number"
-
-                    name="hrContact"
-
-                  >
-
-                    <Input placeholder="Phone number (optional)" className="rounded-lg h-10" />
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Row gutter={24}>
-
-                <Col xs={24} sm={24} md={12}>
-
-                  <Form.Item
-
-                    label="Industry Supervisor Email"
-
-                    name="hrEmail"
-
-                    rules={[
-
-                      { type: "email", message: "Please enter a valid email" },
-
-                    ]}
-
-                  >
-
-                    <Input placeholder="Supervisor email address" className="rounded-lg h-10" />
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Divider plain className="!text-text-secondary uppercase text-[10px] tracking-widest font-bold mt-10">Upload Joining Letter</Divider>
-
-              <Row>
-
-                <Col xs={24}>
-
-                  <Form.Item
-
-                    label="Joining Letter"
-
-                    extra={<Text className="text-[10px] text-text-tertiary italic">Upload your offer letter or joining letter (PDF, max 5MB)</Text>}
-
-                    rules={[
-
-                      { required: true, message: "Please upload joining letter" },
-
-                    ]}
-
-                  >
-
-                    <Upload
-
-                      accept=".pdf"
-
-                      maxCount={1}
-
-                      beforeUpload={(file) => {
-
-                        const isLt5M = file.size / 1024 / 1024 < 5;
-
-                        if (!isLt5M) {
-
-                          message.error("File must be smaller than 5MB!");
-
-                          return Upload.LIST_IGNORE;
-
-                        }
-
-                        setJoiningLetterFile(file);
-
-                        return false; // Prevent auto upload
-
-                      }}
-
-                      onRemove={() => {
-
-                        setJoiningLetterFile(null);
-
-                      }}
-
-                      fileList={
-
-                        joiningLetterFile
-
-                          ? [
-
-                              {
-
-                                uid: "-1",
-
-                                name: joiningLetterFile.name,
-
-                                status: "done",
-
-                              },
-
-                            ]
-
-                          : []
-
-                      }
-
-                    >
-
-                      <Button icon={<UploadOutlined />} className="rounded-lg h-10">
-
-                        Select Joining Letter (PDF)
-
-                      </Button>
-
-                    </Upload>
-
-                  </Form.Item>
-
-                </Col>
-
-              </Row>
-
-  
-
-              <Divider className="my-8" />
-
-  
-
-              <Form.Item className="!mb-0">
-
-                <Button
-
-                  type="primary"
-
-                  htmlType="submit"
-
-                  loading={loading}
-
-                  block
-
-                  size="large"
-
-                  className="h-12 rounded-xl text-lg font-semibold shadow-lg shadow-primary/20"
-
-                >
-
-                  Submit for Approval
-
-                </Button>
-
-              </Form.Item>
-
-            </Form>
-
-          </Card>
-
+  return (
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex items-center">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+              <PlusOutlined className="text-lg" />
+            </div>
+            <div>
+              <Title level={2} className="mb-0 text-text-primary text-2xl">
+                Submit Internship Details
+              </Title>
+              <Paragraph className="text-text-secondary text-sm mb-0">
+                Register an internship you found independently or through external sources
+              </Paragraph>
+            </div>
+          </div>
         </div>
+
+        <Card 
+          className="rounded-2xl border-border shadow-sm overflow-hidden"
+          styles={{ body: { padding: '32px' } }}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+            autoComplete="off"
+            requiredMark="optional"
+          >
+            <div className="mb-8">
+              <Divider plain className="!m-0 !mb-6">
+                <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest px-2">Company Information</Text>
+              </Divider>
+              
+              <Row gutter={24}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Company Name</span>}
+                    name="companyName"
+                    rules={[{ required: true, message: "Please enter company name" }]}
+                  >
+                    <Input placeholder="e.g., Google India" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Company Contact</span>}
+                    name="companyContact"
+                    rules={[{ required: true, message: "Please enter contact number" }]}
+                  >
+                    <Input placeholder="Phone number" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Company Address</span>}
+                    name="companyAddress"
+                    rules={[{ required: true, message: "Please enter company address" }]}
+                  >
+                    <TextArea
+                      rows={2}
+                      placeholder="Full official address of the internship location"
+                      className="rounded-lg bg-background border-border p-3"
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Company Email</span>}
+                    name="companyEmail"
+                    rules={[{ type: "email", message: "Please enter a valid email" }]}
+                  >
+                    <Input placeholder="hr@company.com" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Job Profile / Role</span>}
+                    name="jobProfile"
+                    rules={[{ required: true, message: "Please enter job profile" }]}
+                  >
+                    <Input placeholder="e.g., Data Analyst Intern" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            <div className="mb-8">
+              <Divider plain className="!m-0 !mb-6">
+                <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest px-2">Internship Details</Text>
+              </Divider>
+
+              <Row gutter={24}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Start Date</span>}
+                    name="startDate"
+                    rules={[{ required: true, message: "Select start date" }]}
+                  >
+                    <DatePicker 
+                      className="w-full rounded-lg h-11 bg-background border-border"
+                      format="DD/MM/YYYY"
+                      onChange={handleStartDateChange}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">End Date</span>}
+                    name="endDate"
+                    rules={[{ required: true, message: "Select end date" }]}
+                  >
+                    <DatePicker 
+                      className="w-full rounded-lg h-11 bg-background border-border"
+                      format="DD/MM/YYYY"
+                      onChange={handleEndDateChange}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Duration</span>}
+                    name="internshipDuration"
+                    extra={<Text className="text-[10px] text-text-tertiary">Calculated automatically based on dates</Text>}
+                  >
+                    <Input 
+                      placeholder="Auto-calculated duration" 
+                      disabled
+                      className="rounded-lg h-11 bg-background border-border"
+                      value={internshipDuration}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item label={<span className="font-medium text-text-primary">Stipend (₹ per month)</span>} name="stipend">
+                    <InputNumber
+                      className="w-full rounded-lg h-11 bg-background border-border flex items-center"
+                      placeholder="Amount (0 if unpaid)"
+                      min={0}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            <div className="mb-8">
+              <Divider plain className="!m-0 !mb-6">
+                <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest px-2">Verification Documents</Text>
+              </Divider>
+
+              <Form.Item
+                label={<span className="font-medium text-text-primary">Official Joining Letter</span>}
+                extra={<Text className="text-[10px] text-text-tertiary italic">Upload PDF only (Max 5MB)</Text>}
+                rules={[{ required: true, message: "Please upload joining letter" }]}
+              >
+                <Upload
+                  accept=".pdf"
+                  maxCount={1}
+                  beforeUpload={(file) => {
+                    const isLt5M = file.size / 1024 / 1024 < 5;
+                    if (!isLt5M) {
+                      message.error("File must be smaller than 5MB!");
+                      return Upload.LIST_IGNORE;
+                    }
+                    setJoiningLetterFile(file);
+                    return false;
+                  }}
+                  onRemove={() => setJoiningLetterFile(null)}
+                  fileList={joiningLetterFile ? [{ uid: "-1", name: joiningLetterFile.name, status: "done" }] : []}
+                >
+                  <Button icon={<UploadOutlined />} className="rounded-xl h-11 px-6 font-bold border-dashed hover:border-primary transition-all">
+                    Choose PDF File
+                  </Button>
+                </Upload>
+              </Form.Item>
+            </div>
+
+            <div className="pt-6 border-t border-border/50">
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                block
+                className="h-12 rounded-xl font-bold text-lg bg-primary border-0 shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
+              >
+                Submit for Academic Approval
+              </Button>
+            </div>
+          </Form>
+        </Card>
+      </div>
+    </div>
+  );
+};
     );
 
   };

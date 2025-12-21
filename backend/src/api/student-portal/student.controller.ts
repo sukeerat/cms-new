@@ -69,14 +69,14 @@ export class StudentController {
   @ApiResponse({ status: 200, description: 'Internships list retrieved successfully' })
   async getInternships(
     @Req() req,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('industry') industry?: string,
   ) {
     return this.studentService.getAvailableInternships(req.user.userId, {
-      page,
-      limit,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
       search,
       industryType: industry,
     });
@@ -104,19 +104,31 @@ export class StudentController {
   @ApiResponse({ status: 200, description: 'Applications retrieved successfully' })
   async getApplications(
     @Req() req,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
-    return this.studentService.getApplications(req.user.userId, { page, limit, status });
+    return this.studentService.getApplications(req.user.userId, { 
+      page: page ? parseInt(page, 10) : undefined, 
+      limit: limit ? parseInt(limit, 10) : undefined, 
+      status 
+    });
   }
 
   @Get('applications/:id')
   @Roles(Role.STUDENT)
   @ApiOperation({ summary: 'Get application details' })
   @ApiResponse({ status: 200, description: 'Application details retrieved successfully' })
-  async getApplicationDetails(@Param('id') id: string) {
-    return this.studentService.getApplicationDetails(id);
+  async getApplicationDetails(@Req() req, @Param('id') id: string) {
+    return this.studentService.getApplicationDetails(req.user.userId, id);
+  }
+
+  @Post('applications/:id/withdraw')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Withdraw application' })
+  @ApiResponse({ status: 200, description: 'Application withdrawn successfully' })
+  async withdrawApplication(@Req() req, @Param('id') id: string) {
+    return this.studentService.withdrawApplication(req.user.userId, id);
   }
 
   // Self-Identified Internships
@@ -134,10 +146,13 @@ export class StudentController {
   @ApiResponse({ status: 200, description: 'Self-identified internships retrieved successfully' })
   async getSelfIdentified(
     @Req() req,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.studentService.getSelfIdentified(req.user.userId, { page, limit });
+    return this.studentService.getSelfIdentified(req.user.userId, { 
+      page: page ? parseInt(page, 10) : undefined, 
+      limit: limit ? parseInt(limit, 10) : undefined 
+    });
   }
 
   // Monthly Reports
@@ -147,10 +162,13 @@ export class StudentController {
   @ApiResponse({ status: 200, description: 'Monthly reports retrieved successfully' })
   async getMonthlyReports(
     @Req() req,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.studentService.getMonthlyReports(req.user.userId, { page, limit });
+    return this.studentService.getMonthlyReports(req.user.userId, { 
+      page: page ? parseInt(page, 10) : undefined, 
+      limit: limit ? parseInt(limit, 10) : undefined 
+    });
   }
 
   @Post('monthly-reports')
@@ -220,11 +238,15 @@ export class StudentController {
   @ApiResponse({ status: 200, description: 'Grievances retrieved successfully' })
   async getGrievances(
     @Req() req,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
-    return this.studentService.getGrievances(req.user.userId, { page, limit, status });
+    return this.studentService.getGrievances(req.user.userId, { 
+      page: page ? parseInt(page, 10) : undefined, 
+      limit: limit ? parseInt(limit, 10) : undefined, 
+      status 
+    });
   }
 
   @Post('technical-queries')

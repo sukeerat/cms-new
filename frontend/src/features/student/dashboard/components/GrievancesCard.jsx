@@ -34,7 +34,10 @@ const getPriorityColor = (priority) => {
 const GrievancesCard = ({ grievances = [], loading, onCreateNew, onViewAll }) => {
   const navigate = useNavigate();
 
-  const pendingCount = grievances.filter(
+  // Handle both array and API response object format
+  const grievancesList = Array.isArray(grievances) ? grievances : (grievances?.grievances || []);
+
+  const pendingCount = grievancesList.filter(
     g => g.status !== 'RESOLVED' && g.status !== 'CLOSED'
   ).length;
 
@@ -61,11 +64,11 @@ const GrievancesCard = ({ grievances = [], loading, onCreateNew, onViewAll }) =>
       }
       className="h-full border border-border rounded-xl"
     >
-      {grievances.length > 0 ? (
+      {grievancesList.length > 0 ? (
         <>
           <List
             loading={loading}
-            dataSource={grievances.slice(0, 3)}
+            dataSource={grievancesList.slice(0, 3)}
             size="small"
             renderItem={(grievance) => {
               const statusConfig = getStatusConfig(grievance.status);
@@ -101,14 +104,14 @@ const GrievancesCard = ({ grievances = [], loading, onCreateNew, onViewAll }) =>
               );
             }}
           />
-          {grievances.length > 3 && (
+          {grievancesList.length > 3 && (
             <Button
               type="link"
               block
               onClick={onViewAll || (() => navigate('/grievances'))}
               className="mt-2"
             >
-              View All ({grievances.length}) <RightOutlined />
+              View All ({grievancesList.length}) <RightOutlined />
             </Button>
           )}
         </>

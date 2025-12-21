@@ -2,10 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import API from '../../../../services/api';
 import { toast } from 'react-hot-toast';
 
+// Utility function to get student ID from localStorage
+const getStudentId = () => {
+  try {
+    const loginData = localStorage.getItem('loginResponse');
+    if (loginData) {
+      const parsed = JSON.parse(loginData);
+      return parsed.userId || parsed.user?.id || parsed.studentId || null;
+    }
+  } catch (error) {
+    console.error('Failed to parse login response:', error);
+  }
+  return null;
+};
+
 export const useApplications = () => {
   const [loading, setLoading] = useState(true);
   const [applications, setApplications] = useState([]);
   const [selfIdentifiedApplications, setSelfIdentifiedApplications] = useState([]);
+  const [error, setError] = useState(null);
 
   const fetchMyApplications = useCallback(async () => {
     try {
@@ -16,9 +31,12 @@ export const useApplications = () => {
         );
         setApplications(platformApps);
       }
-    } catch (error) {
-      console.error('Error fetching applications:', error);
+      return true;
+    } catch (err) {
+      console.error('Error fetching applications:', err);
+      setError(err.message || 'Failed to fetch applications');
       toast.error('Failed to fetch applications');
+      return false;
     }
   }, []);
 
@@ -28,13 +46,17 @@ export const useApplications = () => {
       if (response.data?.data) {
         setSelfIdentifiedApplications(response.data.data);
       }
-    } catch (error) {
-      console.error('Error fetching self-identified applications:', error);
+      return true;
+    } catch (err) {
+      console.error('Error fetching self-identified applications:', err);
+      // Don't show toast for this as it's secondary data
+      return false;
     }
   }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       await Promise.all([
         fetchMyApplications(),
@@ -51,6 +73,7 @@ export const useApplications = () => {
 
   return {
     loading,
+    error,
     applications,
     selfIdentifiedApplications,
     refetch: fetchAll,
@@ -60,18 +83,21 @@ export const useApplications = () => {
 export const useCompletionFeedback = () => {
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchFeedback = useCallback(async (applicationId) => {
     if (!applicationId) return null;
     setLoading(true);
+    setError(null);
     try {
       const response = await API.get(`/completion-feedback/application/${applicationId}`);
       const feedbackData = response.data?.data || null;
       setFeedback(feedbackData);
       return feedbackData;
-    } catch (error) {
-      if (error.response?.status !== 404) {
-        console.error('Error fetching feedback:', error);
+    } catch (err) {
+      if (err.response?.status !== 404) {
+        console.error('Error fetching feedback:', err);
+        setError(err.message || 'Failed to fetch feedback');
       }
       setFeedback(null);
       return null;
@@ -90,13 +116,21 @@ export const useCompletionFeedback = () => {
       wouldRecommend: values.wouldRecommend || false,
     };
 
-    const response = await API.post('/completion-feedback/student', payload);
-    return response.data;
+    try {
+      const response = await API.post('/completion-feedback/student', payload);
+      toast.success('Feedback submitted successfully!');
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to submit feedback';
+      toast.error(message);
+      throw err;
+    }
   }, []);
 
   return {
     feedback,
     loading,
+    error,
     fetchFeedback,
     submitFeedback,
     setFeedback,
@@ -108,10 +142,12 @@ export const useMonthlyReports = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [missingReports, setMissingReports] = useState([]);
+  const [error, setError] = useState(null);
 
   const fetchReports = useCallback(async (applicationId) => {
     if (!applicationId) return;
     setLoading(true);
+    setError(null);
     try {
       const response = await API.get(`/monthly-reports/application/${applicationId}`);
       if (response.data?.data) {
@@ -134,8 +170,9 @@ export const useMonthlyReports = () => {
         }
         setMissingReports(missing);
       }
-    } catch (error) {
-      console.error('Error fetching monthly reports:', error);
+    } catch (err) {
+      console.error('Error fetching monthly reports:', err);
+      setError(err.message || 'Failed to fetch reports');
     } finally {
       setLoading(false);
     }
@@ -144,15 +181,9 @@ export const useMonthlyReports = () => {
   const uploadReport = useCallback(async (applicationId, file, month, year) => {
     setUploading(true);
     try {
-      const loginData = localStorage.getItem('loginResponse');
-      let studentId = null;
-      if (loginData) {
-        const parsed = JSON.parse(loginData);
-        studentId = parsed.userId || parsed.user?.id;
-      }
-
+      const studentId = getStudentId();
       if (!studentId) {
-        throw new Error('Student ID not found');
+        throw new Error('Student ID not found. Please log in again.');
       }
 
       const formData = new FormData();
@@ -168,9 +199,10 @@ export const useMonthlyReports = () => {
 
       toast.success('Report uploaded successfully!');
       return response.data;
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to upload report');
-      throw error;
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to upload report';
+      toast.error(message);
+      throw err;
     } finally {
       setUploading(false);
     }
@@ -178,11 +210,9 @@ export const useMonthlyReports = () => {
 
   const submitReport = useCallback(async (reportId) => {
     try {
-      const loginData = localStorage.getItem('loginResponse');
-      let studentId = null;
-      if (loginData) {
-        const parsed = JSON.parse(loginData);
-        studentId = parsed.userId || parsed.user?.id;
+      const studentId = getStudentId();
+      if (!studentId) {
+        throw new Error('Student ID not found. Please log in again.');
       }
 
       const response = await API.patch(`/monthly-reports/${reportId}/submit`, {
@@ -190,9 +220,10 @@ export const useMonthlyReports = () => {
       });
       toast.success('Report submitted for review!');
       return response.data;
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit report');
-      throw error;
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to submit report';
+      toast.error(message);
+      throw err;
     }
   }, []);
 
@@ -200,9 +231,10 @@ export const useMonthlyReports = () => {
     try {
       await API.delete(`/monthly-reports/${reportId}`);
       toast.success('Report deleted successfully');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete report');
-      throw error;
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to delete report';
+      toast.error(message);
+      throw err;
     }
   }, []);
 
@@ -210,6 +242,7 @@ export const useMonthlyReports = () => {
     reports,
     loading,
     uploading,
+    error,
     missingReports,
     fetchReports,
     uploadReport,
@@ -223,17 +256,20 @@ export const useMonthlyFeedback = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchFeedbacks = useCallback(async (applicationId) => {
     if (!applicationId) return;
     setLoading(true);
+    setError(null);
     try {
       const response = await API.get(`/monthly-feedback/application/${applicationId}`);
       if (response.data?.data) {
         setFeedbacks(response.data.data);
       }
-    } catch (error) {
-      console.error('Error fetching monthly feedbacks:', error);
+    } catch (err) {
+      console.error('Error fetching monthly feedbacks:', err);
+      setError(err.message || 'Failed to fetch feedbacks');
     } finally {
       setLoading(false);
     }
@@ -242,15 +278,9 @@ export const useMonthlyFeedback = () => {
   const submitFeedback = useCallback(async (applicationId, imageFile) => {
     setSubmitting(true);
     try {
-      const loginData = localStorage.getItem('loginResponse');
-      let studentId = null;
-      if (loginData) {
-        const parsed = JSON.parse(loginData);
-        studentId = parsed.userId || parsed.user?.id;
-      }
-
+      const studentId = getStudentId();
       if (!studentId) {
-        throw new Error('Student ID not found');
+        throw new Error('Student ID not found. Please log in again.');
       }
 
       const formData = new FormData();
@@ -264,9 +294,10 @@ export const useMonthlyFeedback = () => {
 
       toast.success('Monthly progress uploaded successfully!');
       return response.data;
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to upload progress');
-      throw error;
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to upload progress';
+      toast.error(message);
+      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -276,6 +307,7 @@ export const useMonthlyFeedback = () => {
     feedbacks,
     loading,
     submitting,
+    error,
     fetchFeedbacks,
     submitFeedback,
     setFeedbacks,

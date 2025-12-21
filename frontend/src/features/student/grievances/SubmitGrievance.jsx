@@ -256,14 +256,18 @@ const SubmitGrievance = () => {
 
           {/* Submit Form */}
           <Card
-            title={
-              <Space className="text-primary font-semibold">
-                <FileTextOutlined />
-                <span>Submit New Grievance</span>
-              </Space>
-            }
-            className="rounded-xl border-border shadow-sm"
+            className="rounded-2xl border-border shadow-sm overflow-hidden"
+            styles={{ body: { padding: '24px' } }}
           >
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border/50">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                <FileTextOutlined className="text-lg text-primary" />
+              </div>
+              <Title level={4} className="!mb-0 text-text-primary">
+                Submit New Grievance
+              </Title>
+            </div>
+
             <Form
               form={form}
               layout="vertical"
@@ -274,13 +278,14 @@ const SubmitGrievance = () => {
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="category"
-                    label="Category"
+                    label={<span className="font-medium text-text-primary">Category</span>}
                     rules={[{ required: true, message: 'Please select a category' }]}
                   >
                     <Select
                       placeholder="Select category"
                       size="large"
-                      className="rounded-lg"
+                      className="rounded-lg h-12"
+                      dropdownStyle={{ borderRadius: '12px', padding: '8px' }}
                     >
                       {CATEGORIES.map(cat => (
                         <Option key={cat.value} value={cat.value}>
@@ -297,19 +302,20 @@ const SubmitGrievance = () => {
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="priority"
-                    label="Priority"
+                    label={<span className="font-medium text-text-primary">Priority</span>}
                     rules={[{ required: true, message: 'Please select priority' }]}
                     initialValue="MEDIUM"
                   >
                     <Select
                       placeholder="Select priority level"
                       size="large"
-                      className="rounded-lg"
+                      className="rounded-lg h-12"
+                      dropdownStyle={{ borderRadius: '12px', padding: '8px' }}
                     >
                       {PRIORITIES.map(pri => (
                         <Option key={pri.value} value={pri.value}>
                           <div className="flex items-center gap-2">
-                            <Tag color={pri.color} className="m-0 rounded-md">{pri.label}</Tag>
+                            <Tag color={pri.color} className="m-0 rounded-md border-0 font-medium px-2">{pri.label}</Tag>
                             <span className="text-[10px] text-text-tertiary">
                               {pri.description}
                             </span>
@@ -323,7 +329,7 @@ const SubmitGrievance = () => {
                 <Col xs={24}>
                   <Form.Item
                     name="subject"
-                    label="Subject"
+                    label={<span className="font-medium text-text-primary">Subject</span>}
                     rules={[
                       { required: true, message: 'Please enter a subject' },
                       { min: 10, message: 'Subject must be at least 10 characters' },
@@ -332,7 +338,7 @@ const SubmitGrievance = () => {
                     <Input
                       placeholder="Brief summary of your concern"
                       size="large"
-                      className="rounded-lg"
+                      className="rounded-lg h-12 bg-background border-border"
                     />
                   </Form.Item>
                 </Col>
@@ -340,7 +346,7 @@ const SubmitGrievance = () => {
                 <Col xs={24}>
                   <Form.Item
                     name="description"
-                    label="Detailed Description"
+                    label={<span className="font-medium text-text-primary">Detailed Description</span>}
                     rules={[
                       { required: true, message: 'Please describe your grievance' },
                       { min: 50, message: 'Description must be at least 50 characters' },
@@ -349,7 +355,7 @@ const SubmitGrievance = () => {
                     <TextArea
                       rows={6}
                       placeholder="Provide detailed information about your concern. Include relevant dates, people involved, and any actions you've already taken."
-                      className="rounded-lg"
+                      className="rounded-lg bg-background border-border p-4"
                     />
                   </Form.Item>
                 </Col>
@@ -357,17 +363,17 @@ const SubmitGrievance = () => {
                 <Col xs={24}>
                   <Form.Item
                     name="attachments"
-                    label="Attachments (Optional)"
+                    label={<span className="font-medium text-text-primary">Attachments (Optional)</span>}
                     extra={<Text className="text-[10px] text-text-tertiary italic">Upload supporting documents (max 5MB per file)</Text>}
                   >
-                    <Dragger {...uploadProps} className="bg-background-tertiary/20 rounded-xl border-dashed">
-                      <p className="ant-upload-drag-icon text-primary">
+                    <Dragger {...uploadProps} className="bg-background-tertiary/30 rounded-xl border-dashed border-border hover:border-primary/50 transition-colors">
+                      <p className="ant-upload-drag-icon text-primary/60">
                         <InboxOutlined className="text-4xl" />
                       </p>
-                      <p className="text-text-primary font-medium">
+                      <p className="text-text-primary font-medium text-sm">
                         Click or drag file to this area to upload
                       </p>
-                      <p className="text-text-tertiary text-xs">
+                      <p className="text-text-tertiary text-xs mt-1">
                         Support for single or bulk upload. Max size 5MB.
                       </p>
                     </Dragger>
@@ -375,13 +381,13 @@ const SubmitGrievance = () => {
                 </Col>
               </Row>
 
-              <Divider className="my-8" />
+              <Divider className="my-6 border-border/50" />
 
               <div className="flex justify-end gap-3">
                 <Button
                   onClick={() => form.resetFields()}
                   size="large"
-                  className="rounded-xl px-8"
+                  className="rounded-xl px-6 h-12 border-border text-text-secondary hover:text-text-primary hover:border-text-tertiary"
                 >
                   Reset
                 </Button>
@@ -391,7 +397,7 @@ const SubmitGrievance = () => {
                   icon={<SendOutlined />}
                   loading={submitting}
                   size="large"
-                  className="rounded-xl px-10 h-12 shadow-lg shadow-primary/20"
+                  className="rounded-xl px-8 h-12 shadow-lg shadow-primary/20 font-bold bg-primary hover:bg-primary-600 border-0"
                 >
                   Submit Grievance
                 </Button>
@@ -401,15 +407,18 @@ const SubmitGrievance = () => {
 
           {/* My Grievances */}
           <Card
-            title={
-              <Space className="text-text-primary font-semibold">
-                <AlertOutlined className="text-warning" />
-                <span>My Grievances</span>
-              </Space>
-            }
-            className="rounded-xl border-border shadow-sm overflow-hidden"
+            className="rounded-2xl border-border shadow-sm overflow-hidden"
             styles={{ body: { padding: 0 } }}
           >
+            <div className="px-6 py-5 border-b border-border/50 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+                <AlertOutlined className="text-warning" />
+              </div>
+              <Title level={4} className="!mb-0 text-text-primary text-lg">
+                My Grievances
+              </Title>
+            </div>
+            
             <Table
               dataSource={grievances}
               columns={columns}
@@ -422,8 +431,9 @@ const SubmitGrievance = () => {
               }}
               locale={{
                 emptyText: (
-                  <div className="py-12">
-                    <Empty description="No grievances submitted yet" />
+                  <div className="py-12 flex flex-col items-center justify-center">
+                    <Empty description={false} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    <Text className="text-text-tertiary mt-2">No grievances submitted yet</Text>
                   </div>
                 ),
               }}
@@ -434,10 +444,12 @@ const SubmitGrievance = () => {
           {/* Detail Modal */}
           <Modal
             title={
-              <Space className="text-primary font-semibold">
-                <FileTextOutlined />
-                <span>Grievance Details</span>
-              </Space>
+              <div className="flex items-center gap-3 py-1">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                  <FileTextOutlined className="text-primary" />
+                </div>
+                <span className="font-bold text-text-primary text-lg">Grievance Details</span>
+              </div>
             }
             open={detailModalVisible}
             onCancel={() => {
@@ -445,18 +457,19 @@ const SubmitGrievance = () => {
               setSelectedGrievance(null);
             }}
             footer={
-              <div className="flex justify-end py-2">
-                <Button onClick={() => setDetailModalVisible(false)} className="rounded-lg px-6">
+              <div className="flex justify-end py-2 px-4">
+                <Button onClick={() => setDetailModalVisible(false)} className="rounded-xl px-6 h-10 font-medium">
                   Close
                 </Button>
               </div>
             }
-            width={800}
+            width={700}
             className="rounded-2xl overflow-hidden"
+            styles={{ mask: { backdropFilter: 'blur(4px)' } }}
           >
             {selectedGrievance && (
-              <div className="py-4 space-y-6">
-                <div className="flex justify-between items-center bg-background-tertiary/30 p-4 rounded-xl border border-border/50">
+              <div className="py-2 space-y-6">
+                <div className="flex justify-between items-center bg-background-tertiary p-4 rounded-xl border border-border/50">
                   <div className="flex items-center gap-3">
                     <Badge
                       status={getStatusConfig(selectedGrievance.status).badge}
@@ -465,15 +478,15 @@ const SubmitGrievance = () => {
                       {getStatusConfig(selectedGrievance.status).label}
                     </Text>
                   </div>
-                  <Tag color={getPriorityConfig(selectedGrievance.severity).color} className="rounded-md px-3 m-0">
+                  <Tag color={getPriorityConfig(selectedGrievance.severity).color} className="rounded-lg px-3 py-1 m-0 border-0 font-medium">
                     {getPriorityConfig(selectedGrievance.severity).label} Priority
                   </Tag>
                 </div>
 
                 <Alert
-                  message={<span className="font-semibold text-sm uppercase tracking-wider">Status Information</span>}
+                  message={<span className="font-bold text-xs uppercase tracking-wide">Status Information</span>}
                   description={
-                    <Text className="text-sm">
+                    <Text className="text-sm block mt-1">
                       {selectedGrievance.status === 'RESOLVED'
                         ? 'Your grievance has been resolved.'
                         : selectedGrievance.status === 'IN_REVIEW'
@@ -491,35 +504,44 @@ const SubmitGrievance = () => {
                       : 'info'
                   }
                   showIcon
-                  className="rounded-xl border-border/50"
+                  className="rounded-xl border-0 shadow-sm"
                 />
 
-                <Descriptions bordered column={1} size="small" className="rounded-xl overflow-hidden">
-                  <Descriptions.Item label="Subject">
-                    <Text strong className="text-text-primary">{selectedGrievance.title}</Text>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Category">
-                    <Text className="text-text-primary">{getCategoryConfig(selectedGrievance.category).label}</Text>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Submitted">
-                    <Space className="text-text-secondary">
-                      <CalendarOutlined className="text-xs" />
-                      {dayjs(selectedGrievance.submittedDate || selectedGrievance.createdAt).format('MMMM DD, YYYY HH:mm')}
-                    </Space>
-                  </Descriptions.Item>
-                </Descriptions>
+                <div className="bg-surface rounded-xl border border-border/60 overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border/60">
+                    <div className="p-4">
+                      <Text className="text-xs uppercase font-bold text-text-tertiary block mb-1">Subject</Text>
+                      <Text className="text-text-primary font-medium">{selectedGrievance.title}</Text>
+                    </div>
+                    <div className="p-4">
+                      <Text className="text-xs uppercase font-bold text-text-tertiary block mb-1">Category</Text>
+                      <Text className="text-text-primary font-medium">{getCategoryConfig(selectedGrievance.category).label}</Text>
+                    </div>
+                    <div className="p-4 border-t border-border/60 md:border-t-0">
+                      <Text className="text-xs uppercase font-bold text-text-tertiary block mb-1">Submitted On</Text>
+                      <Space className="text-text-primary font-medium">
+                        <CalendarOutlined className="text-primary" />
+                        {dayjs(selectedGrievance.submittedDate || selectedGrievance.createdAt).format('MMMM DD, YYYY HH:mm')}
+                      </Space>
+                    </div>
+                  </div>
+                </div>
 
-                <div className="bg-background-tertiary/20 p-6 rounded-2xl border border-border">
-                  <Title level={5} className="!mb-3 text-xs uppercase tracking-widest text-text-tertiary font-bold">Concern Details</Title>
-                  <Paragraph className="text-text-primary text-base leading-relaxed mb-0">
+                <div className="bg-background-tertiary/30 p-5 rounded-2xl border border-border/60">
+                  <Title level={5} className="!mb-3 text-xs uppercase tracking-widest text-text-tertiary font-bold flex items-center gap-2">
+                    <FileTextOutlined /> Concern Details
+                  </Title>
+                  <Paragraph className="text-text-primary text-sm leading-relaxed mb-0 whitespace-pre-line">
                     {selectedGrievance.description}
                   </Paragraph>
                 </div>
 
                 {selectedGrievance.resolution && (
-                  <div className="bg-success-50 p-6 rounded-2xl border border-success-border/50">
-                    <Title level={5} className="!mb-3 text-xs uppercase tracking-widest text-success-700 font-bold">Resolution</Title>
-                    <Paragraph className="text-text-primary font-medium mb-3">{selectedGrievance.resolution}</Paragraph>
+                  <div className="bg-success-50/50 p-5 rounded-2xl border border-success-border/30">
+                    <Title level={5} className="!mb-3 text-xs uppercase tracking-widest text-success-700 font-bold flex items-center gap-2">
+                      <CheckCircleOutlined /> Resolution
+                    </Title>
+                    <Paragraph className="text-text-primary font-medium mb-3 whitespace-pre-line">{selectedGrievance.resolution}</Paragraph>
                     {selectedGrievance.resolvedDate && (
                       <Text className="text-xs text-success-600 block italic">
                         Resolved on: {dayjs(selectedGrievance.resolvedDate).format('MMMM DD, YYYY HH:mm')}

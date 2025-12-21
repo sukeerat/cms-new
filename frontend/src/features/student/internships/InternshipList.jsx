@@ -149,90 +149,123 @@ const InternshipList = () => {
   };
 
   return (
-    <div>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic title="Available Internships" value={stats.total} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic title="Applications Submitted" value={stats.applied} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic title="Selected" value={stats.selected} />
-          </Card>
-        </Col>
-      </Row>
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex items-center">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+              <ShopOutlined className="text-lg" />
+            </div>
+            <div>
+              <Title level={2} className="mb-0 text-text-primary text-2xl">
+                Internship Opportunities
+              </Title>
+              <Paragraph className="text-text-secondary text-sm mb-0">
+                Explore and apply for internships matching your profile
+              </Paragraph>
+            </div>
+          </div>
+        </div>
 
-      <Card title="Available Internships">
-        <Space style={{ marginBottom: 16 }} wrap>
-          <Input
-            placeholder="Search by position or company"
-            prefix={<SearchOutlined />}
-            style={{ width: 250 }}
-            onChange={(e) => handleSearch(e.target.value)}
-            allowClear
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
+                <ShopOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">{stats.total}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Available</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-500/10 text-blue-500">
+                <SendOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">{stats.applied}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Applications</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-success/10 text-success">
+                <CheckCircleOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">{stats.selected}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Selected</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card className="rounded-xl border-border shadow-sm" styles={{ body: { padding: '16px' } }}>
+          <div className="flex flex-wrap items-center gap-4">
+            <Input
+              placeholder="Search by position or company"
+              prefix={<SearchOutlined className="text-text-tertiary" />}
+              className="max-w-md rounded-lg h-10 bg-background border-border"
+              onChange={(e) => handleSearch(e.target.value)}
+              allowClear
+            />
+            <Select
+              placeholder="Location"
+              className="w-40 h-10"
+              onChange={(value) => {
+                setFilters({ ...filters, location: value });
+                setPagination({ ...pagination, current: 1 });
+              }}
+              allowClear
+            >
+              <Select.Option value="Remote">Remote</Select.Option>
+              <Select.Option value="Bangalore">Bangalore</Select.Option>
+              <Select.Option value="Mumbai">Mumbai</Select.Option>
+              <Select.Option value="Delhi">Delhi</Select.Option>
+            </Select>
+            <Select
+              placeholder="Duration"
+              className="w-40 h-10"
+              onChange={(value) => {
+                setFilters({ ...filters, duration: value });
+                setPagination({ ...pagination, current: 1 });
+              }}
+              allowClear
+            >
+              <Select.Option value="3">3 months</Select.Option>
+              <Select.Option value="6">6 months</Select.Option>
+              <Select.Option value="12">12 months</Select.Option>
+            </Select>
+          </div>
+        </Card>
+
+        {/* Table Container */}
+        <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>
+          <Table
+            columns={columns}
+            dataSource={internships.list}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              ...pagination,
+              total: internships.total,
+              showTotal: (total) => `Total ${total} internships`,
+              showSizeChanger: true,
+              className: "px-6 py-4",
+            }}
+            onChange={handleTableChange}
+            className="custom-table"
           />
-          <Select
-            placeholder="Location"
-            style={{ width: 150 }}
-            onChange={(value) => {
-              setFilters({ ...filters, location: value });
-              setPagination({ ...pagination, current: 1 });
-            }}
-            allowClear
-          >
-            <Select.Option value="Remote">Remote</Select.Option>
-            <Select.Option value="Bangalore">Bangalore</Select.Option>
-            <Select.Option value="Mumbai">Mumbai</Select.Option>
-            <Select.Option value="Delhi">Delhi</Select.Option>
-            <Select.Option value="Hyderabad">Hyderabad</Select.Option>
-          </Select>
-          <Select
-            placeholder="Type"
-            style={{ width: 120 }}
-            onChange={(value) => {
-              setFilters({ ...filters, type: value });
-              setPagination({ ...pagination, current: 1 });
-            }}
-            allowClear
-          >
-            <Select.Option value="REMOTE">Remote</Select.Option>
-            <Select.Option value="ONSITE">On-site</Select.Option>
-            <Select.Option value="HYBRID">Hybrid</Select.Option>
-          </Select>
-          <Select
-            placeholder="Duration"
-            style={{ width: 120 }}
-            onChange={(value) => {
-              setFilters({ ...filters, duration: value });
-              setPagination({ ...pagination, current: 1 });
-            }}
-            allowClear
-          >
-            <Select.Option value="3">3 months</Select.Option>
-            <Select.Option value="6">6 months</Select.Option>
-            <Select.Option value="12">12 months</Select.Option>
-          </Select>
-        </Space>
-        <Table
-          columns={columns}
-          dataSource={internships.list}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            ...pagination,
-            total: internships.total,
-            showTotal: (total) => `Total ${total} internships`,
-            showSizeChanger: true,
-          }}
-          onChange={handleTableChange}
-        />
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };

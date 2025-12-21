@@ -638,138 +638,126 @@ const ViewApplicants = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background-secondary">
-      <div className="mx-auto p-4 md:p-6">
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <div className="max-w-[1600px] mx-auto space-y-6">
         {/* Header */}
-        <Card className="mb-4 rounded-2xl border-border bg-background/95 shadow-sm">
-          <div className="mb-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex items-center">
             {currentInternship && (
-              <div className="flex items-center mb-4">
-                <Button
-                  icon={<ArrowLeftOutlined />}
-                  onClick={handleBackToInternships}
-                  className="mr-3 rounded-lg"
-                >
-                  Back to Internships
-                </Button>
-                <div className="flex items-center text-primary font-medium">
-                  <BankOutlined className="mr-2" />
-                  <Text className="text-sm">
-                    {currentInternship.fieldOfWork} •{" "}
-                    {currentInternship.duration}
-                  </Text>
-                </div>
-              </div>
-            )}
-            <Title level={3} className="mb-2 text-text-primary">
-              {getPageTitle()}
-            </Title>
-            <Text className="text-text-secondary text-lg">
-              {getPageDescription()}
-            </Text>
-          </div>
-
-          {/* Status Overview */}
-          <Row gutter={[16, 16]} className="mb-8">
-            <Col xs={24} sm={6}>
-              <Card
-                size="small"
-                className="text-center rounded-xl border-border shadow-sm bg-gradient-to-r from-primary-50 to-primary-100/50"
-              >
-                <Statistic
-                  title={<Text className="text-[10px] uppercase font-bold text-primary-700">Total Applications</Text>}
-                  value={statusCounts.total}
-                  valueStyle={{ color: "var(--ant-primary-color)", fontWeight: "bold" }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={6}>
-              <Card
-                size="small"
-                className="text-center rounded-xl border-border shadow-sm bg-gradient-to-r from-warning-50 to-warning-100/50"
-              >
-                <Statistic
-                  title={<Text className="text-[10px] uppercase font-bold text-warning-700">Pending Review</Text>}
-                  value={statusCounts.applied}
-                  valueStyle={{ color: "var(--ant-warning-color)", fontWeight: "bold" }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={6}>
-              <Card
-                size="small"
-                className="text-center rounded-xl border-border shadow-sm bg-gradient-to-r from-success-50 to-success-100/50"
-              >
-                <Statistic
-                  title={<Text className="text-[10px] uppercase font-bold text-success-700">Selected</Text>}
-                  value={statusCounts.selected}
-                  valueStyle={{ color: "var(--ant-success-color)", fontWeight: "bold" }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={6}>
-              <Card
-                size="small"
-                className="text-center rounded-xl border-border shadow-sm bg-gradient-to-r from-error-50 to-error-100/50"
-              >
-                <Statistic
-                  title={<Text className="text-[10px] uppercase font-bold text-error-700">Rejected</Text>}
-                  value={statusCounts.rejected}
-                  valueStyle={{ color: "var(--ant-error-color)", fontWeight: "bold" }}
-                />
-              </Card>
-            </Col>
-          </Row>
-
-          {/* Filters */}
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={8}>
-              <Search
-                placeholder="Search students..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="rounded-lg"
-                size="large"
-                allowClear
+              <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={handleBackToInternships}
+                className="mr-4 w-10 h-10 flex items-center justify-center rounded-xl border-border hover:border-primary hover:text-primary transition-all"
               />
-            </Col>
-            <Col xs={24} sm={8}>
-              <Select
-                value={statusFilter}
-                onChange={setStatusFilter}
-                className="w-full rounded-lg"
-                placeholder="Filter by status"
-                size="large"
-              >
-                <Option value="all">All Status</Option>
-                <Option value="APPLIED">Applied</Option>
-                <Option value="UNDER_REVIEW">Under Review</Option>
-                <Option value="SELECTED">Selected</Option>
-                <Option value="REJECTED">Rejected</Option>
-                <Option value="JOINED">Joined</Option>
-                <Option value="COMPLETED">Completed</Option>
-              </Select>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Select
-                value={branchFilter}
-                onChange={setBranchFilter}
-                className="w-full rounded-lg"
-                placeholder="Filter by branch"
-                size="large"
-              >
-                <Option value="all">All Branches</Option>
-                {uniqueBranches.map((branch) => (
-                  <Option key={branch} value={branch}>
-                    {branch}
-                  </Option>
-                ))}
-              </Select>
-            </Col>
-          </Row>
+            )}
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+              <ContactsOutlined className="text-lg" />
+            </div>
+            <div>
+              <Title level={2} className="mb-0 text-text-primary text-2xl">
+                {getPageTitle()}
+              </Title>
+              <Paragraph className="text-text-secondary text-sm mb-0">
+                {getPageDescription()}
+              </Paragraph>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <TeamOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">{statusCounts.total}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Total Applications</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center">
+                <ClockCircleOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">{statusCounts.applied}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Pending Review</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center">
+                <CheckCircleOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">{statusCounts.selected}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Selected</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-error/10 text-error flex items-center justify-center">
+                <CloseCircleOutlined className="text-lg" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-text-primary">{statusCounts.rejected}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Rejected</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card className="rounded-xl border-border shadow-sm" styles={{ body: { padding: '16px' } }}>
+          <div className="flex flex-wrap items-center gap-4">
+            <Search
+              placeholder="Search student name or roll no..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="max-w-md rounded-lg h-10 bg-background border-border"
+              prefix={<SearchOutlined className="text-text-tertiary" />}
+              allowClear
+            />
+            <Select
+              value={statusFilter}
+              onChange={setStatusFilter}
+              className="w-44 h-10 rounded-lg"
+              placeholder="Filter by Status"
+            >
+              <Option value="all">All Statuses</Option>
+              <Option value="APPLIED">Applied</Option>
+              <Option value="UNDER_REVIEW">Under Review</Option>
+              <Option value="SELECTED">Selected</Option>
+              <Option value="REJECTED">Rejected</Option>
+              <Option value="JOINED">Joined</Option>
+              <Option value="COMPLETED">Completed</Option>
+            </Select>
+            <Select
+              value={branchFilter}
+              onChange={setBranchFilter}
+              className="w-44 h-10 rounded-lg"
+              placeholder="Filter by Branch"
+            >
+              <Option value="all">All Branches</Option>
+              {uniqueBranches.map((branch) => (
+                <Option key={branch} value={branch}>
+                  {branch}
+                </Option>
+              ))}
+            </Select>
+          </div>
         </Card>
+
         {/* Applications Table */}
-        <Card className="rounded-2xl border-border shadow-sm overflow-hidden">
+        <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>
           <Table
             columns={columns}
             dataSource={filteredData}
@@ -778,34 +766,26 @@ const ViewApplicants = () => {
             scroll={{ x: "max-content" }}
             pagination={{
               total: filteredData.length,
-              pageSize: 5,
+              pageSize: 10,
               showSizeChanger: true,
               showQuickJumper: true,
+              className: "px-6 py-4",
               showTotal: (total, range) =>
                 `${range[0]}-${range[1]} of ${total} applications`,
             }}
-            locale={{
-              emptyText: (
-                <div className="text-center py-12">
-                  <UserOutlined className="text-4xl text-text-tertiary mb-4" />
-                  <Text className="text-text-secondary block text-lg font-medium">
-                    No applications found
-                  </Text>
-                  <Text className="text-text-tertiary">
-                    Applications will appear here once students apply
-                  </Text>
-                </div>
-              ),
-            }}
+            size="middle"
             className="custom-table"
           />
         </Card>
+
         {/* Application Details Modal */}
         <Modal
           title={
-            <div className="flex items-center text-primary font-semibold">
-              <UserOutlined className="mr-2" />
-              Application Details
+            <div className="flex items-center gap-3 py-1">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                <UserOutlined className="text-primary" />
+              </div>
+              <span className="font-bold text-text-primary text-lg">Application Details</span>
             </div>
           }
           open={detailsModal}
@@ -813,152 +793,104 @@ const ViewApplicants = () => {
           width={900}
           footer={null}
           className="rounded-2xl overflow-hidden"
+          styles={{ mask: { backdropFilter: 'blur(4px)' } }}
         >
           {selectedApplication && (
-            <div className="space-y-6 mt-6">
-              <Tabs defaultActiveKey="details" className="custom-tabs">
-                <TabPane tab="Student Details" key="details">
-                  <div className="flex items-start space-x-6 mb-8">
-                    <Avatar
-                      size={100}
-                      src={selectedApplication.student?.profileImage}
-                      icon={
-                        !selectedApplication.student?.profileImage && (
-                          <UserOutlined />
-                        )
-                      }
-                      className="flex-shrink-0 bg-primary border-4 border-background shadow-lg"
-                    />
-                    <div className="flex-1">
-                      <Title level={4} className="mb-1 text-text-primary">
-                        {selectedApplication.student?.name}
-                      </Title>
-                      <Text className="text-text-secondary text-lg block mb-3 font-medium">
-                        {selectedApplication.student?.rollNumber}
-                      </Text>
-                      <div className="flex flex-wrap gap-2">
-                        <Tag color="blue" className="px-3 py-1 rounded-full border-0 font-medium">
-                          {selectedApplication.student?.branchName}
-                        </Tag>
-                        <Tag color="green" className="px-3 py-1 rounded-full border-0 font-medium">
-                          10th: {selectedApplication.student?.tenthper}%
-                        </Tag>
-                        <Tag color="purple" className="px-3 py-1 rounded-full border-0 font-medium">
-                          12th: {selectedApplication.student?.twelthper}%
-                        </Tag>
-                        <Tag color="orange" className="px-3 py-1 rounded-full border-0 font-medium">
-                          {selectedApplication.student?.category}
-                        </Tag>
+            <div className="py-2 space-y-6">
+              <Tabs defaultActiveKey="details" className="custom-tabs" items={[
+                {
+                  key: "details",
+                  label: <span className="font-bold text-xs uppercase tracking-widest px-2">Student Profile</span>,
+                  children: (
+                    <div className="pt-6 space-y-8">
+                      <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
+                        <Avatar
+                          size={120}
+                          src={selectedApplication.student?.profileImage}
+                          icon={!selectedApplication.student?.profileImage && <UserOutlined />}
+                          className="rounded-2xl border-4 border-background shadow-soft ring-1 ring-border shrink-0"
+                        />
+                        <div className="flex-grow text-center md:text-left">
+                          <Title level={3} className="!mb-1 !text-text-primary text-2xl font-black">
+                            {selectedApplication.student?.name}
+                          </Title>
+                          <Text className="text-primary font-bold text-sm block mb-4 uppercase tracking-wider">
+                            {selectedApplication.student?.branchName} • {selectedApplication.student?.rollNumber}
+                          </Text>
+                          <div className="flex flex-wrap justify-center md:justify-start gap-2">
+                            <Tag className="m-0 px-3 py-0.5 rounded-full border-0 bg-background-tertiary text-text-secondary font-bold text-[10px] uppercase tracking-wider">
+                              10th: {selectedApplication.student?.tenthper}%
+                            </Tag>
+                            <Tag className="m-0 px-3 py-0.5 rounded-full border-0 bg-background-tertiary text-text-secondary font-bold text-[10px] uppercase tracking-wider">
+                              12th: {selectedApplication.student?.twelthper}%
+                            </Tag>
+                            <Tag className="m-0 px-3 py-0.5 rounded-full border-0 bg-primary/10 text-primary font-bold text-[10px] uppercase tracking-wider">
+                              {selectedApplication.student?.category}
+                            </Tag>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border/60">
+                          <div className="p-4">
+                            <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest block mb-1">Email Address</Text>
+                            <a href={`mailto:${selectedApplication.student?.email}`} className="text-sm font-bold text-primary hover:underline block truncate">
+                              {selectedApplication.student?.email}
+                            </a>
+                          </div>
+                          <div className="p-4">
+                            <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest block mb-1">Contact Number</Text>
+                            <Text className="text-sm font-bold text-text-primary block">{selectedApplication.student?.contact}</Text>
+                          </div>
+                          <div className="p-4 md:col-span-2">
+                            <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest block mb-1">Permanent Address</Text>
+                            <Text className="text-sm font-medium text-text-primary block">
+                              {selectedApplication.student?.address}, {selectedApplication.student?.city}, {selectedApplication.student?.state} - {selectedApplication.student?.pinCode}
+                            </Text>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  <Descriptions bordered column={2} className="mb-6 rounded-xl overflow-hidden">
-                    <Descriptions.Item label="Email" span={1}>
-                      <Space>
-                        <MailOutlined className="text-primary" />
-                        <a
-                          href={`mailto:${selectedApplication.student?.email}`}
-                          className="text-primary hover:underline font-medium"
-                        >
-                          {selectedApplication.student?.email}
-                        </a>
-                      </Space>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Contact" span={1}>
-                      <Space>
-                        <PhoneOutlined className="text-success" />
-                        <a
-                          href={`tel:${selectedApplication.student?.contact}`}
-                          className="text-primary hover:underline font-medium"
-                        >
-                          {selectedApplication.student?.contact}
-                        </a>
-                      </Space>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Address" span={2}>
-                      {selectedApplication.student?.address},{" "}
-                      {selectedApplication.student?.city},{" "}
-                      {selectedApplication.student?.state} -{" "}
-                      {selectedApplication.student?.pinCode}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Parent Name">
-                      {selectedApplication.student?.parentName}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Parent Contact">
-                      <a
-                        href={`tel:${selectedApplication.student?.parentContact}`}
-                        className="text-primary hover:underline"
-                      >
-                        {selectedApplication.student?.parentContact}
-                      </a>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Application Date" span={2}>
-                      {formatDate(selectedApplication.appliedDate)}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Status" span={2}>
-                      <Tag color={getStatusColor(selectedApplication.status)} className="font-medium px-3 rounded-full">
-                        {selectedApplication.status}
-                      </Tag>
-                    </Descriptions.Item>
-                  </Descriptions>
-                </TabPane>
-
-                <TabPane tab="Application" key="application">
-                  <div className="space-y-6">
-                    <div>
-                      <Title level={5} className="text-text-primary mb-3">
-                        Internship Applied For
-                      </Title>
-                      <div className="bg-primary-50 p-4 rounded-xl border border-primary-200">
-                        <Text strong className="text-lg block text-primary-800">
-                          {selectedApplication.internship?.title}
-                        </Text>
-                        <Text className="text-primary-700">
-                          {selectedApplication.internship?.fieldOfWork} •{" "}
-                          {selectedApplication.internship?.duration}
-                        </Text>
+                  )
+                },
+                {
+                  key: "application",
+                  label: <span className="font-bold text-xs uppercase tracking-widest px-2">Application Documents</span>,
+                  children: (
+                    <div className="pt-6 space-y-8">
+                      <div className="bg-primary-50/50 p-5 rounded-2xl border border-primary-100">
+                        <Title level={5} className="!mb-4 text-[10px] uppercase font-black text-primary tracking-widest">Position Applied For</Title>
+                        <Title level={4} className="!mb-1 text-text-primary">{selectedApplication.internship?.title}</Title>
+                        <Text className="text-primary-700 font-medium">{selectedApplication.internship?.fieldOfWork} • {selectedApplication.internship?.duration}</Text>
                       </div>
-                    </div>
 
-                    <div>
-                      <Title level={5} className="text-text-primary mb-3">
-                        Cover Letter
-                      </Title>
-                      <div className="bg-background-tertiary p-6 rounded-xl border border-border">
-                        <Paragraph className="mb-0 text-text-primary leading-relaxed text-base">
+                      <div className="bg-background-tertiary/30 p-6 rounded-2xl border border-border/60">
+                        <Title level={5} className="!mb-4 text-[10px] uppercase font-black text-text-tertiary tracking-widest flex items-center gap-2">
+                          <FileTextOutlined className="text-primary" /> Cover Letter
+                        </Title>
+                        <Paragraph className="text-text-primary text-base leading-relaxed mb-0 whitespace-pre-line">
                           {selectedApplication.coverLetter}
                         </Paragraph>
                       </div>
-                    </div>
 
-                    {selectedApplication.additionalInfo && (
-                      <div>
-                        <Title level={5} className="text-text-primary mb-3">
-                          Additional Information
-                        </Title>
-                        <div className="bg-background-tertiary/50 p-6 rounded-xl border border-border/50">
-                          <Paragraph className="mb-0 text-text-primary leading-relaxed text-base">
+                      {selectedApplication.additionalInfo && (
+                        <div className="bg-background-tertiary/30 p-6 rounded-2xl border border-border/60">
+                          <Title level={5} className="!mb-4 text-[10px] uppercase font-black text-text-tertiary tracking-widest flex items-center gap-2">
+                            <InfoCircleOutlined className="text-primary" /> Additional Info
+                          </Title>
+                          <Paragraph className="text-text-primary text-base leading-relaxed mb-0">
                             {selectedApplication.additionalInfo}
                           </Paragraph>
                         </div>
-                      </div>
-                    )}
-
-                    {selectedApplication.rejectionReason && (
-                      <div>
-                        <Title level={5} className="text-error mb-3">
-                          Rejection Reason
-                        </Title>
-                        <div className="bg-error-50 p-6 rounded-xl border border-error-border">
-                          <Paragraph className="mb-0 text-error-700 leading-relaxed text-base">
-                            {selectedApplication.rejectionReason}
-                          </Paragraph>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TabPane>
+                      )}
+                    </div>
+                  )
+                }
+              ]} />
+            </div>
+          )}
+        </Modal>
 
                 {/* Monthly Feedbacks Tab */}
                 {selectedApplication.monthlyFeedbacks?.length > 0 && (

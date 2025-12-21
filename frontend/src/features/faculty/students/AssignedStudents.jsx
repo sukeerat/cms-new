@@ -173,53 +173,66 @@ export default function AssignedStudents() {
   }
 
   return (
-    <>
-      <div className="">
+    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <Title level={2} className="mb-0">
-            Assigned Students ({safeStudents.length})
-          </Title>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={forceRefresh}
-            loading={loading}
-          >
-            Refresh
-          </Button>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex items-center">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+              <TeamOutlined className="text-lg" />
+            </div>
+            <div>
+              <Title level={2} className="mb-0 text-text-primary text-2xl">
+                Assigned Students
+              </Title>
+              <Paragraph className="text-text-secondary text-sm mb-0">
+                You have <span className="font-semibold text-primary">{safeStudents.length}</span> students assigned for mentorship
+              </Paragraph>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              icon={<ReloadOutlined spin={loading} />}
+              onClick={forceRefresh}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-text-secondary shadow-sm hover:bg-surface-hover hover:scale-105 active:scale-95 transition-all duration-200"
+            />
+          </div>
         </div>
 
-        {/* Table */}
+        {/* Table Container */}
+        <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>
           {safeStudents.length > 0 ? (
             <Table
               columns={columns}
               dataSource={safeStudents}
               rowKey={(record) => record?.id || Math.random()}
               pagination={{
-                pageSize: 5,
+                pageSize: 10,
                 showSizeChanger: true,
                 showQuickJumper: true,
+                className: "px-6 py-4",
                 showTotal: (total, range) =>
                   `${range[0]}-${range[1]} of ${total} students`,
               }}
-              bordered
-              size="small"
-                 scroll={{ x: "max-content" }}
+              size="middle"
+              scroll={{ x: "max-content" }}
+              className="custom-table"
             />
           ) : (
-            <Card className="text-center py-12">
+            <div className="py-20 flex flex-col items-center justify-center">
               <Empty
-                description="No students assigned yet"
+                description={false}
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-              >
-                <Text className="text-gray-500">
-                  Students will appear here once they are assigned to you by the
-                  admin.
-                </Text>
-              </Empty>
-            </Card>
+              />
+              <Title level={4} className="text-text-secondary mt-4 mb-1">No students assigned yet</Title>
+              <Text className="text-text-tertiary">
+                Students will appear here once they are assigned to you by the admin.
+              </Text>
+            </div>
           )}
+        </Card>
       </div>
-    </>
+    </div>
   );
 }

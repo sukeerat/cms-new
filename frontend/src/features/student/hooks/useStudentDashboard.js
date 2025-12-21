@@ -20,22 +20,72 @@ import {
 export const useStudentDashboard = () => {
   const dispatch = useDispatch();
 
-  // Selectors
-  const dashboard = useSelector((state) => state.student.dashboard);
-  const profile = useSelector((state) => state.student.profile);
-  const internships = useSelector((state) => state.student.internships);
-  const applications = useSelector((state) => state.student.applications);
-  const reports = useSelector((state) => state.student.reports);
-  const mentor = useSelector((state) => state.student.mentor);
-  const grievances = useSelector((state) => state.student.grievances);
+  // Selectors with safe defaults
+  const dashboard = useSelector((state) => state.student?.dashboard || { loading: false, stats: null, error: null });
+  const profile = useSelector((state) => state.student?.profile || { loading: false, data: null, error: null });
+  const internships = useSelector((state) => state.student?.internships || { loading: false, list: [], error: null });
+  const applications = useSelector((state) => state.student?.applications || { loading: false, list: [], error: null });
+  const reports = useSelector((state) => state.student?.reports || { loading: false, list: [], error: null });
+  const mentor = useSelector((state) => state.student?.mentor || { loading: false, data: null, error: null });
+  const grievances = useSelector((state) => state.student?.grievances || { loading: false, list: [], error: null });
 
-  // Derived loading state
+  // Detailed loading states
+  const loadingStates = useMemo(() => ({
+    dashboard: dashboard.loading,
+    profile: profile.loading,
+    internships: internships.loading,
+    applications: applications.loading,
+    reports: reports.loading,
+    mentor: mentor.loading,
+    grievances: grievances.loading,
+  }), [
+    dashboard.loading,
+    profile.loading,
+    internships.loading,
+    applications.loading,
+    reports.loading,
+    mentor.loading,
+    grievances.loading,
+  ]);
+
+  // Overall loading state
   const isLoading = useMemo(() => (
     dashboard.loading ||
     profile.loading ||
     internships.loading ||
-    applications.loading
-  ), [dashboard.loading, profile.loading, internships.loading, applications.loading]);
+    applications.loading ||
+    reports.loading
+  ), [
+    dashboard.loading,
+    profile.loading,
+    internships.loading,
+    applications.loading,
+    reports.loading,
+  ]);
+
+  // Detailed error states
+  const errors = useMemo(() => ({
+    dashboard: dashboard.error,
+    profile: profile.error,
+    internships: internships.error,
+    applications: applications.error,
+    reports: reports.error,
+    mentor: mentor.error,
+    grievances: grievances.error,
+  }), [
+    dashboard.error,
+    profile.error,
+    internships.error,
+    applications.error,
+    reports.error,
+    mentor.error,
+    grievances.error,
+  ]);
+
+  // Check if any error exists
+  const hasError = useMemo(() => (
+    !!(dashboard.error || profile.error || applications.error || reports.error)
+  ), [dashboard.error, profile.error, applications.error, reports.error]);
 
   // Fetch all dashboard data
   const fetchDashboardData = useCallback((forceRefresh = false) => {
@@ -53,58 +103,86 @@ export const useStudentDashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // Normalize applications list
+  const normalizedApplications = useMemo(() => {
+    if (Array.isArray(applications.list)) {
+      return applications.list;
+    }
+    return applications.list?.applications || [];
+  }, [applications.list]);
+
+  // Normalize grievances list
+  const normalizedGrievances = useMemo(() => {
+    if (Array.isArray(grievances.list)) {
+      return grievances.list;
+    }
+    return grievances.list?.grievances || [];
+  }, [grievances.list]);
+
   // Calculate statistics from data
-  const stats = useMemo(() => {
-    const apps = applications.list || [];
-    return {
-      totalApplications: apps.length,
-      activeApplications: apps.filter(app =>
-        ['APPLIED', 'SHORTLISTED', 'UNDER_REVIEW'].includes(app.status)
-      ).length,
-      selectedApplications: apps.filter(app => app.status === 'SELECTED').length,
-      completedInternships: apps.filter(app => app.status === 'COMPLETED').length,
-      totalInternships: (internships.list || []).length,
-      grievances: (grievances.list || []).length,
-    };
-  }, [applications.list, internships.list, grievances.list]);
+  const stats = useMemo(() => ({
+    totalApplications: normalizedApplications.length,
+    activeApplications: normalizedApplications.filter(app =>
+      ['APPLIED', 'SHORTLISTED', 'UNDER_REVIEW'].includes(app.status)
+    ).length,
+    selectedApplications: normalizedApplications.filter(app => app.status === 'SELECTED').length,
+    completedInternships: normalizedApplications.filter(app => app.status === 'COMPLETED').length,
+    totalInternships: (internships.list || []).length,
+    grievances: normalizedGrievances.length,
+  }), [normalizedApplications, internships.list, normalizedGrievances]);
 
   // Get active internship(s)
-  const activeInternships = useMemo(() => {
-    return (applications.list || []).filter(app =>
-      app.status === 'SELECTED' || app.status === 'ACTIVE'
-    );
-  }, [applications.list]);
+  const activeInternships = useMemo(() => (
+    normalizedApplications.filter(app =>
+      app.status === 'SELECTED' || app.status === 'ACTIVE' || app.status === 'JOINED'
+    )
+  ), [normalizedApplications]);
 
   // Get recent applications
-  const recentApplications = useMemo(() => {
-    return [...(applications.list || [])]
+  const recentApplications = useMemo(() => (
+    [...normalizedApplications]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 5);
-  }, [applications.list]);
+      .slice(0, 5)
+  ), [normalizedApplications]);
 
   // Get monthly reports with internship info
-  const monthlyReports = useMemo(() => {
-    return (applications.list || []).flatMap(app =>
+  const monthlyReports = useMemo(() => (
+    normalizedApplications.flatMap(app =>
       (app.monthlyReports || []).map(report => ({
         ...report,
         applicationId: app.id,
         internshipTitle: app.internship?.title,
         companyName: app.internship?.industry?.companyName,
       }))
-    );
-  }, [applications.list]);
+    )
+  ), [normalizedApplications]);
 
-  // Action handlers
-  const handleWithdrawApplication = useCallback((applicationId) => {
-    return dispatch(withdrawApplication(applicationId));
+  // Action handlers with error handling
+  const handleWithdrawApplication = useCallback(async (applicationId) => {
+    try {
+      const result = await dispatch(withdrawApplication(applicationId)).unwrap();
+      return result;
+    } catch (error) {
+      throw error;
+    }
   }, [dispatch]);
 
-  const handleUpdateApplication = useCallback((id, data) => {
-    return dispatch(updateApplication({ id, data }));
+  const handleUpdateApplication = useCallback(async (id, data) => {
+    try {
+      const result = await dispatch(updateApplication({ id, data })).unwrap();
+      return result;
+    } catch (error) {
+      throw error;
+    }
   }, [dispatch]);
 
-  const handleSubmitReport = useCallback((reportId, data) => {
-    return dispatch(submitMonthlyReport({ reportId, data }));
+  const handleSubmitReport = useCallback(async (reportId, data) => {
+    try {
+      const result = await dispatch(submitMonthlyReport({ reportId, data })).unwrap();
+      return result;
+    } catch (error) {
+      throw error;
+    }
   }, [dispatch]);
 
   const refresh = useCallback(() => {
@@ -114,11 +192,12 @@ export const useStudentDashboard = () => {
   return {
     // State
     isLoading,
+    loadingStates,
     dashboard: dashboard.stats,
     profile: profile.data,
     mentor: mentor.data,
-    grievances: grievances.list || [],
-    applications: applications.list || [],
+    grievances: normalizedGrievances,
+    applications: normalizedApplications,
     internships: internships.list || [],
     reports: reports.list || [],
 
@@ -136,6 +215,8 @@ export const useStudentDashboard = () => {
     handleSubmitReport,
 
     // Errors
+    errors,
+    hasError,
     error: dashboard.error || profile.error || applications.error,
   };
 };

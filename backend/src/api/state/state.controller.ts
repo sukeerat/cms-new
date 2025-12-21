@@ -15,6 +15,12 @@ import { Roles } from '../../core/auth/decorators/roles.decorator';
 import { RolesGuard } from '../../core/auth/guards/roles.guard';
 import { JwtAuthGuard } from '../../core/auth/guards/jwt-auth.guard';
 import { Role } from '@prisma/client';
+import {
+  CreateInstitutionDto,
+  UpdateInstitutionDto,
+  CreatePrincipalDto,
+  UpdatePrincipalDto,
+} from './dto';
 
 @ApiTags('State Directorate')
 @ApiBearerAuth()
@@ -86,13 +92,13 @@ export class StateController {
 
   @Post('institutions')
   @ApiOperation({ summary: 'Create new institution' })
-  async createInstitution(@Body() data: any) {
+  async createInstitution(@Body() data: CreateInstitutionDto) {
     return this.stateService.createInstitution(data);
   }
 
   @Put('institutions/:id')
   @ApiOperation({ summary: 'Update institution by ID' })
-  async updateInstitution(@Param('id') id: string, @Body() data: any) {
+  async updateInstitution(@Param('id') id: string, @Body() data: UpdateInstitutionDto) {
     return this.stateService.updateInstitution(id, data);
   }
 
@@ -118,7 +124,7 @@ export class StateController {
 
   @Post('principals')
   @ApiOperation({ summary: 'Create new principal for an institution' })
-  async createPrincipal(@Body() data: any) {
+  async createPrincipal(@Body() data: CreatePrincipalDto) {
     return this.stateService.createPrincipal(data);
   }
 
@@ -130,7 +136,7 @@ export class StateController {
 
   @Put('principals/:id')
   @ApiOperation({ summary: 'Update principal by ID' })
-  async updatePrincipal(@Param('id') id: string, @Body() data: any) {
+  async updatePrincipal(@Param('id') id: string, @Body() data: UpdatePrincipalDto) {
     return this.stateService.updatePrincipal(id, data);
   }
 
@@ -348,5 +354,35 @@ export class StateController {
         monthlyAnalytics: monthlyData,
       },
     };
+  }
+
+  // ==================== Mentor Management ====================
+
+  @Get('institutions/:id/mentors')
+  @ApiOperation({ summary: 'Get mentors/faculty from an institution' })
+  async getInstitutionMentors(@Param('id') institutionId: string) {
+    const mentors = await this.stateService.getInstitutionMentors(institutionId);
+    return { success: true, data: mentors };
+  }
+
+  @Post('students/:id/assign-mentor')
+  @ApiOperation({ summary: 'Assign mentor to student' })
+  async assignMentorToStudent(
+    @Param('id') studentId: string,
+    @Body('mentorId') mentorId: string,
+    @Request() req,
+  ) {
+    const assignedBy = req.user?.userId || 'state-admin';
+    return this.stateService.assignMentorToStudent(studentId, mentorId, assignedBy);
+  }
+
+  @Delete('students/:id/mentor')
+  @ApiOperation({ summary: 'Remove mentor from student' })
+  async removeMentorFromStudent(
+    @Param('id') studentId: string,
+    @Request() req,
+  ) {
+    const removedBy = req.user?.userId || 'state-admin';
+    return this.stateService.removeMentorFromStudent(studentId, removedBy);
   }
 }

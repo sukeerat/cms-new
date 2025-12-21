@@ -160,7 +160,7 @@ const ManageInternships = () => {
 
       toast.success(`Internship ${newStatus.toLowerCase()} successfully`);
     } catch (error) {
-      toast.error("Error updating status");
+      toast.error("Failed to update internship status");
     }
   };
 
@@ -180,7 +180,7 @@ const ManageInternships = () => {
       }
       toast.success(`"${title}" deleted successfully`);
     } catch (error) {
-      toast.error("Error deleting internship");
+      toast.error("Failed to delete internship");
     }
   };
 

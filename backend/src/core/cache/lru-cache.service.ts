@@ -128,7 +128,8 @@ export class LruCacheService implements OnModuleInit {
       try {
         await this.redisCircuitBreaker.execute(async () => {
           const serialized = JSON.stringify(value);
-          await this.redis.setex(key, Math.floor(ttlMs / 1000), serialized);
+          // Use PX (milliseconds) instead of setex (seconds) to handle sub-second TTLs and avoid 0 seconds error
+          await this.redis.set(key, serialized, 'PX', ttlMs);
 
           // Handle tags if provided
           if (options?.tags && options.tags.length > 0) {

@@ -16,11 +16,39 @@ const MonthlyReportForm = () => {
   const { monthlyReports } = useSelector(state => state.student);
   const report = id ? monthlyReports.list?.find(r => r.id === id) : null;
 
+  // Helper to transform attachments to fileList format
+  const transformAttachmentsToFileList = (attachments) => {
+    if (!attachments) return undefined;
+    if (Array.isArray(attachments)) {
+      return attachments.map((att, index) => {
+        if (typeof att === 'string') {
+          return {
+            uid: `-${index + 1}`,
+            name: `Attachment ${index + 1}`,
+            status: 'done',
+            url: att,
+          };
+        }
+        return att;
+      });
+    }
+    if (typeof attachments === 'string') {
+      return [{
+        uid: '-1',
+        name: 'Attachment',
+        status: 'done',
+        url: attachments,
+      }];
+    }
+    return undefined;
+  };
+
   useEffect(() => {
     if (report) {
       form.setFieldsValue({
         ...report,
         skillsLearned: report.skillsLearned || [],
+        attachments: transformAttachmentsToFileList(report.attachments),
       });
     } else {
       // Set current month and year as default

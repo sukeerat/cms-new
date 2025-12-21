@@ -6,24 +6,16 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { AssignMentorDto } from './dto/assign-mentor.dto';
+import { UserService } from '../../domain/user/user.service';
 import * as bcrypt from 'bcryptjs';
 import * as XLSX from 'xlsx';
-
-// Helper function to generate secure temporary password
-function generateTemporaryPassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
-  let password = '';
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
-}
 
 @Injectable()
 export class PrincipalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: LruCacheService,
+    private readonly userService: UserService,
   ) {}
 
   /**
@@ -262,6 +254,8 @@ export class PrincipalService {
     batchId?: string;
     branchId?: string;
     status?: string; // Internship status filter
+    mentorId?: string; // Mentor filter
+    joiningLetterStatus?: string; // Joining letter filter: 'uploaded', 'pending', 'all'
   }) {
     const principal = await this.prisma.user.findUnique({
       where: { id: principalId },
@@ -273,7 +267,7 @@ export class PrincipalService {
 
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
-    const { search, batchId, branchId, status } = query;
+    const { search, batchId, branchId, status, mentorId, joiningLetterStatus } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.StudentWhereInput = {
@@ -296,6 +290,15 @@ export class PrincipalService {
       where.branchId = branchId;
     }
 
+    // Filter by mentor
+    if (mentorId && mentorId !== 'all') {
+      if (mentorId === 'unassigned') {
+        where.mentorAssignments = { none: { isActive: true } };
+      } else {
+        where.mentorAssignments = { some: { mentorId, isActive: true } };
+      }
+    }
+
     // Get students with their internship applications and reports
     const [students, total] = await Promise.all([
       this.prisma.student.findMany({
@@ -315,7 +318,19 @@ export class PrincipalService {
           internshipApplications: {
             orderBy: { createdAt: 'desc' },
             take: 1,
-            include: {
+            select: {
+              id: true,
+              status: true,
+              joiningDate: true,
+              completionDate: true,
+              hasJoined: true,
+              // Joining letter fields
+              joiningLetterUrl: true,
+              joiningLetterUploadedAt: true,
+              // Self-identified internship fields
+              isSelfIdentified: true,
+              companyName: true,
+              companyAddress: true,
               internship: {
                 select: {
                   id: true,
@@ -323,6 +338,23 @@ export class PrincipalService {
                   startDate: true,
                   endDate: true,
                   duration: true,
+                  workLocation: true,
+                  stipendAmount: true,
+                  industry: {
+                    select: {
+                      id: true,
+                      companyName: true,
+                      companyDescription: true,
+                      industryType: true,
+                      website: true,
+                      logoUrl: true,
+                      contactEmail: true,
+                      contactPhone: true,
+                      address: true,
+                      city: true,
+                      state: true,
+                    },
+                  },
                 },
               },
               monthlyReports: {
@@ -332,6 +364,8 @@ export class PrincipalService {
                   reportYear: true,
                   status: true,
                   submittedAt: true,
+                  summary: true,
+                  reportFileUrl: true,
                 },
                 orderBy: [{ reportYear: 'asc' }, { reportMonth: 'asc' }],
               },
@@ -462,7 +496,47 @@ export class PrincipalService {
           internshipTitle: application.internship?.title,
           joiningDate: application.joiningDate,
           completionDate: application.completionDate,
+          // Joining letter details
+          joiningLetterUrl: (application as any).joiningLetterUrl,
+          joiningLetterUploadedAt: (application as any).joiningLetterUploadedAt,
+          hasJoiningLetter: !!(application as any).joiningLetterUrl,
+          // Company/Industry details
+          company: application.internship?.industry ? {
+            id: application.internship.industry.id,
+            name: application.internship.industry.companyName,
+            description: application.internship.industry.companyDescription,
+            type: application.internship.industry.industryType,
+            website: application.internship.industry.website,
+            logo: application.internship.industry.logoUrl,
+            email: application.internship.industry.contactEmail,
+            phone: application.internship.industry.contactPhone,
+            address: application.internship.industry.address,
+            city: application.internship.industry.city,
+            state: application.internship.industry.state,
+          } : (application as any).isSelfIdentified ? {
+            name: (application as any).companyName,
+            address: (application as any).companyAddress,
+            isSelfIdentified: true,
+          } : null,
+          // Internship details
+          workLocation: application.internship?.workLocation,
+          stipendAmount: application.internship?.stipendAmount,
+          duration: application.internship?.duration,
+          startDate: application.internship?.startDate,
+          endDate: application.internship?.endDate,
+          isSelfIdentified: (application as any).isSelfIdentified,
         } : null,
+        // Monthly reports with details
+        monthlyReports: reports.map((report: any) => ({
+          id: report.id,
+          month: report.reportMonth,
+          year: report.reportYear,
+          monthName: new Date(report.reportYear, report.reportMonth - 1).toLocaleString('default', { month: 'long' }),
+          status: report.status,
+          submittedAt: report.submittedAt,
+          summary: report.summary,
+          reportFileUrl: report.reportFileUrl,
+        })),
       };
     });
 
@@ -472,6 +546,36 @@ export class PrincipalService {
       filteredData = progressData.filter((s) => s.internshipStatus === status);
     }
 
+    // Filter by joining letter status
+    if (joiningLetterStatus && joiningLetterStatus !== 'all') {
+      if (joiningLetterStatus === 'uploaded') {
+        filteredData = filteredData.filter((s) => s.application?.hasJoiningLetter);
+      } else if (joiningLetterStatus === 'pending') {
+        filteredData = filteredData.filter(
+          (s) => s.application && !s.application.hasJoiningLetter && s.application.status === 'JOINED'
+        );
+      }
+    }
+
+    // Get list of mentors for filter dropdown
+    const mentors = await this.prisma.user.findMany({
+      where: {
+        institutionId: principal.institutionId,
+        role: { in: ['FACULTY_SUPERVISOR', 'TEACHER'] },
+        active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            assignedMentees: { where: { isActive: true } },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
     return {
       students: filteredData,
       pagination: {
@@ -480,6 +584,11 @@ export class PrincipalService {
         limit,
         totalPages: Math.ceil(total / limit),
       },
+      mentors: mentors.map((m) => ({
+        id: m.id,
+        name: m.name,
+        assignedCount: m._count.assignedMentees,
+      })),
     };
   }
 
@@ -634,7 +743,7 @@ export class PrincipalService {
   }
 
   /**
-   * Create a new student
+   * Create a new student - delegates to domain UserService
    */
   async createStudent(principalId: string, createStudentDto: CreateStudentDto) {
     const principal = await this.prisma.user.findUnique({
@@ -645,82 +754,24 @@ export class PrincipalService {
       throw new NotFoundException('Institution not found');
     }
 
-    // Check if email already exists
-    if (createStudentDto.email) {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { email: createStudentDto.email },
-      });
-
-      if (existingUser) {
-        throw new BadRequestException(`User with email ${createStudentDto.email} already exists`);
-      }
-    }
-
-    // Check if admission/enrollment number already exists (maps to Student.admissionNumber)
-    if (createStudentDto.enrollmentNumber) {
-      const existingStudent = await this.prisma.student.findFirst({
-        where: { admissionNumber: createStudentDto.enrollmentNumber },
-      });
-
-      if (existingStudent) {
-        throw new BadRequestException(
-          `Student with enrollment number ${createStudentDto.enrollmentNumber} already exists`,
-        );
-      }
-    }
-
-    const batch = await this.prisma.batch.findUnique({
-      where: { id: createStudentDto.batchId },
-      select: { id: true, institutionId: true },
+    // Delegate to domain UserService for student creation
+    const result = await this.userService.createStudent(principal.institutionId, {
+      name: createStudentDto.name,
+      email: createStudentDto.email,
+      phone: createStudentDto.phone,
+      enrollmentNumber: createStudentDto.enrollmentNumber,
+      batchId: createStudentDto.batchId,
+      dateOfBirth: createStudentDto.dateOfBirth,
+      gender: createStudentDto.gender,
+      address: createStudentDto.address,
     });
 
-    if (!batch || batch.institutionId !== principal.institutionId) {
-      throw new BadRequestException('Invalid batchId for this institution');
-    }
-
-    // Generate and hash secure temporary password
-    const temporaryPassword = generateTemporaryPassword();
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
-
-    // Create user first
-    const user = await this.prisma.user.create({
-      data: {
-        name: createStudentDto.name,
-        email: createStudentDto.email,
-        password: hashedPassword,
-        role: Role.STUDENT,
-        Institution: { connect: { id: principal.institutionId } },
-        phoneNo: createStudentDto.phone,
-        dob: createStudentDto.dateOfBirth,
-      },
-    });
     // TODO: Send email with temporary password to student
-
-    // Create student profile
-    const student = await this.prisma.student.create({
-      data: {
-        user: { connect: { id: user.id } },
-        name: createStudentDto.name,
-        email: createStudentDto.email,
-        admissionNumber: createStudentDto.enrollmentNumber,
-        contact: createStudentDto.phone,
-        address: createStudentDto.address,
-        dob: createStudentDto.dateOfBirth,
-        gender: createStudentDto.gender,
-        batch: { connect: { id: createStudentDto.batchId } },
-        Institution: { connect: { id: principal.institutionId } },
-        isActive: true,
-      },
-      include: {
-        user: true,
-        batch: true,
-        branch: true,
-      },
-    });
+    // result.temporaryPassword contains the generated password
 
     await this.cache.invalidateByTags(['students', `institution:${principal.institutionId}`]);
 
-    return student;
+    return result.student;
   }
 
   /**
@@ -996,8 +1047,8 @@ export class PrincipalService {
           ? Role.FACULTY_SUPERVISOR
           : Role.PRINCIPAL;
 
-    // Generate and hash secure temporary password
-    const temporaryPassword = generateTemporaryPassword();
+    // Generate and hash secure temporary password using domain service
+    const temporaryPassword = this.userService.generateSecurePassword();
     const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
     const staff = await this.prisma.user.create({

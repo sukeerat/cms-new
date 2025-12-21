@@ -101,8 +101,13 @@ export class ExcelService {
     // Freeze header row
     worksheet.views = [{ state: 'frozen', ySplit: 4 }];
 
-    // Generate buffer
-    return (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
+    // Generate buffer - ExcelJS returns ArrayBuffer, convert to Buffer
+    const arrayBuffer = await workbook.xlsx.writeBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    console.log(`[ExcelService] Generated Excel buffer: ${buffer.length} bytes`);
+
+    return buffer;
   }
 
   /**
@@ -184,6 +189,8 @@ export class ExcelService {
       });
     }
 
-    return (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
+    // Generate buffer - ExcelJS returns ArrayBuffer, convert to Buffer
+    const arrayBuffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(arrayBuffer);
   }
 }

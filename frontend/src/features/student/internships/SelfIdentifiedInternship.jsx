@@ -256,7 +256,7 @@ const SelfIdentifiedInternship = () => {
       // Enhanced error handling
       if (error.code === 'ERR_NETWORK') {
         toast.error(
-          "Network error: Unable to submit application. Please check your internet connection and try again."
+          "Unable to connect to server. Please try again later."
         );
       } else if (error.code === 'ECONNABORTED') {
         toast.error(

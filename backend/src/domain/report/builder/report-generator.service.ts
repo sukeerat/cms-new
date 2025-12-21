@@ -380,22 +380,50 @@ export class ReportGeneratorService {
   /**
    * Generate report based on type
    */
-  async generateReport(type: ReportType, filters: any): Promise<any[]> {
-    switch (type) {
-      case ReportType.STUDENT_PROGRESS:
-        return this.generateStudentProgressReport(filters);
-      case ReportType.INTERNSHIP:
-        return this.generateInternshipReport(filters);
-      case ReportType.FACULTY_VISIT:
-        return this.generateFacultyVisitReport(filters);
-      case ReportType.MONTHLY:
-        return this.generateMonthlyReport(filters);
-      case ReportType.PLACEMENT:
-        return this.generatePlacementReport(filters);
-      case ReportType.INSTITUTION_PERFORMANCE:
-        return this.generateInstitutionPerformanceReport(filters);
-      default:
-        throw new Error(`Unknown report type: ${type}`);
+  async generateReport(type: ReportType | string, filters: any): Promise<any[]> {
+    // Map new report types to generators
+    const typeStr = String(type).toLowerCase();
+
+    // Student reports
+    if (typeStr.includes('student') || typeStr === ReportType.STUDENT_PROGRESS) {
+      return this.generateStudentProgressReport(filters);
     }
+
+    // Internship reports
+    if (typeStr.includes('internship') || typeStr === ReportType.INTERNSHIP) {
+      return this.generateInternshipReport(filters);
+    }
+
+    // Faculty/Mentor reports
+    if (typeStr.includes('mentor') || typeStr.includes('faculty-visit') || typeStr === ReportType.FACULTY_VISIT) {
+      return this.generateFacultyVisitReport(filters);
+    }
+
+    // Monthly reports
+    if (typeStr.includes('monthly') || typeStr === ReportType.MONTHLY) {
+      return this.generateMonthlyReport(filters);
+    }
+
+    // Placement reports
+    if (typeStr.includes('placement') || typeStr === ReportType.PLACEMENT) {
+      return this.generatePlacementReport(filters);
+    }
+
+    // Institution reports
+    if (typeStr.includes('institut') || typeStr === ReportType.INSTITUTION_PERFORMANCE) {
+      return this.generateInstitutionPerformanceReport(filters);
+    }
+
+    // Compliance reports - use faculty visit or monthly as base
+    if (typeStr.includes('compliance') || typeStr.includes('pending')) {
+      if (typeStr.includes('visit')) {
+        return this.generateFacultyVisitReport(filters);
+      }
+      return this.generateMonthlyReport(filters);
+    }
+
+    // Default to student report
+    console.warn(`[ReportGenerator] Unknown report type: ${type}, defaulting to student report`);
+    return this.generateStudentProgressReport(filters);
   }
 }

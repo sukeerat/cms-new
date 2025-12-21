@@ -22,9 +22,17 @@ export enum ExportFormat {
 
 export interface ReportJobData {
   userId: string;
-  reportType: ReportType;
-  filters: any;
-  format: ExportFormat;
+  reportType: ReportType | string;
+  filters?: any;
+  config?: {
+    columns?: string[];
+    filters?: Record<string, unknown>;
+    groupBy?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    format?: string;
+  };
+  format?: ExportFormat | string;
   reportId?: string;
 }
 
@@ -67,9 +75,11 @@ export interface ExportConfig {
 }
 
 export interface ReportCatalogItem {
-  type: ReportType;
+  type: ReportType | string;
   name: string;
   description: string;
   icon?: string;
   category: string;
+  columnsCount?: number;
+  filtersCount?: number;
 }

@@ -1,16 +1,32 @@
-import { IsEnum, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
-import { ReportType, ExportFormat } from '../interfaces/report.interface';
+import { IsArray, IsEnum, IsIn, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { ExportFormat } from '../interfaces/report.interface';
 
 export class GenerateReportDto {
-  @IsEnum(ReportType)
+  @IsString()
   @IsNotEmpty()
-  type: ReportType;
+  type: string;
 
-  @IsEnum(ExportFormat)
-  @IsNotEmpty()
-  format: ExportFormat;
+  @IsArray()
+  @IsOptional()
+  columns?: string[];
 
   @IsObject()
   @IsOptional()
-  filters?: any;
+  filters?: Record<string, unknown>;
+
+  @IsString()
+  @IsOptional()
+  groupBy?: string;
+
+  @IsString()
+  @IsOptional()
+  sortBy?: string;
+
+  @IsIn(['asc', 'desc'])
+  @IsOptional()
+  sortOrder?: 'asc' | 'desc';
+
+  @IsIn(['excel', 'csv', 'pdf', 'json'])
+  @IsOptional()
+  format?: string;
 }

@@ -34,9 +34,9 @@ const PerformerItem = ({ item, rank, type }) => {
         />
         <div className="flex-1 min-w-0">
           <Tooltip title={item.name}>
-            <Text strong className="block truncate text-slate-900">{item.name}</Text>
+            <Text strong className="block truncate text-slate-900 dark:text-slate-200">{item.name}</Text>
           </Tooltip>
-          <Text className="text-xs text-slate-500">
+          <Text className="text-xs text-slate-500 dark:text-slate-400">
             {item.city || item.shortName || 'Institution'}
           </Text>
         </div>
@@ -54,7 +54,7 @@ const PerformerItem = ({ item, rank, type }) => {
               {item.placementRate || item.score || 0}%
             </Text>
           </div>
-          <Text className="text-xs text-slate-500">
+          <Text className="text-xs text-slate-500 dark:text-slate-400">
             {item.selectedApplications || item.studentsPlaced || 0} placed
           </Text>
         </div>
@@ -74,7 +74,7 @@ const TopPerformers = ({ topPerformers = [], bottomPerformers = [], loading }) =
             <span>Top Performers</span>
           </div>
         }
-        className="shadow-sm border-slate-200"
+        className="shadow-sm border-slate-200 dark:border-slate-800"
         loading={loading}
       >
         {topPerformers.length > 0 ? (
@@ -101,7 +101,7 @@ const TopPerformers = ({ topPerformers = [], bottomPerformers = [], loading }) =
             <span>Needs Attention</span>
           </div>
         }
-        className="shadow-sm border-slate-200"
+        className="shadow-sm border-slate-200 dark:border-slate-800"
         loading={loading}
       >
         {bottomPerformers.length > 0 ? (

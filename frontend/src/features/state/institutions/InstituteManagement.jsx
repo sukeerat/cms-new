@@ -507,49 +507,52 @@ const InstituteManagement = () => {
       </div>
 
       {/* Statistics Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card className="shadow-sm border-slate-200">
-            <Statistic
-              title={<span className="text-slate-600">Total Institutes</span>}
-              value={stats.total}
-              prefix={<BankOutlined className="text-blue-500" />}
-              valueStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card className="shadow-sm border-slate-200">
-            <Statistic
-              title={<span className="text-slate-600">Active Institutes</span>}
-              value={stats.active}
-              prefix={<CheckCircleOutlined className="text-green-500" />}
-              valueStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card className="shadow-sm border-slate-200">
-            <Statistic
-              title={<span className="text-slate-600">Inactive Institutes</span>}
-              value={stats.inactive}
-              prefix={<CloseCircleOutlined className="text-red-500" />}
-              valueStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card className="shadow-sm border-slate-200">
-            <Statistic
-              title={<span className="text-slate-600">Autonomous Institutes</span>}
-              value={stats.autonomous}
-              prefix={<CheckCircleOutlined className="text-purple-500" />}
-              valueStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
+              <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card className="shadow-sm border-slate-200 dark:border-slate-700 dark:bg-slate-800">
+                    <Statistic
+                      title={<span className="text-slate-600 dark:text-slate-400">Total Institutes</span>}
+                      value={stats.total}
+                      prefix={<BankOutlined className="text-blue-500" />}
+                      valueStyle={{ fontWeight: 'bold' }}
+                      className="text-slate-900 dark:text-slate-100"
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card className="shadow-sm border-slate-200 dark:border-slate-700 dark:bg-slate-800">
+                    <Statistic
+                      title={<span className="text-slate-600 dark:text-slate-400">Active Institutes</span>}
+                      value={stats.active}
+                      prefix={<CheckCircleOutlined className="text-green-500" />}
+                      valueStyle={{ fontWeight: 'bold' }}
+                      className="text-slate-900 dark:text-slate-100"
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card className="shadow-sm border-slate-200 dark:border-slate-700 dark:bg-slate-800">
+                    <Statistic
+                      title={<span className="text-slate-600 dark:text-slate-400">Inactive Institutes</span>}
+                      value={stats.inactive}
+                      prefix={<CloseCircleOutlined className="text-red-500" />}
+                      valueStyle={{ fontWeight: 'bold' }}
+                      className="text-slate-900 dark:text-slate-100"
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                  <Card className="shadow-sm border-slate-200 dark:border-slate-700 dark:bg-slate-800">
+                    <Statistic
+                      title={<span className="text-slate-600 dark:text-slate-400">Autonomous Institutes</span>}
+                      value={stats.autonomous}
+                      prefix={<CheckCircleOutlined className="text-purple-500" />}
+                      valueStyle={{ fontWeight: 'bold' }}
+                      className="text-slate-900 dark:text-slate-100"
+                    />
+                  </Card>
+                </Col>
+              </Row>
       {/* Main Content Card */}
       <Card className="shadow-sm border-slate-200">
         {/* Toolbar */}

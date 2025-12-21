@@ -586,6 +586,43 @@ export const fetchInstituteCompanies = createAsyncThunk(
   }
 );
 
+// Mentor management thunks
+export const fetchInstitutionMentors = createAsyncThunk(
+  'state/fetchInstitutionMentors',
+  async (institutionId, { rejectWithValue }) => {
+    try {
+      const response = await stateService.getInstitutionMentors(institutionId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch mentors');
+    }
+  }
+);
+
+export const assignMentorToStudent = createAsyncThunk(
+  'state/assignMentorToStudent',
+  async ({ studentId, mentorId }, { rejectWithValue }) => {
+    try {
+      const response = await stateService.assignMentorToStudent(studentId, mentorId);
+      return { studentId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to assign mentor');
+    }
+  }
+);
+
+export const removeMentorFromStudent = createAsyncThunk(
+  'state/removeMentorFromStudent',
+  async (studentId, { rejectWithValue }) => {
+    try {
+      const response = await stateService.removeMentorFromStudent(studentId);
+      return { studentId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to remove mentor');
+    }
+  }
+);
+
 const stateSlice = createSlice({
   name: 'state',
   initialState,

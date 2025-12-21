@@ -324,7 +324,7 @@ const FacultyReports = () => {
               title="Total Visits"
               value={stats?.totalVisits || 0}
               prefix={<CheckCircleOutlined className="text-primary-500" />}
-              valueStyle={{ color: '#1890ff' }}
+              className="text-blue-600 dark:text-blue-400"
             />
           </Card>
         </Col>
@@ -336,7 +336,7 @@ const FacultyReports = () => {
               precision={1}
               prefix={<StarOutlined className="text-amber-500" />}
               suffix="/ 5"
-              valueStyle={{ color: '#faad14' }}
+              className="text-yellow-600 dark:text-yellow-400"
             />
           </Card>
         </Col>
@@ -346,7 +346,7 @@ const FacultyReports = () => {
               title="Visits This Month"
               value={stats?.visitsThisMonth || 0}
               prefix={<CalendarOutlined className="text-emerald-500" />}
-              valueStyle={{ color: '#52c41a' }}
+              className="text-green-600 dark:text-green-400"
             />
           </Card>
         </Col>

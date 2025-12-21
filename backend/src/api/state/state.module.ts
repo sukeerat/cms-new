@@ -8,6 +8,8 @@ import { PlacementModule } from '../../domain/placement/placement.module';
 import { ReportModule } from '../../domain/report/report.module';
 import { MentorModule } from '../../domain/mentor/mentor.module';
 import { AcademicModule } from '../../domain/academic/academic.module';
+import { InstitutionModule } from '../../domain/institution/institution.module';
+import { UserModule } from '../../domain/user/user.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { AcademicModule } from '../../domain/academic/academic.module';
     ReportModule,
     MentorModule,
     AcademicModule,
+    InstitutionModule,
+    UserModule,
   ],
   controllers: [StateController],
   providers: [StateService],

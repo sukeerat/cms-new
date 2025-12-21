@@ -40,7 +40,9 @@ export class CsvService {
     }
 
     // Convert to buffer
-    return Buffer.from(lines.join('\n'), 'utf-8');
+    const buffer = Buffer.from(lines.join('\n'), 'utf-8');
+    console.log(`[CsvService] Generated CSV buffer: ${buffer.length} bytes`);
+    return buffer;
   }
 
   /**

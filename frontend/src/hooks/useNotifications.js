@@ -49,7 +49,7 @@ export const useNotifications = () => {
       setUnreadCount(0);
       toast.success('All notifications marked as read');
     } catch (error) {
-      toast.error('Error marking all as read');
+      toast.error('Failed to mark notifications as read');
     }
   }, []);
 
@@ -62,7 +62,7 @@ export const useNotifications = () => {
       );
       toast.success('Notification deleted');
     } catch (error) {
-      toast.error('Error deleting notification');
+      toast.error('Failed to delete notification');
     }
   }, []);
 
@@ -74,7 +74,7 @@ export const useNotifications = () => {
       setUnreadCount(0);
       toast.success('All notifications cleared');
     } catch (error) {
-      toast.error('Error clearing notifications');
+      toast.error('Failed to clear notifications');
     }
   }, []);
 

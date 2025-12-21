@@ -30,32 +30,19 @@ const handleApiCall = async (apiCall, errorMessage = "API request failed") => {
 // Report Catalog & Configuration
 // ============================================
 
+// API base path - matches backend @Controller('shared/reports')
+const API_PATH = '/shared/reports';
+
 /**
  * Get the full catalog of available reports grouped by category
- * Backend returns: { categories: [{ id, name, description, reports: [...] }] }
- * Frontend expects: { CATEGORY_ID: [reports] }
- * @returns {Promise} Transformed catalog object grouped by category
+ * Backend returns: { success: true, data: { CategoryLabel: [...reports] } }
+ * @returns {Promise} Catalog object grouped by category
  */
 export const getReportCatalog = async () => {
   return handleApiCall(async () => {
-    const response = await API.get("/report-builder/catalog");
-    const catalogData = response.data;
-
-    // Transform from { categories: [...] } to { CATEGORY: [reports] }
-    const transformedCatalog = {};
-    if (catalogData?.categories) {
-      catalogData.categories.forEach((category) => {
-        transformedCatalog[category.id] = category.reports.map((report) => ({
-          ...report,
-          category: category.id,
-          // Ensure columns/filters arrays exist for UI
-          columns: report.columns || [],
-          filters: report.filters || [],
-        }));
-      });
-    }
-
-    return { data: transformedCatalog };
+    const response = await API.get(`${API_PATH}/catalog`);
+    const catalogData = response.data?.data || response.data || {};
+    return { data: catalogData };
   }, "Failed to load report catalog");
 };
 
@@ -70,26 +57,31 @@ export const getReportConfig = async (reportType) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.get(`/report-builder/config/${reportType}`);
-    return { data: response.data };
+    const response = await API.get(`${API_PATH}/config/${reportType}`);
+    return { data: response.data?.data || response.data };
   }, `Failed to load configuration for ${reportType}`);
 };
 
 /**
  * Get available filter values for dynamic filters
- * Backend returns: { filterId, options: [{ value, label }] }
+ * Backend returns: { success: true, data: [{ value, label }] }
  * @param {string} reportType - The report type identifier
  * @param {string} filterId - The filter identifier
+ * @param {string} institutionId - Optional institution ID for dependent filters
  * @returns {Promise} API response with filter options array
  */
-export const getFilterValues = async (reportType, filterId) => {
+export const getFilterValues = async (reportType, filterId, institutionId) => {
   if (!reportType || !filterId) {
     return { data: [] };
   }
 
   return handleApiCall(async () => {
-    const response = await API.get(`/report-builder/filter-values/${reportType}/${filterId}`);
-    return { data: response.data?.options || [] };
+    let url = `${API_PATH}/filters/${reportType}/${filterId}`;
+    if (institutionId) {
+      url += `?institutionId=${institutionId}`;
+    }
+    const response = await API.get(url);
+    return { data: response.data?.data || [] };
   }, `Failed to load filter values for ${filterId}`);
 };
 
@@ -104,19 +96,16 @@ export const getFilterValues = async (reportType, filterId) => {
  * @returns {Promise} API response with report ID and status 'pending'
  */
 export const generateReport = async (payload) => {
-  if (!payload?.reportType) {
+  if (!payload?.type) {
     throw new Error("Report type is required");
-  }
-  if (!payload?.columns?.length) {
-    throw new Error("At least one column must be selected");
   }
   if (!payload?.format) {
     throw new Error("Export format is required");
   }
 
   return handleApiCall(async () => {
-    const response = await API.post("/report-builder/generate", payload);
-    return { data: response.data };
+    const response = await API.post(`${API_PATH}/generate`, payload);
+    return { data: response.data?.data || response.data };
   }, "Failed to generate report");
 };
 
@@ -127,19 +116,16 @@ export const generateReport = async (payload) => {
  * @returns {Promise} API response with generated report
  */
 export const generateReportSync = async (payload) => {
-  if (!payload?.reportType) {
+  if (!payload?.type) {
     throw new Error("Report type is required");
-  }
-  if (!payload?.columns?.length) {
-    throw new Error("At least one column must be selected");
   }
   if (!payload?.format) {
     throw new Error("Export format is required");
   }
 
   return handleApiCall(async () => {
-    const response = await API.post("/report-builder/generate-sync", payload);
-    return { data: response.data };
+    const response = await API.post(`${API_PATH}/generate-sync`, payload);
+    return { data: response.data?.data || response.data };
   }, "Failed to generate report (sync mode)");
 };
 
@@ -158,8 +144,8 @@ export const getReport = async (reportId) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.get(`/report-builder/reports/${reportId}`);
-    return { data: response.data };
+    const response = await API.get(`${API_PATH}/${reportId}`);
+    return { data: response.data?.data || response.data };
   }, "Failed to load report details");
 };
 
@@ -175,26 +161,25 @@ export const getReportStatus = async (reportId) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.get(`/report-builder/reports/${reportId}/status`);
-    return { data: response.data };
+    const response = await API.get(`${API_PATH}/${reportId}/status`);
+    return { data: response.data?.data || response.data };
   }, "Failed to fetch report status");
 };
 
 /**
  * Get user's report generation history
- * @param {number} [limit=20] - Number of reports to fetch
- * @param {number} [offset=0] - Offset for pagination
+ * @param {Object} params - Pagination params { page, limit }
  * @returns {Promise} API response with report history
  */
-export const getReportHistory = async (limit = 20, offset = 0) => {
+export const getReportHistory = async (params = {}) => {
   return handleApiCall(async () => {
-    const response = await API.get(`/report-builder/history?limit=${limit}&offset=${offset}`);
-    // Backend returns array directly, need to wrap for frontend
-    const reports = Array.isArray(response.data) ? response.data : response.data?.reports || [];
-    return {
-      data: reports,
-      total: response.data?.total || reports.length,
-    };
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    const queryString = queryParams.toString();
+    const url = queryString ? `${API_PATH}?${queryString}` : API_PATH;
+    const response = await API.get(url);
+    return response.data?.data || response.data || { data: [], total: 0 };
   }, "Failed to load report history");
 };
 
@@ -209,15 +194,84 @@ export const deleteReport = async (reportId) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.delete(`/report-builder/reports/${reportId}`);
+    const response = await API.delete(`${API_PATH}/report/${reportId}`);
     return response.data;
   }, "Failed to delete report");
 };
 
+// ============================================
+// Queue Management
+// ============================================
+
 /**
- * Download/export a generated report
+ * Get queue statistics (waiting, active, completed, failed, delayed)
+ * @returns {Promise} Queue statistics
+ */
+export const getQueueStats = async () => {
+  return handleApiCall(async () => {
+    const response = await API.get(`${API_PATH}/queue/stats`);
+    return { data: response.data?.data || response.data };
+  }, "Failed to get queue statistics");
+};
+
+/**
+ * Get active/pending reports for current user
+ * @returns {Promise} Array of active reports
+ */
+export const getActiveReports = async () => {
+  return handleApiCall(async () => {
+    const response = await API.get(`${API_PATH}/queue/active`);
+    return { data: response.data?.data || [] };
+  }, "Failed to get active reports");
+};
+
+/**
+ * Get failed/cancelled reports for current user
+ * @returns {Promise} Array of failed reports
+ */
+export const getFailedReports = async () => {
+  return handleApiCall(async () => {
+    const response = await API.get(`${API_PATH}/queue/failed`);
+    return { data: response.data?.data || [] };
+  }, "Failed to get failed reports");
+};
+
+/**
+ * Cancel a report generation
  * @param {string} reportId - The report UUID
- * @returns {Promise} Blob response for file download
+ * @returns {Promise} API response
+ */
+export const cancelReport = async (reportId) => {
+  if (!reportId) {
+    throw new Error("Report ID is required");
+  }
+
+  return handleApiCall(async () => {
+    const response = await API.post(`${API_PATH}/cancel/${reportId}`);
+    return response.data;
+  }, "Failed to cancel report");
+};
+
+/**
+ * Retry a failed report generation
+ * @param {string} reportId - The report UUID
+ * @returns {Promise} API response with new job ID
+ */
+export const retryReport = async (reportId) => {
+  if (!reportId) {
+    throw new Error("Report ID is required");
+  }
+
+  return handleApiCall(async () => {
+    const response = await API.post(`${API_PATH}/retry/${reportId}`);
+    return response.data;
+  }, "Failed to retry report");
+};
+
+/**
+ * Download/export a generated report (redirects to file URL)
+ * @param {string} reportId - The report UUID
+ * @returns {Promise} Download URL or blob
  */
 export const exportReport = async (reportId) => {
   if (!reportId) {
@@ -225,22 +279,23 @@ export const exportReport = async (reportId) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.get(`/report-builder/export/${reportId}`, {
+    const response = await API.get(`${API_PATH}/${reportId}/download`, {
       responseType: 'blob',
+      maxRedirects: 5,
     });
     return response;
   }, "Failed to download report");
 };
 
 /**
- * Get the export URL for a report (for direct download)
+ * Get the download URL for a report
  * @param {string} reportId - The report UUID
- * @returns {string} The export URL
+ * @returns {string} The download URL
  */
 export const getExportUrl = (reportId) => {
   if (!reportId) return '';
   const baseUrl = API.defaults.baseURL || '';
-  return `${baseUrl}/report-builder/export/${reportId}`;
+  return `${baseUrl}${API_PATH}/${reportId}/download`;
 };
 
 // ============================================
@@ -259,26 +314,28 @@ export const saveTemplate = async (payload) => {
   if (!payload?.reportType) {
     throw new Error("Report type is required");
   }
-  if (!payload?.columns?.length) {
-    throw new Error("At least one column must be selected");
-  }
 
   return handleApiCall(async () => {
-    const response = await API.post("/report-builder/templates", payload);
-    return { data: transformTemplateResponse(response.data) };
+    const response = await API.post(`${API_PATH}/templates`, payload);
+    return { data: transformTemplateResponse(response.data?.data || response.data) };
   }, "Failed to save template");
 };
 
 /**
  * Get all templates (user's and public)
+ * @param {string} reportType - Optional filter by report type
  * @returns {Promise} API response with templates list
  */
-export const getTemplates = async () => {
+export const getTemplates = async (reportType) => {
   return handleApiCall(async () => {
-    const response = await API.get("/report-builder/templates");
-    // Transform array of templates
-    const templates = Array.isArray(response.data)
-      ? response.data.map(transformTemplateResponse)
+    let url = `${API_PATH}/templates/list`;
+    if (reportType) {
+      url += `?reportType=${reportType}`;
+    }
+    const response = await API.get(url);
+    const templatesData = response.data?.data || response.data || [];
+    const templates = Array.isArray(templatesData)
+      ? templatesData.map(transformTemplateResponse)
       : [];
     return { data: templates };
   }, "Failed to load templates");
@@ -295,8 +352,8 @@ export const getTemplate = async (templateId) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.get(`/report-builder/templates/${templateId}`);
-    return { data: transformTemplateResponse(response.data) };
+    const response = await API.get(`${API_PATH}/templates/${templateId}`);
+    return { data: transformTemplateResponse(response.data?.data || response.data) };
   }, "Failed to load template");
 };
 
@@ -312,8 +369,8 @@ export const updateTemplate = async (templateId, payload) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.put(`/report-builder/templates/${templateId}`, payload);
-    return { data: transformTemplateResponse(response.data) };
+    const response = await API.put(`${API_PATH}/templates/${templateId}`, payload);
+    return { data: transformTemplateResponse(response.data?.data || response.data) };
   }, "Failed to update template");
 };
 
@@ -328,7 +385,7 @@ export const deleteTemplate = async (templateId) => {
   }
 
   return handleApiCall(async () => {
-    const response = await API.delete(`/report-builder/templates/${templateId}`);
+    const response = await API.delete(`${API_PATH}/templates/${templateId}`);
     return response.data;
   }, "Failed to delete template");
 };
@@ -425,6 +482,12 @@ export default {
   deleteReport,
   exportReport,
   getExportUrl,
+  // Queue Management
+  getQueueStats,
+  getActiveReports,
+  getFailedReports,
+  cancelReport,
+  retryReport,
   // Templates
   saveTemplate,
   getTemplates,

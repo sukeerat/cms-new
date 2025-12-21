@@ -360,7 +360,7 @@ const NotificationDropdown = () => {
           <Button
             type="text"
             icon={<BellOutlined className="text-lg" />}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 text-slate-600 dark:text-slate-300 shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all duration-200"
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-text-secondary shadow-sm hover:bg-surface-hover hover:scale-105 active:scale-95 transition-all duration-200"
           />
         </Badge>
       </Dropdown>

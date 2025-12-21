@@ -19,11 +19,68 @@ import { RedlockService } from './redlock.service';
       }),
     }),
     BullModule.registerQueue(
-      { name: 'email' },
-      { name: 'notifications' },
-      { name: 'file-processing' },
-      { name: 'data-sync' },
-      { name: 'bulk-operations' },
+      {
+        name: 'email',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'notifications',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'file-processing',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'data-sync',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'bulk-operations',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'report-generation',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'dead-letter-queue',
+        defaultJobOptions: {
+          attempts: 1,
+          removeOnComplete: false,
+          removeOnFail: false,
+        },
+      },
     ),
   ],
   providers: [QueueService, RedlockService],

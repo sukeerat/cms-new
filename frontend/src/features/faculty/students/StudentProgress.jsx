@@ -466,7 +466,12 @@ const StudentProgressPage = () => {
     onRemove: () => {
       setReportFile(null);
     },
-    fileList: reportFile ? [reportFile] : [],
+    fileList: reportFile ? [{
+      uid: reportFile.uid || '-1',
+      name: reportFile.name,
+      status: 'done',
+      originFileObj: reportFile,
+    }] : [],
   };
 
   const MONTH_NAMES = [

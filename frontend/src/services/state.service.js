@@ -235,6 +235,22 @@ export const stateService = {
     const response = await API.get(url, { responseType: 'blob' });
     return response.data;
   },
+
+  // Mentor Management
+  async getInstitutionMentors(institutionId) {
+    const response = await API.get(`/state/institutions/${institutionId}/mentors`);
+    return response.data?.data || response.data;
+  },
+
+  async assignMentorToStudent(studentId, mentorId) {
+    const response = await API.post(`/state/students/${studentId}/assign-mentor`, { mentorId });
+    return response.data;
+  },
+
+  async removeMentorFromStudent(studentId) {
+    const response = await API.delete(`/state/students/${studentId}/mentor`);
+    return response.data;
+  },
 };
 
 export default stateService;

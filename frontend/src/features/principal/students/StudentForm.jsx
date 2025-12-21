@@ -38,9 +38,25 @@ const StudentForm = () => {
   // Set form values when student data is available
   useEffect(() => {
     if (student) {
+      // Transform profileImage to fileList format if it's a string URL
+      let profileImageValue = undefined;
+      if (student.profileImage) {
+        if (typeof student.profileImage === 'string') {
+          profileImageValue = [{
+            uid: '-1',
+            name: 'Profile Image',
+            status: 'done',
+            url: student.profileImage,
+          }];
+        } else if (Array.isArray(student.profileImage)) {
+          profileImageValue = student.profileImage;
+        }
+      }
+
       form.setFieldsValue({
         ...student,
         dateOfBirth: student.dateOfBirth ? dayjs(student.dateOfBirth) : null,
+        profileImage: profileImageValue,
       });
     }
   }, [student, form]);

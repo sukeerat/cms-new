@@ -1,33 +1,145 @@
 import API from './api';
 
+const API_PATH = '/shared/reports';
+
 export const reportService = {
+  // Catalog & Configuration
   async getCatalog() {
-    const response = await API.get('/shared/reports/catalog');
-    return response.data;
+    const response = await API.get(`${API_PATH}/catalog`);
+    return response.data?.data || response.data;
   },
+
   async getConfig(type) {
-    const response = await API.get(`/shared/reports/config/${type}`);
-    return response.data;
+    const response = await API.get(`${API_PATH}/config/${type}`);
+    return response.data?.data || response.data;
   },
-  async generateReport(data) {
-    const response = await API.post('/shared/reports/generate', data);
-    return response.data;
-  },
-  async getReportStatus(id) {
-    const response = await API.get(`/shared/reports/${id}`);
-    return response.data;
-  },
-  async downloadReport(id) {
-    const response = await API.get(`/shared/reports/${id}/download`, {
-      responseType: 'blob',
-    });
-    return response.data;
-  },
-  async getHistory(params) {
-    const queryParams = new URLSearchParams(params).toString();
-    const url = queryParams ? `/shared/reports/history?${queryParams}` : '/shared/reports/history';
+
+  async getFilterValues(reportType, filterId, institutionId) {
+    let url = `${API_PATH}/filters/${reportType}/${filterId}`;
+    if (institutionId) {
+      url += `?institutionId=${institutionId}`;
+    }
     const response = await API.get(url);
+    return response.data?.data || [];
+  },
+
+  // Report Generation
+  async generateReport(data) {
+    const response = await API.post(`${API_PATH}/generate`, data);
+    return response.data?.data || response.data;
+  },
+
+  async generateReportSync(data) {
+    const response = await API.post(`${API_PATH}/generate-sync`, data);
+    return response.data?.data || response.data;
+  },
+
+  // Report Status & Retrieval
+  async getReportStatus(id) {
+    const response = await API.get(`${API_PATH}/${id}/status`);
+    return response.data?.data || response.data;
+  },
+
+  async getReport(id) {
+    const response = await API.get(`${API_PATH}/${id}`);
+    return response.data?.data || response.data;
+  },
+
+  async downloadReport(id) {
+    try {
+      const response = await API.get(`${API_PATH}/${id}/download`, {
+        responseType: 'blob',
+      });
+
+      // Check if the response is an error (JSON instead of file)
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const error = JSON.parse(text);
+        throw new Error(error.message || 'Failed to download report');
+      }
+
+      return response.data;
+    } catch (error) {
+      // Handle axios error with blob response
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const errorData = JSON.parse(text);
+          throw new Error(errorData.message || errorData.error || 'Failed to download report');
+        } catch (parseError) {
+          // If parsing fails, use original error
+          throw new Error(error.message || 'Failed to download report');
+        }
+      }
+      throw error;
+    }
+  },
+
+  async getHistory(params = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    const queryString = queryParams.toString();
+    const url = queryString ? `${API_PATH}?${queryString}` : API_PATH;
+    const response = await API.get(url);
+    return response.data?.data || response.data;
+  },
+
+  // Template Management
+  async saveTemplate(data) {
+    const response = await API.post(`${API_PATH}/templates`, data);
+    return response.data?.data || response.data;
+  },
+
+  async getTemplates(reportType) {
+    let url = `${API_PATH}/templates/list`;
+    if (reportType) {
+      url += `?reportType=${reportType}`;
+    }
+    const response = await API.get(url);
+    return response.data?.data || response.data || [];
+  },
+
+  async deleteTemplate(id) {
+    const response = await API.delete(`${API_PATH}/templates/${id}`);
     return response.data;
+  },
+
+  // Queue Management
+  async cancelReport(id) {
+    const response = await API.post(`${API_PATH}/cancel/${id}`);
+    return response.data;
+  },
+
+  async retryReport(id) {
+    const response = await API.post(`${API_PATH}/retry/${id}`);
+    return response.data;
+  },
+
+  async deleteReport(id) {
+    const response = await API.delete(`${API_PATH}/report/${id}`);
+    return response.data;
+  },
+
+  async getActiveReports() {
+    const response = await API.get(`${API_PATH}/queue/active`);
+    return response.data?.data || [];
+  },
+
+  async getFailedReports() {
+    const response = await API.get(`${API_PATH}/queue/failed`);
+    return response.data?.data || [];
+  },
+
+  async getQueueStats() {
+    const response = await API.get(`${API_PATH}/queue/stats`);
+    return response.data?.data || response.data;
+  },
+
+  // Utility - get download URL for direct linking
+  getDownloadUrl(id) {
+    const baseUrl = API.defaults.baseURL || '';
+    return `${baseUrl}${API_PATH}/${id}/download`;
   },
 };
 

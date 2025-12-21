@@ -92,7 +92,7 @@ const BrowseInternships = () => {
         setAppliedInternships(appliedIds);
       }
     } catch (error) {
-      toast.error(error.message || 'Error fetching data');
+      toast.error(error.message || 'Failed to load internships');
       setInternships([]);
     } finally {
       setLoading(false);

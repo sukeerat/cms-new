@@ -34,13 +34,11 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
-  // Enable CORS with permissive settings for development
+  // Enable CORS with specific allowed origins
   app.enableCors({
-    origin: true, // Allow all origins in development
+    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : true,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    // Some browsers reject `Access-Control-Allow-Headers: *` for preflight.
-    // Explicitly allow the headers the frontend sends.
     allowedHeaders: [
       'Content-Type',
       'Authorization',
@@ -52,7 +50,7 @@ async function bootstrap() {
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
-  logger.log('NestJS application created with CORS enabled (permissive mode)');
+  logger.log(`CORS enabled (${process.env.NODE_ENV === 'production' ? 'restricted' : 'permissive'} mode)`);
 
   // ===== SECURITY CONFIGURATION =====
 

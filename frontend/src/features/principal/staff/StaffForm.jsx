@@ -34,12 +34,29 @@ const StaffForm = () => {
     loadData();
   }, [dispatch, id, staffMember]);
 
+  // Helper to transform image URL to fileList format
+  const transformImageToFileList = (imageUrl, name = 'Image') => {
+    if (!imageUrl) return undefined;
+    if (typeof imageUrl === 'string') {
+      return [{
+        uid: '-1',
+        name: name,
+        status: 'done',
+        url: imageUrl,
+      }];
+    }
+    if (Array.isArray(imageUrl)) return imageUrl;
+    return undefined;
+  };
+
   // Set form values when staff data is available
   useEffect(() => {
     if (staffMember) {
       form.setFieldsValue({
         ...staffMember,
         dateOfJoining: staffMember.dateOfJoining ? dayjs(staffMember.dateOfJoining) : null,
+        profileImage: transformImageToFileList(staffMember.profileImage, 'Profile Image'),
+        signature: transformImageToFileList(staffMember.signature, 'Signature'),
       });
     }
   }, [staffMember, form]);

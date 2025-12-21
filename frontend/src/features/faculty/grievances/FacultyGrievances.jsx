@@ -1194,7 +1194,7 @@ export default function FacultyGrievances() {
                       <Badge
                         count={escalationHistory.escalationCount}
                         showZero
-                        style={{ backgroundColor: "#ff4d4f" }}
+                        className="[&_.ant-badge-count]:!bg-red-500"
                       />
                     </Descriptions.Item>
                     {escalationHistory.escalatedAt && (

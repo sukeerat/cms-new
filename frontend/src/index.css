@@ -112,11 +112,12 @@ body {
   border-color: rgb(var(--color-border));
   background: rgb(var(--color-card-bg));
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 200ms ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ant-card:hover {
   box-shadow: var(--shadow-md);
+  border-color: rgba(var(--color-primary), 0.2);
 }
 
 .ant-btn {

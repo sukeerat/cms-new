@@ -1,15 +1,17 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
-import { Role, InstitutionType } from '@prisma/client';
 import { BulkInstitutionRowDto, BulkInstitutionResultDto, BulkInstitutionValidationResultDto } from './dto/bulk-institution.dto';
+import { InstitutionService, CreateInstitutionData, CreatePrincipalData } from '../../domain/institution/institution.service';
 import * as XLSX from 'xlsx';
-import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class BulkInstitutionService {
   private readonly logger = new Logger(BulkInstitutionService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly institutionService: InstitutionService,
+  ) {}
 
   /**
    * Parse CSV/Excel file and extract institution data
@@ -52,6 +54,23 @@ export class BulkInstitutionService {
    */
   async validateInstitutions(institutions: BulkInstitutionRowDto[]): Promise<BulkInstitutionValidationResultDto> {
     const errors: Array<{ row: number; field?: string; value?: string; error: string }> = [];
+
+    // OPTIMIZATION: Extract all codes and emails for batch queries
+    const allCodes = institutions
+      .map((i) => i.code)
+      .filter((code): code is string => !!code);
+    const allPrincipalEmails = institutions
+      .map((i) => i.principalEmail?.toLowerCase())
+      .filter((email): email is string => !!email);
+
+    // Use domain service for existing checks (batch queries)
+    const [existingCodeSet, existingEmailSet] = await Promise.all([
+      this.institutionService.findExistingCodes(allCodes),
+      this.institutionService.findExistingEmails(allPrincipalEmails),
+    ]);
+
+    // O(n) duplicate detection using Maps
+    const codeFirstOccurrence = new Map<string, number>();
 
     for (let i = 0; i < institutions.length; i++) {
       const institution = institutions[i];
@@ -102,26 +121,23 @@ export class BulkInstitutionService {
         });
       }
 
-      // Check for duplicate code in the file
-      const duplicateInFile = institutions.findIndex(
-        (inst, idx) => idx !== i && inst.code?.toLowerCase() === institution.code?.toLowerCase(),
-      );
-      if (duplicateInFile !== -1) {
-        errors.push({
-          row: rowNumber,
-          field: 'code',
-          value: institution.code,
-          error: `Duplicate institution code in file (also found in row ${duplicateInFile + 2})`,
-        });
-      }
-
-      // Check if code already exists in database
+      // Check for duplicate code in the file using O(n) approach with Map
       if (institution.code) {
-        const existingInstitution = await this.prisma.institution.findUnique({
-          where: { code: institution.code },
-        });
+        const codeLower = institution.code.toLowerCase();
+        const firstRow = codeFirstOccurrence.get(codeLower);
+        if (firstRow !== undefined) {
+          errors.push({
+            row: rowNumber,
+            field: 'code',
+            value: institution.code,
+            error: `Duplicate institution code in file (also found in row ${firstRow})`,
+          });
+        } else {
+          codeFirstOccurrence.set(codeLower, rowNumber);
+        }
 
-        if (existingInstitution) {
+        // O(1) check against pre-fetched existing codes
+        if (existingCodeSet.has(codeLower)) {
           errors.push({
             row: rowNumber,
             field: 'code',
@@ -133,11 +149,9 @@ export class BulkInstitutionService {
 
       // Check if principal email already exists
       if (institution.principalEmail) {
-        const existingUser = await this.prisma.user.findUnique({
-          where: { email: institution.principalEmail },
-        });
-
-        if (existingUser) {
+        const emailLower = institution.principalEmail.toLowerCase();
+        // O(1) check against pre-fetched existing emails
+        if (existingEmailSet.has(emailLower)) {
           errors.push({
             row: rowNumber,
             field: 'principalEmail',
@@ -246,68 +260,39 @@ export class BulkInstitutionService {
 
   /**
    * Create a single institution and optionally create principal user
+   * Delegates to domain InstitutionService
    */
   private async createInstitution(institutionDto: BulkInstitutionRowDto) {
-    // Map institution type to enum
-    let institutionType: InstitutionType | undefined;
-    if (institutionDto.type) {
-      const typeMapping: Record<string, InstitutionType> = {
-        'POLYTECHNIC': InstitutionType.POLYTECHNIC,
-        'ENGINEERING_COLLEGE': InstitutionType.ENGINEERING_COLLEGE,
-        'ENGINEERING': InstitutionType.ENGINEERING_COLLEGE,
-        'UNIVERSITY': InstitutionType.UNIVERSITY,
-        'DEGREE_COLLEGE': InstitutionType.DEGREE_COLLEGE,
-        'DEGREE': InstitutionType.DEGREE_COLLEGE,
-        'ITI': InstitutionType.ITI,
-        'SKILL_CENTER': InstitutionType.SKILL_CENTER,
-        'SKILL': InstitutionType.SKILL_CENTER,
-      };
-      institutionType = typeMapping[institutionDto.type.toUpperCase()];
-    }
-
-    // Create institution
-    const institution = await this.prisma.institution.create({
-      data: {
-        name: institutionDto.name,
-        code: institutionDto.code,
-        type: institutionType,
-        contactEmail: institutionDto.email,
-        contactPhone: institutionDto.phone,
-        address: institutionDto.address,
-        city: institutionDto.city,
-        state: institutionDto.state,
-        pinCode: institutionDto.pinCode,
-        website: institutionDto.website,
-        isActive: true,
-      },
-    });
-
-    // Create principal user if details are provided
-    let principal = null;
-    if (institutionDto.principalName && institutionDto.principalEmail) {
-      const defaultPassword = 'Principal@123';
-      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-
-      principal = await this.prisma.user.create({
-        data: {
-          name: institutionDto.principalName,
-          email: institutionDto.principalEmail,
-          password: hashedPassword,
-          role: Role.PRINCIPAL,
-          phoneNo: institutionDto.principalPhone,
-          institutionId: institution.id,
-          active: true,
-          hasChangedDefaultPassword: false,
-        },
-      });
-
-      this.logger.log(`Principal created for institution ${institution.code}: ${principal.email}`);
-    }
-
-    return {
-      institution,
-      principal,
+    // Map DTO to domain CreateInstitutionData
+    const institutionData: CreateInstitutionData = {
+      name: institutionDto.name,
+      code: institutionDto.code,
+      type: this.institutionService.mapInstitutionType(institutionDto.type),
+      email: institutionDto.email,
+      phone: institutionDto.phone,
+      address: institutionDto.address,
+      city: institutionDto.city,
+      state: institutionDto.state,
+      pinCode: institutionDto.pinCode,
+      website: institutionDto.website,
     };
+
+    // Map principal data if provided
+    let principalData: CreatePrincipalData | undefined;
+    if (institutionDto.principalName && institutionDto.principalEmail) {
+      principalData = {
+        name: institutionDto.principalName,
+        email: institutionDto.principalEmail,
+        phone: institutionDto.principalPhone,
+      };
+    }
+
+    // Delegate to domain service (skip validation since bulk already validated)
+    return this.institutionService.createInstitution(
+      institutionData,
+      principalData,
+      { skipValidation: true },
+    );
   }
 
   /**

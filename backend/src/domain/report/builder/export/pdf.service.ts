@@ -18,7 +18,11 @@ export class PdfService {
       const buffers: Buffer[] = [];
 
       doc.on('data', (chunk) => buffers.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('end', () => {
+        const buffer = Buffer.concat(buffers);
+        console.log(`[PdfService] Generated PDF buffer: ${buffer.length} bytes`);
+        resolve(buffer);
+      });
       doc.on('error', reject);
 
       // Add header

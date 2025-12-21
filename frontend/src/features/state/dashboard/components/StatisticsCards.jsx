@@ -18,7 +18,7 @@ const StatCard = ({ title, value, icon, gradient, active, total, trend }) => {
   const percentage = total > 0 ? Math.round((active / total) * 100) : 0;
 
   return (
-    <Card className="overflow-hidden h-full border-border" styles={{ body: { padding: 0 } }}>
+    <Card className="overflow-hidden h-full border-slate-200 dark:border-slate-800" styles={{ body: { padding: 0 } }}>
       <div className="p-4 text-white relative" style={{ background: gradient }}>
         {/* Decorative circles */}
         <div 
@@ -49,8 +49,8 @@ const StatCard = ({ title, value, icon, gradient, active, total, trend }) => {
       </div>
       <div className="p-4 bg-background-tertiary">
         <div className="flex justify-between mb-1">
-          <span className="text-sm font-medium text-slate-900">Active</span>
-          <span className="text-sm font-semibold text-slate-700">
+          <span className="text-sm font-medium text-slate-900 dark:text-white">Active</span>
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-400">
             {active?.toLocaleString() || 0}/{total?.toLocaleString() || 0}
           </span>
         </div>

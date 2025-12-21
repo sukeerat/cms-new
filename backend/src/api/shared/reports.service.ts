@@ -9,7 +9,11 @@ interface PaginationParams {
 
 interface GenerateReportDto {
   type: string;
+  columns?: string[];
   filters?: any;
+  groupBy?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   format?: string;
 }
 
@@ -62,14 +66,29 @@ export class ReportsService {
    */
   async generateReport(userId: string, reportDto: GenerateReportDto) {
     try {
-      const { type, filters = {}, format = 'pdf' } = reportDto;
+      const { type, columns = [], filters = {}, groupBy, sortBy, sortOrder, format = 'excel' } = reportDto;
+
+      // Build config object
+      const validFormats = ['excel', 'csv', 'pdf', 'json'] as const;
+      const validFormat = validFormats.includes(format as any)
+        ? (format as 'excel' | 'csv' | 'pdf' | 'json')
+        : 'excel';
+
+      const config = {
+        type,
+        columns,
+        filters: filters as Record<string, unknown>,
+        groupBy,
+        sortBy,
+        sortOrder,
+        format: validFormat,
+      };
 
       // Queue the report generation
       const result = await this.reportBuilderService.queueReportGeneration(
         userId,
         type,
-        filters,
-        format,
+        config,
       );
 
       this.logger.log(`Report generation queued: ${result.reportId} for user ${userId}`);

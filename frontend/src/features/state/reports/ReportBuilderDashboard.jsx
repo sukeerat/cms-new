@@ -381,14 +381,18 @@ const ReportBuilderDashboard = () => {
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div>
-              <Title level={2} className="mb-2 flex items-center gap-3 text-text-primary">
-                <BarChartOutlined className="text-primary" />
-                Report Builder
-              </Title>
-              <Paragraph className="text-text-secondary text-base mb-0">
-                Create custom reports with flexible filtering, grouping, and export options
-              </Paragraph>
+            <div className="flex items-center">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+                <BarChartOutlined className="text-lg" />
+              </div>
+              <div>
+                <Title level={2} className="mb-0 text-text-primary text-2xl">
+                  Report Builder
+                </Title>
+                <Paragraph className="text-text-secondary text-sm mb-0">
+                  Create custom reports with flexible filtering and exports
+                </Paragraph>
+              </div>
             </div>
 
             <div className="flex lg:flex-nowrap flex-wrap gap-3 items-center">
@@ -401,27 +405,25 @@ const ReportBuilderDashboard = () => {
                 pausePolling={statusMonitorVisible}
               />
 
-              <Button
-                size="middle"
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  loadCatalog();
-                  loadHistory(true);
-                }}
-                className="rounded-lg border-border hover:border-primary hover:text-primary"
-              >
-                Refresh
-              </Button>
+              <Tooltip title="Refresh Data">
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => {
+                    loadCatalog();
+                    loadHistory(true);
+                  }}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-text-secondary shadow-sm hover:bg-surface-hover hover:scale-105 active:scale-95 transition-all duration-200"
+                />
+              </Tooltip>
 
               <Button
                 type="primary"
-                size="middle"
                 icon={<PlusOutlined />}
                 onClick={() => {
                   setSelectedReport(null);
                   setActiveTab("catalog");
                 }}
-                className="rounded-lg shadow-md shadow-primary/20"
+                className="h-10 rounded-xl font-bold shadow-lg shadow-primary/20"
               >
                 New Report
               </Button>
@@ -432,7 +434,7 @@ const ReportBuilderDashboard = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card size="small" className="rounded-xl border-border hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
                   <AppstoreOutlined className="text-lg" />
                 </div>
                 <div>
@@ -446,7 +448,7 @@ const ReportBuilderDashboard = () => {
 
             <Card size="small" className="rounded-xl border-border hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-success/10 text-success">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-success/10 text-success">
                   <FileTextOutlined className="text-lg" />
                 </div>
                 <div>
@@ -460,7 +462,7 @@ const ReportBuilderDashboard = () => {
 
             <Card size="small" className="rounded-xl border-border hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-warning/10 text-warning">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-warning/10 text-warning">
                   <HistoryOutlined className="text-lg" />
                 </div>
                 <div>
@@ -474,7 +476,7 @@ const ReportBuilderDashboard = () => {
 
             <Card size="small" className="rounded-xl border-border hover:shadow-md transition-all">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-secondary/10 text-secondary">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-secondary/10 text-secondary">
                   <DownloadOutlined className="text-lg" />
                 </div>
                 <div>

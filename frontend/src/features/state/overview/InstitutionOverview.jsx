@@ -37,10 +37,10 @@ const InstitutionOverview = () => {
   }, [dispatch]);
 
   return (
-    <div className="institution-overview flex h-[calc(100vh-120px)] bg-background-secondary rounded-xl overflow-hidden shadow-sm border border-slate-200">
+    <div className="institution-overview flex h-[calc(100vh-120px)] bg-background-secondary rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
       {/* Side Panel */}
       <div
-        className={`transition-all duration-300 border-r border-slate-200 ${
+        className={`transition-all duration-300 border-r border-slate-200 dark:border-slate-800 ${
           sidePanelOpen ? 'w-80' : 'w-0 overflow-hidden'
         } flex-shrink-0`}
       >
@@ -54,7 +54,7 @@ const InstitutionOverview = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header with toggle and back button */}
-        <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-slate-200">
+        <div className="flex items-center gap-2 px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
           <Button
             type="text"
             icon={sidePanelOpen ? <CloseOutlined /> : <MenuOutlined />}
@@ -72,7 +72,7 @@ const InstitutionOverview = () => {
 
           <div className="flex-1" />
 
-          <Text className="text-sm text-slate-600">
+          <Text className="text-sm text-slate-800 dark:text-slate-400">
             {institutions.length} institutions loaded
           </Text>
         </div>

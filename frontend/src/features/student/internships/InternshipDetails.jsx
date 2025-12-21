@@ -108,7 +108,7 @@ const InternshipDetails = () => {
         }
       }
     } catch (error) {
-      toast.error(error.message || "Error fetching data");
+      toast.error(error.message || "Failed to load internship details");
     } finally {
       setLoading(false);
     }

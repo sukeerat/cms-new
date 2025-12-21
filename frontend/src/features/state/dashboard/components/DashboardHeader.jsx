@@ -23,14 +23,14 @@ const DashboardHeader = ({ userName, onRefresh, onExport, selectedMonth, onMonth
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         {/* Left Section - Welcome */}
         <div>
-          <div className="flex items-center gap-2 text-slate-600 text-sm mb-2">
+          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm mb-2">
             <CalendarOutlined />
             <span>{currentDate}</span>
           </div>
-          <Title level={2} className="!mb-1 !text-slate-900">
+          <Title level={2} className="!mb-1 !text-slate-900 dark:!text-white">
             Welcome back, <span className="text-primary">{userName || 'Administrator'}</span>
           </Title>
-          <Text className="text-slate-600 text-base">
+          <Text className="text-slate-600 dark:text-slate-400 text-base">
             State Directorate Dashboard - Monitor all institutions and their performance
           </Text>
         </div>
@@ -39,7 +39,7 @@ const DashboardHeader = ({ userName, onRefresh, onExport, selectedMonth, onMonth
         <div className="flex flex-wrap items-center gap-2">
           {/* Month Filter */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background-tertiary border border-border">
-            <FilterOutlined className="text-slate-600 text-sm" />
+            <FilterOutlined className="text-slate-600 dark:text-slate-400 text-sm" />
             <DatePicker
               picker="month"
               value={selectedMonth ? dayjs(selectedMonth) : null}
@@ -51,7 +51,9 @@ const DashboardHeader = ({ userName, onRefresh, onExport, selectedMonth, onMonth
                 !px-0 !py-0 !bg-transparent
                 [&_.ant-picker-input>input]:!text-sm
                 [&_.ant-picker-input>input]:!text-slate-900
+                [&_.ant-picker-input>input]:dark:!text-white
                 [&_.ant-picker-input>input::placeholder]:!text-slate-500
+                [&_.ant-picker-input>input::placeholder]:dark:!text-slate-500
               "
               style={{ width: 140 }}
             />

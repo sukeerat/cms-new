@@ -2,9 +2,12 @@ import { Module } from '@nestjs/common';
 import { PrincipalController } from './principal.controller';
 import { PrincipalService } from './principal.service';
 import { PrismaModule } from '../../core/database/prisma.module';
+import { UserModule } from '../../domain/user/user.module';
+import { MentorModule } from '../../domain/mentor/mentor.module';
+import { AcademicModule } from '../../domain/academic/academic.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, UserModule, MentorModule, AcademicModule],
   controllers: [PrincipalController],
   providers: [PrincipalService],
   exports: [PrincipalService],

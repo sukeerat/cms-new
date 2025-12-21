@@ -13,7 +13,7 @@ import {
   ReportType,
   ExportConfig,
 } from './interfaces/report.interface';
-import { CloudinaryService } from '../../../infrastructure/cloudinary/cloudinary.service';
+import { FileStorageService } from '../../../infrastructure/file-storage/file-storage.service';
 
 @Processor('report-generation')
 @Injectable()
@@ -26,13 +26,26 @@ export class ReportProcessor extends WorkerHost {
     private excelService: ExcelService,
     private pdfService: PdfService,
     private csvService: CsvService,
-    private cloudinary: CloudinaryService,
+    private fileStorage: FileStorageService,
   ) {
     super();
   }
 
   async process(job: Job<ReportJobData>): Promise<any> {
-    const { userId, reportType, filters, format, reportId } = job.data;
+    const { userId, reportType, config: jobConfig, reportId } = job.data;
+
+    // Extract format from config or use default
+    const formatStr = jobConfig?.format || job.data.format || 'excel';
+    const filters = jobConfig?.filters || job.data.filters || {};
+
+    // Convert string format to ExportFormat enum
+    const formatMap: Record<string, ExportFormat> = {
+      'excel': ExportFormat.EXCEL,
+      'pdf': ExportFormat.PDF,
+      'csv': ExportFormat.CSV,
+      'json': ExportFormat.CSV, // fallback for json
+    };
+    const format = formatMap[formatStr] || ExportFormat.EXCEL;
 
     this.logger.log(
       `Processing report generation job ${job.id} for user ${userId}`,
@@ -86,29 +99,43 @@ export class ReportProcessor extends WorkerHost {
           throw new Error(`Unsupported format: ${format}`);
       }
 
-      // Upload to Cloudinary
-      this.logger.log('Uploading file to Cloudinary');
-      const uploadResult = await this.uploadFile(
-        fileBuffer,
-        fileName,
-        mimeType,
-      );
+      // Validate buffer before upload
+      this.logger.log(`Generated file buffer size: ${fileBuffer?.length || 0} bytes`);
+
+      if (!fileBuffer || fileBuffer.length === 0) {
+        throw new Error('Generated file buffer is empty');
+      }
+
+      // Upload to MinIO
+      this.logger.log('Uploading file to MinIO');
+      const institutionId = filters?.institutionId as string;
+      const formatExt = format === ExportFormat.EXCEL ? 'xlsx' : format === ExportFormat.PDF ? 'pdf' : 'csv';
+
+      const uploadResult = await this.fileStorage.uploadReport(fileBuffer, {
+        institutionId,
+        reportType,
+        format: formatExt,
+      });
+
+      this.logger.log(`Upload complete. File size: ${uploadResult.size} bytes, URL: ${uploadResult.url}`);
 
       // Update report status to completed
       await this.updateReportStatus(
         reportId,
         ReportStatus.COMPLETED,
-        uploadResult.secure_url,
+        uploadResult.url,
       );
 
-      // Send notification to user
-      await this.sendNotification(userId, reportType, uploadResult.secure_url);
+      // Send notification to user (non-blocking)
+      this.sendNotification(userId, reportType, uploadResult.url).catch((err) => {
+        this.logger.warn(`Failed to send notification: ${err.message}`);
+      });
 
       this.logger.log(`Report generation completed for job ${job.id}`);
 
       return {
         success: true,
-        downloadUrl: uploadResult.secure_url,
+        downloadUrl: uploadResult.url,
       };
     } catch (error) {
       this.logger.error(
@@ -137,19 +164,29 @@ export class ReportProcessor extends WorkerHost {
     downloadUrl?: string,
     errorMessage?: string,
   ) {
-    // The Prisma schema tracks generated outputs via `GeneratedReport`.
-    // It doesn't model a full status state machine, so we only persist the output URL when completed.
-    if (status !== ReportStatus.COMPLETED || !downloadUrl) {
-      return;
-    }
+    try {
+      const updateData: Record<string, unknown> = {
+        status: status,
+      };
 
-    await this.prisma.generatedReport.update({
-      where: { id: reportId },
-      data: {
-        fileUrl: downloadUrl,
-        generatedAt: new Date(),
-      },
-    });
+      if (status === ReportStatus.COMPLETED && downloadUrl) {
+        updateData.fileUrl = downloadUrl;
+        updateData.generatedAt = new Date();
+      }
+
+      if (status === ReportStatus.FAILED && errorMessage) {
+        updateData.errorMessage = errorMessage;
+      }
+
+      await this.prisma.generatedReport.update({
+        where: { id: reportId },
+        data: updateData,
+      });
+
+      this.logger.log(`Report ${reportId} status updated to ${status}`);
+    } catch (err) {
+      this.logger.error(`Failed to update report status: ${err.message}`);
+    }
   }
 
   /**
@@ -248,26 +285,6 @@ export class ReportProcessor extends WorkerHost {
     };
   }
 
-  /**
-   * Upload file to Cloudinary
-   */
-  private async uploadFile(
-    buffer: Buffer,
-    fileName: string,
-    mimeType: string,
-  ): Promise<any> {
-    try {
-      return await this.cloudinary.uploadBuffer(buffer, {
-        folder: 'reports',
-        resource_type: 'raw',
-        public_id: fileName.replace(/\.[^/.]+$/, ''),
-      });
-    } catch (error) {
-      this.logger.error('Error uploading file to Cloudinary:', error);
-      // Fallback to local storage or throw error
-      throw new Error('Failed to upload report file');
-    }
-  }
 
   /**
    * Send notification to user

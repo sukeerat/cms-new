@@ -24,14 +24,13 @@ const LayoutHeader = ({
   onProfileClick,
   onLogoutClick,
 }) => {
-  // Standard button style matching the "Report Issue" button
+  // Standard button style matching the "Report Issue" button, using semantic theme classes
   const iconBtnClass = `
     w-10 h-10 flex items-center justify-center rounded-xl
-    bg-white dark:bg-slate-800
-    border border-slate-200 dark:border-slate-700
-    text-slate-600 dark:text-slate-300
+    bg-surface border border-border
+    text-text-secondary
     shadow-sm
-    hover:bg-slate-50 dark:hover:bg-slate-700
+    hover:bg-surface-hover
     hover:scale-105 active:scale-95
     transition-all duration-200
   `;

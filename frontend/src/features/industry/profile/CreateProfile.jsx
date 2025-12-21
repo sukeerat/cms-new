@@ -100,7 +100,7 @@ const CreateIndustryProfile = () => {
         setExistingProfile(null);
       } else {
         console.error("Error checking profile:", error);
-        toast.error("Error checking existing profile. Please try again.");
+        toast.error("Failed to check existing profile. Please try again.");
       }
     } finally {
       setCheckingProfile(false);

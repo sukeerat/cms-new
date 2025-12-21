@@ -166,7 +166,7 @@ const ApplicationsList = () => {
             <>
               <Button
                 type="primary"
-                style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                className="bg-green-600 hover:bg-green-500 border-green-600 hover:border-green-500"
                 icon={<CheckOutlined />}
                 onClick={() => handleSelect(record.id)}
                 size="small"

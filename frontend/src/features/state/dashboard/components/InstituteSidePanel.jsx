@@ -62,33 +62,33 @@ const InstituteSidePanel = ({ onSelectInstitute }) => {
         onClick={() => handleSelect(institution)}
         className={`cursor-pointer transition-all duration-200 rounded-lg mb-1 px-3 py-2 ${
           isSelected
-            ? 'bg-blue-50'
-            : 'hover:bg-slate-50'
+            ? 'bg-blue-50 dark:bg-blue-900/20'
+            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
         }`}
       >
         <List.Item.Meta
           avatar={
             <Avatar
               icon={<BankOutlined />}
-              className={isSelected ? 'bg-blue-600' : 'bg-slate-200 text-slate-600'}
+              className={isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'}
             />
           }
           title={
-            <Text strong className={isSelected ? 'text-blue-700' : 'text-slate-900'}>
+            <Text strong className={isSelected ? 'text-blue-800 dark:text-blue-300' : 'text-slate-950 dark:text-slate-200'}>
               {institution.name}
             </Text>
           }
           description={
             <div className="flex flex-col">
-              <Text className={`text-xs ${isSelected ? 'text-blue-500' : 'text-slate-500'}`}>{institution.code}</Text>
-              <Text className={`text-xs ${isSelected ? 'text-blue-500' : 'text-slate-500'}`}>{institution.city}</Text>
+              <Text className={`text-xs ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-400'}`}>{institution.code}</Text>
+              <Text className={`text-xs ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-400'}`}>{institution.city}</Text>
             </div>
           }
         />
         {institution._count?.Student > 0 && (
           <Badge
             count={institution._count.Student}
-            style={{ backgroundColor: isSelected ? '#2563eb' : '#94a3b8' }}
+            className={isSelected ? '[&_.ant-badge-count]:!bg-blue-600' : '[&_.ant-badge-count]:!bg-slate-500 dark:[&_.ant-badge-count]:!bg-slate-600'}
             overflowCount={999}
           />
         )}
@@ -97,13 +97,13 @@ const InstituteSidePanel = ({ onSelectInstitute }) => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-r border-slate-200">
+    <div className="h-full flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200">
-        <Title level={5} className="!mb-3 !text-slate-900">Institutions</Title>
+      <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+        <Title level={5} className="!mb-3 !text-slate-950 dark:!text-white">Institutions</Title>
         <Search
           placeholder="Search institutions..."
-          prefix={<SearchOutlined className="text-slate-400" />}
+          prefix={<SearchOutlined className="text-slate-600 dark:text-slate-400" />}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           allowClear
@@ -132,8 +132,8 @@ const InstituteSidePanel = ({ onSelectInstitute }) => {
       </div>
 
       {/* Footer */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50">
-        <Text className="text-xs text-slate-600">
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+        <Text className="text-xs text-slate-800 dark:text-slate-400">
           Showing {filteredInstitutions.length} of {institutions.length} institutions
         </Text>
       </div>

@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Card,
   Row,
   Col,
   Select,
-  DatePicker,
   Form,
   Button,
   Table,
@@ -16,8 +15,13 @@ import {
   Empty,
   Spin,
   Tooltip,
+  Divider,
+  Collapse,
+  Badge,
+  Tabs,
+  Modal,
   Input,
-  InputNumber,
+  Switch,
 } from 'antd';
 import {
   BarChartOutlined,
@@ -30,6 +34,19 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   FileSearchOutlined,
+  SettingOutlined,
+  SaveOutlined,
+  FolderOpenOutlined,
+  TableOutlined,
+  FilterOutlined,
+  SortAscendingOutlined,
+  GroupOutlined,
+  DeleteOutlined,
+  PauseCircleOutlined,
+  ReloadOutlined,
+  ExclamationCircleOutlined,
+  LoadingOutlined,
+  StopOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
@@ -41,26 +58,67 @@ import {
   checkReportStatus,
 } from '../store/stateSlice';
 import reportService from '../../../services/report.service';
+import {
+  getActiveReports,
+  getFailedReports,
+  cancelReport,
+  retryReport,
+  getQueueStats,
+} from '../../../services/reportBuilderApi';
+import ColumnSelector from '../../../components/report-builder/ColumnSelector';
+import FilterBuilder from '../../../components/report-builder/FilterBuilder';
 
-const { Title, Text } = Typography;
-const { RangePicker } = DatePicker;
+const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
-const { Step } = Steps;
+const { Panel } = Collapse;
+const { TabPane } = Tabs;
+
+// Icon mapping for report categories
+const CATEGORY_ICONS = {
+  'Student Reports': FileTextOutlined,
+  'Mentor Reports': BarChartOutlined,
+  'Internship Reports': FileSearchOutlined,
+  'Compliance Reports': CheckCircleOutlined,
+  'Institute Reports': SettingOutlined,
+  'Pending Reports': ClockCircleOutlined,
+};
 
 const ReportBuilder = () => {
   const dispatch = useDispatch();
   const [form] = Form.useForm();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedType, setSelectedType] = useState(null);
-  const [selectedFormat, setSelectedFormat] = useState('pdf');
+  const [selectedFormat, setSelectedFormat] = useState('excel');
+  const [selectedColumns, setSelectedColumns] = useState([]);
+  const [filterValues, setFilterValues] = useState({});
+  const [groupBy, setGroupBy] = useState(null);
+  const [sortBy, setSortBy] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc');
   const [pollingReports, setPollingReports] = useState(new Set());
+  const [activeTab, setActiveTab] = useState('builder');
+
+  // Template state
+  const [templates, setTemplates] = useState([]);
+  const [templateModalVisible, setTemplateModalVisible] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [isPublicTemplate, setIsPublicTemplate] = useState(false);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // Queue management state
+  const [activeReports, setActiveReports] = useState([]);
+  const [failedReports, setFailedReportsState] = useState([]);
+  const [queueStats, setQueueStats] = useState({ waiting: 0, active: 0, completed: 0, failed: 0 });
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState(2000); // Start with 2s
+  const pollingIntervalRef = useRef(2000);
 
   const { catalog: catalogData, config, history: historyData, generating, loading, error } = useSelector(
     (state) => state.state.reportBuilder
   );
 
   // Ensure history is always an array
-  const history = React.useMemo(() => {
+  const history = useMemo(() => {
     if (Array.isArray(historyData)) {
       return historyData;
     }
@@ -70,125 +128,347 @@ const ReportBuilder = () => {
     return [];
   }, [historyData]);
 
-  // Convert catalog to array if it's an object (grouped by category)
-  const catalog = React.useMemo(() => {
-    let reports = [];
-    if (Array.isArray(catalogData)) {
-      reports = catalogData;
-    } else if (catalogData && typeof catalogData === 'object') {
-      // Flatten all reports from all categories
-      reports = Object.values(catalogData).flat();
+  // Organize catalog by categories
+  const catalogByCategory = useMemo(() => {
+    if (!catalogData || typeof catalogData !== 'object') return {};
+
+    // If already organized by category, use as-is
+    if (!Array.isArray(catalogData)) {
+      return catalogData;
     }
-    // Filter out items with null/undefined type values to avoid Select warnings
-    return reports.filter((r) => r && r.type != null);
+
+    // If it's an array, group by category
+    const grouped = {};
+    catalogData.forEach((report) => {
+      const category = report.category || 'Other';
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(report);
+    });
+    return grouped;
   }, [catalogData]);
+
+  // Flatten catalog for easy lookup
+  const allReports = useMemo(() => {
+    const reports = [];
+    Object.values(catalogByCategory).forEach((categoryReports) => {
+      reports.push(...categoryReports);
+    });
+    return reports;
+  }, [catalogByCategory]);
+
+  // Get current report definition
+  const currentReport = useMemo(() => {
+    if (!selectedType) return null;
+    return allReports.find((r) => r.type === selectedType) || config;
+  }, [selectedType, allReports, config]);
+
+  // Available columns from config
+  const availableColumns = useMemo(() => {
+    return config?.columns || currentReport?.columns || [];
+  }, [config, currentReport]);
+
+  // Available filters from config
+  const availableFilters = useMemo(() => {
+    return config?.filters || currentReport?.filters || [];
+  }, [config, currentReport]);
+
+  // GroupBy options
+  const groupByOptions = useMemo(() => {
+    return config?.groupBy || currentReport?.groupBy || [];
+  }, [config, currentReport]);
+
+  // Sortable columns
+  const sortableColumns = useMemo(() => {
+    const sortable = config?.sortableColumns || currentReport?.sortableColumns || [];
+    if (sortable.length > 0) return sortable;
+    // Fall back to columns marked as sortable
+    return availableColumns.filter((col) => col.sortable).map((col) => col.id);
+  }, [config, currentReport, availableColumns]);
+
+  // Export formats available
+  const exportFormats = useMemo(() => {
+    return config?.exportFormats || currentReport?.exportFormats || ['excel', 'csv', 'pdf'];
+  }, [config, currentReport]);
 
   useEffect(() => {
     dispatch(fetchReportCatalog());
     dispatch(fetchReportHistory({ page: 1, limit: 10 }));
   }, [dispatch]);
 
-  // Polling for report status
+  // Load templates when report type changes
   useEffect(() => {
-    if (pollingReports.size === 0) return;
+    if (selectedType) {
+      loadTemplates();
+    }
+  }, [selectedType]);
 
-    const interval = setInterval(async () => {
+  // Load queue data
+  const loadQueueData = useCallback(async () => {
+    try {
+      const [activeRes, failedRes, statsRes] = await Promise.all([
+        getActiveReports(),
+        getFailedReports(),
+        getQueueStats(),
+      ]);
+      setActiveReports(activeRes.data || []);
+      setFailedReportsState(failedRes.data || []);
+      setQueueStats(statsRes.data || { waiting: 0, active: 0, completed: 0, failed: 0 });
+    } catch (err) {
+      console.error('Failed to load queue data:', err);
+    }
+  }, []);
+
+  // Polling for report status with exponential backoff
+  useEffect(() => {
+    if (pollingReports.size === 0 && activeReports.length === 0) {
+      // Reset polling interval when no active reports
+      pollingIntervalRef.current = 2000;
+      setPollingInterval(2000);
+      return;
+    }
+
+    const poll = async () => {
+      let hasChanges = false;
       const reportIds = Array.from(pollingReports);
+
       for (const id of reportIds) {
         try {
           const result = await dispatch(checkReportStatus(id)).unwrap();
-          if (result.status === 'completed' || result.status === 'failed') {
+          if (result.status === 'completed' || result.status === 'failed' || result.status === 'cancelled') {
+            hasChanges = true;
             setPollingReports((prev) => {
               const updated = new Set(prev);
               updated.delete(id);
               return updated;
             });
             if (result.status === 'completed') {
-              toast.success(`Report ${result.type} completed successfully!`);
-            } else {
-              toast.error(`Report ${result.type} failed to generate.`);
+              toast.success(`Report completed successfully!`);
+            } else if (result.status === 'failed') {
+              toast.error(`Report generation failed: ${result.errorMessage || 'Unknown error'}`);
             }
           }
         } catch (err) {
           console.error('Failed to check report status:', err);
         }
       }
-    }, 3000); // Poll every 3 seconds
 
-    return () => clearInterval(interval);
-  }, [pollingReports, dispatch]);
+      // Refresh queue data
+      await loadQueueData();
+
+      if (hasChanges) {
+        // Reset interval on changes
+        pollingIntervalRef.current = 2000;
+        setPollingInterval(2000);
+        dispatch(fetchReportHistory({ page: 1, limit: 10 }));
+      } else {
+        // Exponential backoff: double interval up to 30 seconds
+        const newInterval = Math.min(pollingIntervalRef.current * 1.5, 30000);
+        pollingIntervalRef.current = newInterval;
+        setPollingInterval(newInterval);
+      }
+    };
+
+    const timeoutId = setTimeout(poll, pollingIntervalRef.current);
+    return () => clearTimeout(timeoutId);
+  }, [pollingReports, activeReports.length, dispatch, loadQueueData]);
+
+  // Initial load of queue data
+  useEffect(() => {
+    loadQueueData();
+  }, [loadQueueData]);
+
+  const loadTemplates = async () => {
+    if (!selectedType) return;
+    setLoadingTemplates(true);
+    try {
+      const data = await reportService.getTemplates(selectedType);
+      setTemplates(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load templates:', err);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
 
   const handleTypeSelect = async (type) => {
     setSelectedType(type);
+    setSelectedColumns([]);
+    setFilterValues({});
+    setGroupBy(null);
+    setSortBy(null);
     form.resetFields();
     setCurrentStep(1);
+
     try {
-      await dispatch(fetchReportConfig(type)).unwrap();
+      const configResult = await dispatch(fetchReportConfig(type)).unwrap();
+      // Auto-select default columns
+      if (configResult?.columns) {
+        const defaultCols = configResult.columns
+          .filter((col) => col.default)
+          .map((col) => col.id);
+        setSelectedColumns(defaultCols);
+      }
     } catch (err) {
       toast.error('Failed to load report configuration');
     }
   };
 
-  const handleGenerate = async (values) => {
+  const handleGenerate = async () => {
     if (!selectedType) {
       toast.error('Please select a report type');
       return;
     }
 
-    setCurrentStep(2);
-    const filters = { ...values };
-
-    // Convert date ranges to ISO strings
-    if (filters.dateRange) {
-      filters.startDate = filters.dateRange[0].toISOString();
-      filters.endDate = filters.dateRange[1].toISOString();
-      delete filters.dateRange;
+    if (selectedColumns.length === 0) {
+      toast.error('Please select at least one column');
+      return;
     }
+
+    setCurrentStep(2);
 
     const reportData = {
       type: selectedType,
-      filters,
+      columns: selectedColumns,
+      filters: filterValues,
+      groupBy,
+      sortBy,
+      sortOrder,
       format: selectedFormat,
     };
 
     try {
       const result = await dispatch(generateNewReport(reportData)).unwrap();
       toast.success('Report generation started!');
-      setPollingReports((prev) => new Set(prev).add(result.id));
+      const reportId = result?.reportId || result?.id;
+      if (reportId) {
+        setPollingReports((prev) => new Set(prev).add(reportId));
+      }
       setCurrentStep(3);
       dispatch(fetchReportHistory({ page: 1, limit: 10 }));
     } catch (err) {
-      toast.error(err || 'Failed to generate report');
+      toast.error(err?.message || err || 'Failed to generate report');
       setCurrentStep(1);
     }
   };
 
-  const handleDownload = async (reportId, reportType) => {
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) {
+      toast.error('Please enter a template name');
+      return;
+    }
+
+    try {
+      await reportService.saveTemplate({
+        name: templateName.trim(),
+        description: templateDescription.trim(),
+        reportType: selectedType,
+        configuration: {
+          columns: selectedColumns,
+          filters: filterValues,
+          groupBy,
+          sortBy,
+          sortOrder,
+        },
+        isPublic: isPublicTemplate,
+      });
+      toast.success('Template saved successfully!');
+      setTemplateModalVisible(false);
+      setTemplateName('');
+      setTemplateDescription('');
+      setIsPublicTemplate(false);
+      loadTemplates();
+    } catch (err) {
+      toast.error('Failed to save template');
+    }
+  };
+
+  const handleLoadTemplate = (template) => {
+    const config = template.configuration || template;
+    setSelectedColumns(config.columns || []);
+    setFilterValues(config.filters || {});
+    setGroupBy(config.groupBy || null);
+    setSortBy(config.sortBy || null);
+    setSortOrder(config.sortOrder || 'asc');
+    toast.success(`Template "${template.name}" loaded`);
+  };
+
+  const handleDeleteTemplate = async (templateId) => {
+    try {
+      await reportService.deleteTemplate(templateId);
+      toast.success('Template deleted');
+      loadTemplates();
+    } catch (err) {
+      toast.error('Failed to delete template');
+    }
+  };
+
+  const handleCancelReport = async (reportId) => {
+    try {
+      await cancelReport(reportId);
+      toast.success('Report cancelled successfully');
+      // Remove from polling
+      setPollingReports((prev) => {
+        const updated = new Set(prev);
+        updated.delete(reportId);
+        return updated;
+      });
+      // Refresh data
+      await loadQueueData();
+      dispatch(fetchReportHistory({ page: 1, limit: 10 }));
+    } catch (err) {
+      toast.error(err.message || 'Failed to cancel report');
+    }
+  };
+
+  const handleRetryReport = async (reportId) => {
+    try {
+      const result = await retryReport(reportId);
+      toast.success('Report retry queued successfully');
+      // Add to polling
+      setPollingReports((prev) => new Set(prev).add(reportId));
+      // Refresh data
+      await loadQueueData();
+      dispatch(fetchReportHistory({ page: 1, limit: 10 }));
+    } catch (err) {
+      toast.error(err.message || 'Failed to retry report');
+    }
+  };
+
+  const handleDeleteReport = async (reportId) => {
+    try {
+      await reportService.deleteReport(reportId);
+      toast.success('Report deleted successfully');
+      await loadQueueData();
+      dispatch(fetchReportHistory({ page: 1, limit: 10 }));
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete report');
+    }
+  };
+
+  const handleDownload = async (reportId, format) => {
     try {
       const blob = await reportService.downloadReport(reportId);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${reportType}_${dayjs().format('YYYY-MM-DD')}.${selectedFormat}`;
+      const extension = format === 'excel' ? 'xlsx' : format;
+      link.download = `report_${dayjs().format('YYYY-MM-DD_HHmmss')}.${extension}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success('Report downloaded successfully!');
     } catch (err) {
-      toast.error('Failed to download report');
+      console.error('Download error:', err);
+      toast.error(err.message || 'Failed to download report');
     }
   };
 
-  const getReportIcon = (type) => {
-    const icons = {
-      student_performance: FileTextOutlined,
-      institution_analytics: BarChartOutlined,
-      placement_summary: FileSearchOutlined,
-      default: FileTextOutlined,
-    };
-    const IconComponent = icons[type] || icons.default;
-    return <IconComponent style={{ fontSize: 20 }} />;
+  const getCategoryIcon = (category) => {
+    const IconComponent = CATEGORY_ICONS[category] || FileTextOutlined;
+    return <IconComponent />;
   };
 
   const getStatusTag = (status) => {
@@ -199,9 +479,9 @@ const ReportBuilder = () => {
       failed: { color: 'red', icon: <CloseCircleOutlined /> },
     };
 
-    const config = statusConfig[status] || statusConfig.pending;
+    const cfg = statusConfig[status] || statusConfig.pending;
     return (
-      <Tag color={config.color} icon={config.icon}>
+      <Tag color={cfg.color} icon={cfg.icon}>
         {status?.toUpperCase()}
       </Tag>
     );
@@ -212,94 +492,24 @@ const ReportBuilder = () => {
       pdf: <FilePdfOutlined className="text-red-500" />,
       excel: <FileExcelOutlined className="text-green-500" />,
       csv: <FileTextOutlined className="text-blue-500" />,
+      json: <FileTextOutlined className="text-yellow-500" />,
     };
-    return icons[format] || icons.pdf;
-  };
-
-  const renderFilterField = (filter) => {
-    switch (filter.type) {
-      case 'select':
-        return (
-          <Form.Item
-            key={filter.key}
-            name={filter.key}
-            label={filter.label}
-            rules={[{ required: filter.required, message: `${filter.label} is required` }]}
-          >
-            <Select placeholder={`Select ${filter.label}`} allowClear>
-              {filter.options?.map((opt) => (
-                <Option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        );
-
-      case 'date_range':
-        return (
-          <Form.Item
-            key={filter.key}
-            name={filter.key}
-            label={filter.label}
-            rules={[{ required: filter.required, message: `${filter.label} is required` }]}
-          >
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-        );
-
-      case 'number':
-        return (
-          <Form.Item
-            key={filter.key}
-            name={filter.key}
-            label={filter.label}
-            rules={[{ required: filter.required, message: `${filter.label} is required` }]}
-          >
-            <InputNumber
-              style={{ width: '100%' }}
-              placeholder={filter.placeholder}
-              min={filter.min}
-              max={filter.max}
-            />
-          </Form.Item>
-        );
-
-      case 'text':
-      default:
-        return (
-          <Form.Item
-            key={filter.key}
-            name={filter.key}
-            label={filter.label}
-            rules={[{ required: filter.required, message: `${filter.label} is required` }]}
-          >
-            <Input placeholder={filter.placeholder} />
-          </Form.Item>
-        );
-    }
+    return icons[format] || icons.excel;
   };
 
   const historyColumns = [
     {
-      title: 'Report Type',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type) => (
+      title: 'Report',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name, record) => (
         <Space>
-          {getReportIcon(type)}
-          <Text strong>{type?.replace(/_/g, ' ').toUpperCase()}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'Format',
-      dataIndex: 'format',
-      key: 'format',
-      render: (format) => (
-        <Space>
-          {getFormatIcon(format)}
-          <Text>{format?.toUpperCase()}</Text>
+          {getFormatIcon(record.format)}
+          <div>
+            <Text strong>{name || record.type?.replace(/-/g, ' ')}</Text>
+            <br />
+            <Text type="secondary" className="text-xs">{record.type}</Text>
+          </div>
         </Space>
       ),
     },
@@ -318,141 +528,570 @@ const ReportBuilder = () => {
     {
       title: 'Action',
       key: 'action',
+      width: 220,
       render: (_, record) => (
-        <Space>
-          {record.status === 'completed' ? (
-            <Tooltip title="Download Report">
+        <Space size="small">
+          {record.status === 'completed' && (
+            <>
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
-                onClick={() => handleDownload(record.id, record.type)}
+                onClick={() => handleDownload(record.id, record.format)}
                 size="small"
               >
                 Download
               </Button>
-            </Tooltip>
-          ) : record.status === 'processing' || record.status === 'pending' ? (
-            <Tag icon={<SyncOutlined spin />} color="processing">
-              Generating...
-            </Tag>
-          ) : (
-            <Tag color="error">Failed</Tag>
+              <Button
+                icon={<DeleteOutlined />}
+                onClick={() => handleDeleteReport(record.id)}
+                size="small"
+                danger
+              />
+            </>
+          )}
+          {(record.status === 'processing' || record.status === 'pending') && (
+            <>
+              <Tag icon={<SyncOutlined spin />} color="processing">
+                Processing...
+              </Tag>
+              <Button
+                icon={<StopOutlined />}
+                onClick={() => handleCancelReport(record.id)}
+                size="small"
+                danger
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+          {(record.status === 'failed' || record.status === 'cancelled') && (
+            <>
+              <Tooltip title={record.errorMessage || 'Report failed'}>
+                <Tag color="error" icon={<ExclamationCircleOutlined />}>
+                  {record.status === 'cancelled' ? 'Cancelled' : 'Failed'}
+                </Tag>
+              </Tooltip>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => handleRetryReport(record.id)}
+                size="small"
+              >
+                Retry
+              </Button>
+              <Button
+                icon={<DeleteOutlined />}
+                onClick={() => handleDeleteReport(record.id)}
+                size="small"
+                danger
+              />
+            </>
           )}
         </Space>
       ),
     },
   ];
 
-  return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2}>
-        <BarChartOutlined /> Report Builder
-      </Title>
-      <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
-        Generate custom reports with configurable filters and export in multiple formats
-      </Text>
+  const renderCatalog = () => (
+    <div className="space-y-4">
+      {Object.entries(catalogByCategory).map(([category, reports]) => (
+        <Card
+          key={category}
+          size="small"
+          title={
+            <Space>
+              {getCategoryIcon(category)}
+              <span>{category}</span>
+              <Badge count={reports.length} style={{ backgroundColor: '#1890ff' }} />
+            </Space>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {reports.map((report) => (
+              <div
+                key={report.type}
+                className={`p-3 border rounded-lg cursor-pointer transition-all hover:border-blue-500 hover:shadow-sm ${
+                  selectedType === report.type ? 'border-blue-500 bg-blue-50' : ''
+                }`}
+                onClick={() => handleTypeSelect(report.type)}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <Text strong>{report.name}</Text>
+                    <Paragraph type="secondary" className="text-xs mb-0 mt-1" ellipsis={{ rows: 2 }}>
+                      {report.description}
+                    </Paragraph>
+                  </div>
+                  {selectedType === report.type && (
+                    <CheckCircleOutlined className="text-blue-500" />
+                  )}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <Tag size="small">{report.columnsCount || 0} columns</Tag>
+                  <Tag size="small">{report.filtersCount || 0} filters</Tag>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
 
-      <Steps current={currentStep} style={{ marginBottom: 32 }}>
-        <Step title="Select Type" description="Choose report type" />
-        <Step title="Configure Filters" description="Set parameters" />
-        <Step title="Generate" description="Queue report" />
-        <Step title="Download" description="Get your report" />
-      </Steps>
+  const renderConfiguration = () => {
+    if (!selectedType) {
+      return (
+        <Empty
+          description="Select a report type from the catalog"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      );
+    }
 
-      <Row gutter={24}>
-        <Col xs={24} lg={10}>
-          <Card
-            title={
+    return (
+      <div className="space-y-6">
+        {/* Templates */}
+        {templates.length > 0 && (
+          <Card size="small" title={<><FolderOpenOutlined /> Saved Templates</>}>
+            <div className="flex flex-wrap gap-2">
+              {templates.map((template) => (
+                <Tag
+                  key={template.id}
+                  className="cursor-pointer"
+                  onClick={() => handleLoadTemplate(template)}
+                  closable
+                  onClose={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDeleteTemplate(template.id);
+                  }}
+                >
+                  {template.name}
+                </Tag>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Columns */}
+        <Collapse defaultActiveKey={['columns', 'filters']} ghost>
+          <Panel
+            header={
               <Space>
-                <FileTextOutlined />
-                <span>Report Configuration</span>
+                <TableOutlined />
+                <span>Columns</span>
+                <Badge count={selectedColumns.length} style={{ backgroundColor: '#52c41a' }} />
               </Space>
             }
-            loading={loading && !catalog.length}
+            key="columns"
           >
-            <Form form={form} layout="vertical" onFinish={handleGenerate}>
-              <Form.Item label="Report Type" required>
-                <Select
-                  placeholder="Select a report type"
-                  value={selectedType}
-                  onChange={handleTypeSelect}
-                  size="large"
-                  loading={loading}
-                >
-                  {catalog.map((report) => (
-                    <Option key={report.type} value={report.type}>
-                      <Space>
-                        {getReportIcon(report.type)}
-                        <div>
-                          <div style={{ fontWeight: 600 }}>
-                            {report.name || report.type?.replace(/_/g, ' ')}
-                          </div>
-                          {report.description && (
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              {report.description}
-                            </Text>
-                          )}
-                        </div>
-                      </Space>
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
+            <ColumnSelector
+              columns={availableColumns}
+              selectedColumns={selectedColumns}
+              onChange={setSelectedColumns}
+              showSort={true}
+            />
+          </Panel>
 
-              {selectedType && config?.filters && (
-                <>
-                  <div style={{ marginTop: 24, marginBottom: 16 }}>
-                    <Text strong>Filters</Text>
-                  </div>
-                  {config.filters.map((filter) => renderFilterField(filter))}
-                </>
-              )}
+          {/* Filters */}
+          <Panel
+            header={
+              <Space>
+                <FilterOutlined />
+                <span>Filters</span>
+              </Space>
+            }
+            key="filters"
+          >
+            <FilterBuilder
+              filters={availableFilters}
+              reportType={selectedType}
+              values={filterValues}
+              onChange={setFilterValues}
+              compact
+            />
+          </Panel>
 
-              <Form.Item label="Export Format" required>
+          {/* Grouping & Sorting */}
+          {(groupByOptions.length > 0 || sortableColumns.length > 0) && (
+            <Panel
+              header={
+                <Space>
+                  <GroupOutlined />
+                  <span>Grouping & Sorting</span>
+                </Space>
+              }
+              key="grouping"
+            >
+              <Row gutter={16}>
+                {groupByOptions.length > 0 && (
+                  <Col xs={24} sm={12}>
+                    <Form.Item label="Group By">
+                      <Select
+                        allowClear
+                        placeholder="Select grouping"
+                        value={groupBy}
+                        onChange={setGroupBy}
+                        className="w-full"
+                      >
+                        {groupByOptions.map((opt) => (
+                          <Option key={opt} value={opt}>
+                            {opt.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                )}
+                {sortableColumns.length > 0 && (
+                  <>
+                    <Col xs={24} sm={8}>
+                      <Form.Item label="Sort By">
+                        <Select
+                          allowClear
+                          placeholder="Select column"
+                          value={sortBy}
+                          onChange={setSortBy}
+                          className="w-full"
+                        >
+                          {sortableColumns.map((col) => {
+                            const colDef = availableColumns.find((c) => c.id === col);
+                            return (
+                              <Option key={col} value={col}>
+                                {colDef?.label || col}
+                              </Option>
+                            );
+                          })}
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={4}>
+                      <Form.Item label="Order">
+                        <Select value={sortOrder} onChange={setSortOrder} className="w-full">
+                          <Option value="asc">Asc</Option>
+                          <Option value="desc">Desc</Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                  </>
+                )}
+              </Row>
+            </Panel>
+          )}
+        </Collapse>
+
+        {/* Export Format */}
+        <Card size="small" title={<><SettingOutlined /> Export Settings</>}>
+          <Row gutter={16} align="middle">
+            <Col xs={24} sm={12}>
+              <Form.Item label="Format" className="mb-0">
                 <Select
                   value={selectedFormat}
                   onChange={setSelectedFormat}
+                  className="w-full"
                   size="large"
                 >
-                  <Option value="pdf">
-                    <Space>
-                      <FilePdfOutlined className="text-red-500" />
-                      PDF Document
-                    </Space>
-                  </Option>
-                  <Option value="excel">
-                    <Space>
-                      <FileExcelOutlined className="text-green-500" />
-                      Excel Spreadsheet
-                    </Space>
-                  </Option>
-                  <Option value="csv">
-                    <Space>
-                      <FileTextOutlined className="text-blue-500" />
-                      CSV File
-                    </Space>
-                  </Option>
+                  {exportFormats.includes('excel') && (
+                    <Option value="excel">
+                      <Space>
+                        <FileExcelOutlined className="text-green-500" />
+                        Excel (.xlsx)
+                      </Space>
+                    </Option>
+                  )}
+                  {exportFormats.includes('csv') && (
+                    <Option value="csv">
+                      <Space>
+                        <FileTextOutlined className="text-blue-500" />
+                        CSV (.csv)
+                      </Space>
+                    </Option>
+                  )}
+                  {exportFormats.includes('pdf') && (
+                    <Option value="pdf">
+                      <Space>
+                        <FilePdfOutlined className="text-red-500" />
+                        PDF (.pdf)
+                      </Space>
+                    </Option>
+                  )}
+                  {exportFormats.includes('json') && (
+                    <Option value="json">
+                      <Space>
+                        <FileTextOutlined className="text-yellow-500" />
+                        JSON (.json)
+                      </Space>
+                    </Option>
+                  )}
                 </Select>
               </Form.Item>
-
-              <Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Space className="w-full justify-end">
                 <Button
-                  type="primary"
-                  htmlType="submit"
-                  size="large"
-                  block
-                  loading={generating}
-                  disabled={!selectedType}
-                  icon={<BarChartOutlined />}
+                  icon={<SaveOutlined />}
+                  onClick={() => setTemplateModalVisible(true)}
+                  disabled={selectedColumns.length === 0}
                 >
-                  {generating ? 'Generating Report...' : 'Generate Report'}
+                  Save Template
                 </Button>
-              </Form.Item>
-            </Form>
-          </Card>
-        </Col>
+              </Space>
+            </Col>
+          </Row>
+        </Card>
 
-        <Col xs={24} lg={14}>
+        {/* Generate Button */}
+        <Button
+          type="primary"
+          size="large"
+          block
+          loading={generating}
+          disabled={!selectedType || selectedColumns.length === 0}
+          icon={<BarChartOutlined />}
+          onClick={handleGenerate}
+        >
+          {generating ? 'Generating Report...' : 'Generate Report'}
+        </Button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <Title level={2} className="mb-1">
+          <BarChartOutlined className="mr-2" />
+          Report Builder
+        </Title>
+        <Text type="secondary">
+          Generate custom reports with configurable columns, filters, and export formats
+        </Text>
+      </div>
+
+      <Steps current={currentStep} className="mb-8" size="small">
+        <Steps.Step title="Select Type" description="Choose report" />
+        <Steps.Step title="Configure" description="Set columns & filters" />
+        <Steps.Step title="Generate" description="Queue report" />
+        <Steps.Step title="Download" description="Get your report" />
+      </Steps>
+
+      <Tabs activeKey={activeTab} onChange={setActiveTab}>
+        <TabPane
+          tab={
+            <span>
+              <SettingOutlined />
+              Builder
+            </span>
+          }
+          key="builder"
+        >
+          <Row gutter={24}>
+            <Col xs={24} lg={10}>
+              <Card
+                title={
+                  <Space>
+                    <FolderOpenOutlined />
+                    <span>Report Catalog</span>
+                  </Space>
+                }
+                loading={loading && Object.keys(catalogByCategory).length === 0}
+                className="mb-4"
+                bodyStyle={{ maxHeight: 600, overflow: 'auto' }}
+              >
+                {renderCatalog()}
+              </Card>
+            </Col>
+
+            <Col xs={24} lg={14}>
+              <Card
+                title={
+                  <Space>
+                    <SettingOutlined />
+                    <span>Configuration</span>
+                    {currentReport && (
+                      <Tag color="blue">{currentReport.name || selectedType}</Tag>
+                    )}
+                  </Space>
+                }
+                loading={loading && selectedType && !config}
+              >
+                {renderConfiguration()}
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+
+        <TabPane
+          tab={
+            <span>
+              <LoadingOutlined spin={activeReports.length > 0} style={{ display: activeReports.length > 0 ? 'inline' : 'none' }} />
+              <ClockCircleOutlined style={{ display: activeReports.length > 0 ? 'none' : 'inline' }} />
+              Queue
+              {(activeReports.length > 0 || failedReports.length > 0) && (
+                <Badge
+                  count={activeReports.length + failedReports.length}
+                  className="ml-2"
+                  size="small"
+                  style={{ backgroundColor: activeReports.length > 0 ? '#1890ff' : '#ff4d4f' }}
+                />
+              )}
+            </span>
+          }
+          key="queue"
+        >
+          <Row gutter={16}>
+            {/* Queue Stats */}
+            <Col span={24} className="mb-4">
+              <Card size="small">
+                <Row gutter={16}>
+                  <Col xs={12} sm={6}>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-500">{queueStats.waiting}</div>
+                      <Text type="secondary">Waiting</Text>
+                    </div>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-500">{queueStats.active}</div>
+                      <Text type="secondary">Active</Text>
+                    </div>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-500">{queueStats.completed}</div>
+                      <Text type="secondary">Completed</Text>
+                    </div>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-500">{queueStats.failed}</div>
+                      <Text type="secondary">Failed</Text>
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+
+            {/* Active Reports */}
+            <Col xs={24} lg={12}>
+              <Card
+                title={
+                  <Space>
+                    <SyncOutlined spin={activeReports.length > 0} />
+                    <span>Active Reports</span>
+                    <Badge count={activeReports.length} style={{ backgroundColor: '#1890ff' }} />
+                  </Space>
+                }
+                extra={
+                  <Text type="secondary" className="text-xs">
+                    Polling every {Math.round(pollingInterval / 1000)}s
+                  </Text>
+                }
+              >
+                {activeReports.length === 0 ? (
+                  <Empty description="No active reports" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                ) : (
+                  <div className="space-y-3">
+                    {activeReports.map((report) => (
+                      <div key={report.id} className="p-3 border rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {getFormatIcon(report.format)}
+                          <div>
+                            <Text strong>{report.reportName || report.reportType?.replace(/-/g, ' ')}</Text>
+                            <br />
+                            <Text type="secondary" className="text-xs">
+                              {dayjs(report.createdAt).format('MMM DD, HH:mm')}
+                            </Text>
+                          </div>
+                        </div>
+                        <Space>
+                          <Tag icon={<SyncOutlined spin />} color={report.status === 'processing' ? 'orange' : 'blue'}>
+                            {report.status === 'processing' ? 'Processing' : 'Pending'}
+                          </Tag>
+                          <Button
+                            icon={<StopOutlined />}
+                            size="small"
+                            danger
+                            onClick={() => handleCancelReport(report.id)}
+                          >
+                            Cancel
+                          </Button>
+                        </Space>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </Col>
+
+            {/* Failed Reports */}
+            <Col xs={24} lg={12}>
+              <Card
+                title={
+                  <Space>
+                    <ExclamationCircleOutlined />
+                    <span>Failed / Cancelled</span>
+                    <Badge count={failedReports.length} style={{ backgroundColor: '#ff4d4f' }} />
+                  </Space>
+                }
+              >
+                {failedReports.length === 0 ? (
+                  <Empty description="No failed reports" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                ) : (
+                  <div className="space-y-3">
+                    {failedReports.map((report) => (
+                      <div key={report.id} className="p-3 border rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {getFormatIcon(report.format)}
+                          <div>
+                            <Text strong>{report.reportName || report.reportType?.replace(/-/g, ' ')}</Text>
+                            <br />
+                            <Tooltip title={report.errorMessage}>
+                              <Text type="danger" className="text-xs">
+                                {report.errorMessage?.slice(0, 40) || 'Unknown error'}
+                                {report.errorMessage?.length > 40 && '...'}
+                              </Text>
+                            </Tooltip>
+                          </div>
+                        </div>
+                        <Space>
+                          <Tag color={report.status === 'cancelled' ? 'default' : 'error'}>
+                            {report.status === 'cancelled' ? 'Cancelled' : 'Failed'}
+                          </Tag>
+                          <Button
+                            icon={<ReloadOutlined />}
+                            size="small"
+                            onClick={() => handleRetryReport(report.id)}
+                          >
+                            Retry
+                          </Button>
+                          <Button
+                            icon={<DeleteOutlined />}
+                            size="small"
+                            danger
+                            onClick={() => handleDeleteReport(report.id)}
+                          />
+                        </Space>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+
+        <TabPane
+          tab={
+            <span>
+              <FileSearchOutlined />
+              History
+              {history.length > 0 && (
+                <Badge count={history.length} className="ml-2" size="small" />
+              )}
+            </span>
+          }
+          key="history"
+        >
           <Card
             title={
               <Space>
@@ -464,13 +1103,14 @@ const ReportBuilder = () => {
               <Button
                 icon={<SyncOutlined />}
                 onClick={() => dispatch(fetchReportHistory({ page: 1, limit: 10 }))}
+                loading={loading}
               >
                 Refresh
               </Button>
             }
           >
-            {loading && !history.length ? (
-              <div style={{ textAlign: 'center', padding: 40 }}>
+            {loading && history.length === 0 ? (
+              <div className="py-8 text-center">
                 <Spin size="large" />
               </div>
             ) : history.length === 0 ? (
@@ -484,14 +1124,50 @@ const ReportBuilder = () => {
                 dataSource={history}
                 rowKey="id"
                 pagination={{
-                  pageSize: 5,
+                  pageSize: 10,
                   showSizeChanger: false,
                 }}
               />
             )}
           </Card>
-        </Col>
-      </Row>
+        </TabPane>
+      </Tabs>
+
+      {/* Save Template Modal */}
+      <Modal
+        title="Save Template"
+        open={templateModalVisible}
+        onOk={handleSaveTemplate}
+        onCancel={() => setTemplateModalVisible(false)}
+        okText="Save"
+      >
+        <Form layout="vertical">
+          <Form.Item label="Template Name" required>
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Enter template name"
+            />
+          </Form.Item>
+          <Form.Item label="Description">
+            <Input.TextArea
+              value={templateDescription}
+              onChange={(e) => setTemplateDescription(e.target.value)}
+              placeholder="Optional description"
+              rows={2}
+            />
+          </Form.Item>
+          <Form.Item label="Make Public">
+            <Switch
+              checked={isPublicTemplate}
+              onChange={setIsPublicTemplate}
+            />
+            <Text type="secondary" className="ml-2">
+              Other users can use this template
+            </Text>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

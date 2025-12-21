@@ -25,9 +25,6 @@ import { BulkInstitutionService } from './bulk-institution/bulk-institution.serv
   providers: [
     BulkValidationService,
     BulkProcessor,
-    BulkUserService,
-    BulkStudentService,
-    BulkInstitutionService,
   ],
   exports: [
     BulkUserModule,

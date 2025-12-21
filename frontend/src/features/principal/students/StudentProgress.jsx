@@ -22,6 +22,8 @@ import {
   Badge,
   Alert,
   DatePicker,
+  Descriptions,
+  Divider,
 } from 'antd';
 import {
   UserOutlined,
@@ -38,7 +40,16 @@ import {
   FileTextOutlined,
   CalendarOutlined,
   WarningOutlined,
+  BankOutlined,
+  GlobalOutlined,
+  PhoneOutlined,
+  MailOutlined,
+  EnvironmentOutlined,
+  FilePdfOutlined,
+  DownloadOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-hot-toast';
 import { debounce } from 'lodash';
@@ -64,7 +75,10 @@ const StudentProgress = () => {
     batchId: 'all',
     branchId: 'all',
     status: 'all',
+    mentorId: 'all',
+    joiningLetterStatus: 'all',
   });
+  const [mentors, setMentors] = useState([]);
   const [timelineVisible, setTimelineVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [stats, setStats] = useState({
@@ -96,6 +110,8 @@ const StudentProgress = () => {
         batchId: filters.batchId !== 'all' ? filters.batchId : undefined,
         branchId: filters.branchId !== 'all' ? filters.branchId : undefined,
         status: filters.status !== 'all' ? filters.status : undefined,
+        mentorId: filters.mentorId !== 'all' ? filters.mentorId : undefined,
+        joiningLetterStatus: filters.joiningLetterStatus !== 'all' ? filters.joiningLetterStatus : undefined,
       };
 
       Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
@@ -109,6 +125,11 @@ const StudentProgress = () => {
         pageSize: data.pagination?.limit || pageSize,
         total: data.pagination?.total || 0,
       });
+
+      // Set mentors list from API response
+      if (data.mentors && Array.isArray(data.mentors)) {
+        setMentors(data.mentors);
+      }
 
       const studentList = data.students || [];
       const statusCounts = {
@@ -442,39 +463,270 @@ const StudentProgress = () => {
     },
   ];
 
+  const getJoiningLetterStatusTag = (application) => {
+    if (!application) return null;
+
+    if (application.hasJoiningLetter && application.joiningLetterUrl) {
+      return (
+        <Tag icon={<CheckCircleOutlined />} color="success" className="rounded-full px-3">
+          Uploaded
+        </Tag>
+      );
+    } else if (application.status === 'ACCEPTED' || application.status === 'JOINED') {
+      return (
+        <Tag icon={<WarningOutlined />} color="warning" className="rounded-full px-3">
+          Pending Upload
+        </Tag>
+      );
+    }
+    return (
+      <Tag icon={<MinusCircleOutlined />} color="default" className="rounded-full px-3">
+        Not Required
+      </Tag>
+    );
+  };
+
+  const handleViewJoiningLetter = (url) => {
+    if (url) {
+      window.open(url, '_blank');
+    }
+  };
+
+  const getReportMonthlyStatusTag = (status) => {
+    const statusConfig = {
+      SUBMITTED: { color: 'processing', icon: <SyncOutlined />, text: 'Submitted' },
+      APPROVED: { color: 'success', icon: <CheckCircleOutlined />, text: 'Approved' },
+      REJECTED: { color: 'error', icon: <ExclamationCircleOutlined />, text: 'Rejected' },
+      PENDING: { color: 'warning', icon: <ClockCircleOutlined />, text: 'Pending' },
+    };
+    const config = statusConfig[status] || statusConfig.PENDING;
+    return (
+      <Tag icon={config.icon} color={config.color} className="rounded-md text-xs">
+        {config.text}
+      </Tag>
+    );
+  };
+
   const expandedRowRender = (record) => (
     <div className="p-4 bg-background-tertiary/30 rounded-xl border border-border/50 mx-4 my-2">
       {record.application ? (
-        <div className="space-y-4">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <BankOutlined className="text-lg" />
+        <div className="space-y-6">
+          {/* Internship Header */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <BankOutlined className="text-xl" />
+              </div>
+              <div>
+                <Text strong className="block text-xs uppercase tracking-widest text-text-tertiary mb-1">Current Internship</Text>
+                <Text className="text-lg text-text-primary font-semibold">{record.application.internshipTitle || 'N/A'}</Text>
+                {record.application.joiningDate && (
+                  <div className="flex items-center gap-2 mt-1 text-text-secondary text-sm">
+                    <CalendarOutlined className="text-xs" />
+                    <span>Joined on {dayjs(record.application.joiningDate).format("DD MMM YYYY")}</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <Text strong className="block text-xs uppercase tracking-widest text-text-tertiary mb-1">Current Internship</Text>
-              <Text className="text-base text-text-primary font-semibold">{record.application.internshipTitle || 'N/A'}</Text>
-              {record.application.joiningDate && (
-                <div className="flex items-center gap-2 mt-1 text-text-secondary text-sm">
-                  <CalendarOutlined className="text-xs" />
-                  <span>Joined on {dayjs(record.application.joiningDate).format("DD MMM YYYY")}</span>
+            <Tag color={getStatusColor(record.internshipStatus)} className="rounded-full px-3">
+              {record.internshipStatus}
+            </Tag>
+          </div>
+
+          {/* Joining Letter Section */}
+          <div className="bg-background rounded-xl p-4 border border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center">
+                  <FilePdfOutlined className="text-lg" />
                 </div>
+                <div>
+                  <Text className="block text-xs uppercase tracking-widest text-text-tertiary font-bold mb-1">Joining Letter</Text>
+                  <div className="flex items-center gap-2">
+                    {getJoiningLetterStatusTag(record.application)}
+                    {record.application.joiningLetterUploadedAt && (
+                      <Text className="text-xs text-text-tertiary">
+                        Uploaded {dayjs(record.application.joiningLetterUploadedAt).format("DD MMM YYYY")}
+                      </Text>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {record.application.hasJoiningLetter && record.application.joiningLetterUrl && (
+                <Space>
+                  <Button
+                    type="primary"
+                    ghost
+                    icon={<EyeOutlined />}
+                    onClick={() => handleViewJoiningLetter(record.application.joiningLetterUrl)}
+                    className="rounded-lg"
+                  >
+                    View
+                  </Button>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = record.application.joiningLetterUrl;
+                      link.download = `joining-letter-${record.rollNumber}.pdf`;
+                      link.click();
+                    }}
+                    className="rounded-lg"
+                  >
+                    Download
+                  </Button>
+                </Space>
               )}
             </div>
           </div>
-          
+
+          {/* Company/Industry Details */}
+          {record.application.company && (
+            <div className="bg-background rounded-xl p-4 border border-border/50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <BankOutlined className="text-lg" />
+                </div>
+                <div>
+                  <Text className="block text-xs uppercase tracking-widest text-text-tertiary font-bold">Company / Industry Details</Text>
+                </div>
+              </div>
+              <Descriptions
+                column={{ xs: 1, sm: 2, md: 3 }}
+                size="small"
+                className="bg-background-tertiary/30 rounded-lg p-3"
+              >
+                <Descriptions.Item label={<span className="text-text-tertiary"><BankOutlined className="mr-1" />Company</span>}>
+                  <Text strong className="text-text-primary">{record.application.company.name || 'N/A'}</Text>
+                </Descriptions.Item>
+                {(record.application.company.industryType || record.application.company.type) && (
+                  <Descriptions.Item label={<span className="text-text-tertiary">Industry Type</span>}>
+                    <Tag color="blue" className="rounded-md">{record.application.company.industryType || record.application.company.type}</Tag>
+                  </Descriptions.Item>
+                )}
+                {record.application.company.website && (
+                  <Descriptions.Item label={<span className="text-text-tertiary"><GlobalOutlined className="mr-1" />Website</span>}>
+                    <a href={record.application.company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                      <LinkOutlined /> Visit
+                    </a>
+                  </Descriptions.Item>
+                )}
+                {record.application.company.email && (
+                  <Descriptions.Item label={<span className="text-text-tertiary"><MailOutlined className="mr-1" />Email</span>}>
+                    <a href={`mailto:${record.application.company.email}`} className="text-primary hover:underline">
+                      {record.application.company.email}
+                    </a>
+                  </Descriptions.Item>
+                )}
+                {record.application.company.phone && (
+                  <Descriptions.Item label={<span className="text-text-tertiary"><PhoneOutlined className="mr-1" />Phone</span>}>
+                    <Text className="text-text-primary">{record.application.company.phone}</Text>
+                  </Descriptions.Item>
+                )}
+                {record.application.company.address && (
+                  <Descriptions.Item label={<span className="text-text-tertiary"><EnvironmentOutlined className="mr-1" />Address</span>} span={2}>
+                    <Text className="text-text-primary">
+                      {record.application.company.address}
+                      {record.application.company.city && `, ${record.application.company.city}`}
+                      {record.application.company.state && `, ${record.application.company.state}`}
+                    </Text>
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+            </div>
+          )}
+
+          {/* Monthly Reports Section */}
+          {record.monthlyReports && record.monthlyReports.length > 0 && (
+            <div className="bg-background rounded-xl p-4 border border-border/50">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-warning/10 text-warning flex items-center justify-center">
+                    <FileTextOutlined className="text-lg" />
+                  </div>
+                  <div>
+                    <Text className="block text-xs uppercase tracking-widest text-text-tertiary font-bold">Monthly Reports</Text>
+                    <Text className="text-sm text-text-secondary">
+                      {record.reportsSubmitted} of {record.totalReports} submitted
+                    </Text>
+                  </div>
+                </div>
+                <Progress
+                  type="circle"
+                  percent={Math.round((record.reportsSubmitted / record.totalReports) * 100) || 0}
+                  size={50}
+                  strokeColor={record.reportsSubmitted === record.totalReports ? 'var(--ant-success-color)' : 'var(--ant-primary-color)'}
+                />
+              </div>
+              <Table
+                dataSource={record.monthlyReports}
+                rowKey={(r) => r.id || `${r.month}-${r.year}`}
+                size="small"
+                pagination={false}
+                scroll={{ x: 500 }}
+                className="bg-background-tertiary/30 rounded-lg overflow-hidden"
+                columns={[
+                  {
+                    title: 'Month',
+                    key: 'month',
+                    width: 120,
+                    render: (_, r) => (
+                      <Text className="font-medium text-text-primary">
+                        {dayjs().month(r.month - 1).format('MMMM')} {r.year}
+                      </Text>
+                    ),
+                  },
+                  {
+                    title: 'Status',
+                    dataIndex: 'status',
+                    key: 'status',
+                    width: 120,
+                    render: (status) => getReportMonthlyStatusTag(status),
+                  },
+                  {
+                    title: 'Submitted On',
+                    dataIndex: 'submittedAt',
+                    key: 'submittedAt',
+                    width: 140,
+                    render: (date) => date ? dayjs(date).format('DD MMM YYYY') : '-',
+                  },
+                  {
+                    title: 'Actions',
+                    key: 'actions',
+                    width: 100,
+                    render: (_, r) => r.reportFileUrl ? (
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<EyeOutlined />}
+                        onClick={() => window.open(r.reportFileUrl, '_blank')}
+                        className="!p-0"
+                      >
+                        View
+                      </Button>
+                    ) : (
+                      <Text className="text-text-tertiary text-xs">Not submitted</Text>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
+
+          {/* Progress Timeline */}
           {record.timeline && record.timeline.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border/50">
               <Title level={5} className="!mb-4 flex items-center text-xs uppercase tracking-widest text-text-tertiary font-bold">
                 <SyncOutlined className="mr-2" />
                 Progress Timeline
               </Title>
               <div className="px-2">
-                <Timeline 
+                <Timeline
                   items={record.timeline.slice(0, 5).map(item => ({
                     ...item,
                     children: <div className="text-text-primary text-sm">{item.children}</div>
-                  }))} 
-                  className="mt-2" 
+                  }))}
+                  className="mt-2"
                 />
               </div>
               {record.timeline.length > 5 && (
@@ -822,19 +1074,46 @@ const StudentProgress = () => {
             ))}
           </Select>
           {activeTab === 'progress' && (
-            <Select
-              value={filters.status}
-              onChange={(value) => handleFilterChange('status', value)}
-              className="w-full md:w-40 rounded-lg"
-              placeholder="Filter by Status"
-            >
-              <Select.Option value="all">All Status</Select.Option>
-              <Select.Option value="Not Started">Not Started</Select.Option>
-              <Select.Option value="Pending">Pending</Select.Option>
-              <Select.Option value="In Progress">In Progress</Select.Option>
-              <Select.Option value="Delayed">Delayed</Select.Option>
-              <Select.Option value="Completed">Completed</Select.Option>
-            </Select>
+            <>
+              <Select
+                value={filters.status}
+                onChange={(value) => handleFilterChange('status', value)}
+                className="w-full md:w-40 rounded-lg"
+                placeholder="Filter by Status"
+              >
+                <Select.Option value="all">All Status</Select.Option>
+                <Select.Option value="Not Started">Not Started</Select.Option>
+                <Select.Option value="Pending">Pending</Select.Option>
+                <Select.Option value="In Progress">In Progress</Select.Option>
+                <Select.Option value="Delayed">Delayed</Select.Option>
+                <Select.Option value="Completed">Completed</Select.Option>
+              </Select>
+              <Select
+                value={filters.mentorId}
+                onChange={(value) => handleFilterChange('mentorId', value)}
+                className="w-full md:w-48 rounded-lg"
+                placeholder="Filter by Mentor"
+              >
+                <Select.Option value="all">All Mentors</Select.Option>
+                <Select.Option value="unassigned">Unassigned</Select.Option>
+                {mentors?.map(mentor => (
+                  <Select.Option key={mentor.id} value={mentor.id}>
+                    {mentor.name}
+                  </Select.Option>
+                ))}
+              </Select>
+              <Select
+                value={filters.joiningLetterStatus}
+                onChange={(value) => handleFilterChange('joiningLetterStatus', value)}
+                className="w-full md:w-48 rounded-lg"
+                placeholder="Joining Letter"
+              >
+                <Select.Option value="all">All Joining Letters</Select.Option>
+                <Select.Option value="uploaded">Uploaded</Select.Option>
+                <Select.Option value="pending">Pending Upload</Select.Option>
+                <Select.Option value="not_required">Not Required</Select.Option>
+              </Select>
+            </>
           )}
         </div>
       </Card>

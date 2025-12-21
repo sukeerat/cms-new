@@ -135,7 +135,7 @@ API.interceptors.response.use(
     } else if (error.response?.status === 429) {
       toast.error('Too many requests. Please slow down.');
     } else if (!error.response) {
-      toast.error('Network error. Please check your connection.');
+      toast.error('Unable to connect to server. Please try again later.');
     }
 
     return Promise.reject(error);

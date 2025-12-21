@@ -40,8 +40,8 @@ const InstitutionsTable = ({ institutions, loading, onViewAll, onViewDetails }) 
             src={record.logo}
           />
           <div>
-            <Text strong className="block text-slate-900">{name}</Text>
-            <Text className="text-xs text-slate-500">
+            <Text strong className="block text-slate-900 dark:text-slate-200">{name}</Text>
+            <Text className="text-xs text-slate-500 dark:text-slate-400">
               {record.shortName || record.code || record.city}
             </Text>
           </div>
@@ -141,7 +141,7 @@ const InstitutionsTable = ({ institutions, loading, onViewAll, onViewDetails }) 
           View All <RightOutlined />
         </Button>
       }
-      className="shadow-sm h-full"
+      className="shadow-sm h-full border-slate-200 dark:border-slate-800"
       styles={{ body: { padding: 0 } }}
     >
       <Table

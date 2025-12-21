@@ -86,14 +86,14 @@ const IndustryDistributionChart = ({
             bottom: 5,
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border))" />
           {horizontal ? (
             <>
-              <XAxis type="number" tick={{ fontSize: 12, fill: '#666' }} />
+              <XAxis type="number" tick={{ fontSize: 12, fill: 'rgb(var(--color-text-secondary))' }} />
               <YAxis
                 type="category"
                 dataKey={nameKey}
-                tick={{ fontSize: 11, fill: '#666' }}
+                tick={{ fontSize: 11, fill: 'rgb(var(--color-text-secondary))' }}
                 width={110}
               />
             </>
@@ -101,10 +101,10 @@ const IndustryDistributionChart = ({
             <>
               <XAxis
                 dataKey={nameKey}
-                tick={{ fontSize: 11, fill: '#666', angle: -45, textAnchor: 'end' }}
+                tick={{ fontSize: 11, fill: 'rgb(var(--color-text-secondary))', angle: -45, textAnchor: 'end' }}
                 height={80}
               />
-              <YAxis type="number" tick={{ fontSize: 12, fill: '#666' }} />
+              <YAxis type="number" tick={{ fontSize: 12, fill: 'rgb(var(--color-text-secondary))' }} />
             </>
           )}
           <Tooltip content={<CustomTooltip />} />
@@ -123,7 +123,7 @@ const IndustryDistributionChart = ({
               <LabelList
                 dataKey={valueKey}
                 position={horizontal ? 'right' : 'top'}
-                style={{ fontSize: 11, fill: '#666' }}
+                style={{ fontSize: 11, fill: 'rgb(var(--color-text-secondary))' }}
                 formatter={(value) => value.toLocaleString()}
               />
             )}

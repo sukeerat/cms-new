@@ -33,18 +33,18 @@ const IndustryItem = ({ item, rank }) => {
         />
         <div className="flex-1 min-w-0">
           <Tooltip title={item.name}>
-            <Text strong className="block truncate text-slate-900">{item.name}</Text>
+            <Text strong className="block truncate text-slate-900 dark:text-slate-200">{item.name}</Text>
           </Tooltip>
           <div className="flex items-center gap-2">
-            <TeamOutlined className="text-slate-400 text-xs" />
-            <Text className="text-xs text-slate-500">
+            <TeamOutlined className="text-slate-400 dark:text-slate-500 text-xs" />
+            <Text className="text-xs text-slate-500 dark:text-slate-400">
               {item.internsHired || 0} interns
             </Text>
             {item.rating && (
               <>
-                <span className="text-slate-300">|</span>
+                <span className="text-slate-300 dark:text-slate-600">|</span>
                 <StarFilled className="text-warning-400 text-xs" />
-                <Text className="text-xs text-slate-500">
+                <Text className="text-xs text-slate-500 dark:text-slate-400">
                   {item.rating}
                 </Text>
               </>
@@ -79,7 +79,7 @@ const TopIndustriesList = ({ industries = [], loading, onViewAll }) => {
           </a>
         )
       }
-      className="shadow-sm border-slate-200"
+      className="shadow-sm border-slate-200 dark:border-slate-800"
       loading={loading}
     >
       {industries.length > 0 ? (

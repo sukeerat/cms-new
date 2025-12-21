@@ -39,13 +39,7 @@ export class AuthService {
       throw new UnauthorizedException('Account is inactive');
     }
 
-    this.logger.log(`Validating password for user: ${email}`);
-    this.logger.log(`Password hash from DB: ${user.password}`);
-    this.logger.log(`Plain password provided: ${password}`);
-
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    this.logger.log(`Password validation result: ${isPasswordValid}`);
 
     if (!isPasswordValid) {
       this.logger.warn(`Invalid password for user: ${email}`);

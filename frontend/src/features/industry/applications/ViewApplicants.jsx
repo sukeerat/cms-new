@@ -383,7 +383,7 @@ const ViewApplicants = () => {
       }, 1000);
     } catch (error) {
       console.error("Status change error:", error);
-      toast.error(error?.response?.data?.message || "Error updating status");
+      toast.error(error?.response?.data?.message || "Failed to update application status");
       fetchApplications();
     }
   };

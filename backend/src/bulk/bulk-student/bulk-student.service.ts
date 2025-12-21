@@ -1,15 +1,17 @@
 import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
-import { Role } from '@prisma/client';
 import { BulkStudentRowDto, BulkStudentResultDto, BulkStudentValidationResultDto } from './dto/bulk-student.dto';
+import { UserService, CreateStudentData } from '../../domain/user/user.service';
 import * as XLSX from 'xlsx';
-import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class BulkStudentService {
   private readonly logger = new Logger(BulkStudentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userService: UserService,
+  ) {}
 
   /**
    * Parse CSV/Excel file and extract student data
@@ -53,6 +55,7 @@ export class BulkStudentService {
 
   /**
    * Validate student data before processing
+   * Optimized: Uses batch queries instead of N+1, O(n) duplicate detection with Sets
    */
   async validateStudents(
     students: BulkStudentRowDto[],
@@ -62,20 +65,34 @@ export class BulkStudentService {
     const warnings: Array<{ row: number; field?: string; message: string }> = [];
     const validGenders = ['MALE', 'FEMALE', 'OTHER'];
 
-    // Get all batches for the institution
+    // Use domain service for batch/branch lookups (DRY principle)
+    const [batchMap, branchMap] = await Promise.all([
+      this.userService.getBatchMap(institutionId),
+      this.userService.getBranchMap(),
+    ]);
+
     const batches = await this.prisma.batch.findMany({
       where: { institutionId },
-      select: { id: true, name: true },
+      select: { name: true },
     });
 
-    const batchMap = new Map(batches.map(b => [b.name.toLowerCase(), b.id]));
+    // OPTIMIZATION: Extract all emails and enrollment numbers for batch queries
+    const allEmails = students
+      .map(s => s.email?.toLowerCase())
+      .filter((email): email is string => !!email);
+    const allEnrollmentNumbers = students
+      .map(s => s.enrollmentNumber)
+      .filter((num): num is string => !!num);
 
-    // Get all branches
-    const branches = await this.prisma.branch.findMany({
-      select: { id: true, name: true },
-    });
+    // Use domain service for existing checks (DRY principle)
+    const [existingEmailSet, existingEnrollmentSet] = await Promise.all([
+      this.userService.findExistingEmails(allEmails),
+      this.userService.findExistingEnrollments(allEnrollmentNumbers),
+    ]);
 
-    const branchMap = new Map(branches.map(b => [b.name.toLowerCase(), b.id]));
+    // OPTIMIZATION: O(n) duplicate detection using Maps instead of O(n²) findIndex
+    const emailFirstOccurrence = new Map<string, number>();
+    const enrollmentFirstOccurrence = new Map<string, number>();
 
     for (let i = 0; i < students.length; i++) {
       const student = students[i];
@@ -159,39 +176,23 @@ export class BulkStudentService {
         });
       }
 
-      // Check for duplicate email in the file
-      const duplicateInFile = students.findIndex(
-        (s, idx) => idx !== i && s.email?.toLowerCase() === student.email?.toLowerCase(),
-      );
-      if (duplicateInFile !== -1) {
-        errors.push({
-          row: rowNumber,
-          field: 'email',
-          value: student.email,
-          error: `Duplicate email in file (also found in row ${duplicateInFile + 2})`,
-        });
-      }
-
-      // Check for duplicate enrollment number in the file
-      const duplicateEnrollment = students.findIndex(
-        (s, idx) => idx !== i && s.enrollmentNumber === student.enrollmentNumber,
-      );
-      if (duplicateEnrollment !== -1) {
-        errors.push({
-          row: rowNumber,
-          field: 'enrollmentNumber',
-          value: student.enrollmentNumber,
-          error: `Duplicate enrollment number in file (also found in row ${duplicateEnrollment + 2})`,
-        });
-      }
-
-      // Check if email already exists in database
+      // OPTIMIZATION: O(1) duplicate email check using Map
       if (student.email) {
-        const existingUser = await this.prisma.user.findUnique({
-          where: { email: student.email },
-        });
+        const emailLower = student.email.toLowerCase();
+        const firstRow = emailFirstOccurrence.get(emailLower);
+        if (firstRow !== undefined) {
+          errors.push({
+            row: rowNumber,
+            field: 'email',
+            value: student.email,
+            error: `Duplicate email in file (also found in row ${firstRow})`,
+          });
+        } else {
+          emailFirstOccurrence.set(emailLower, rowNumber);
+        }
 
-        if (existingUser) {
+        // OPTIMIZATION: O(1) check against pre-fetched existing emails
+        if (existingEmailSet.has(emailLower)) {
           errors.push({
             row: rowNumber,
             field: 'email',
@@ -201,13 +202,22 @@ export class BulkStudentService {
         }
       }
 
-      // Check if enrollment number already exists
+      // OPTIMIZATION: O(1) duplicate enrollment check using Map
       if (student.enrollmentNumber) {
-        const existingStudent = await this.prisma.student.findFirst({
-          where: { admissionNumber: student.enrollmentNumber },
-        });
+        const firstRow = enrollmentFirstOccurrence.get(student.enrollmentNumber);
+        if (firstRow !== undefined) {
+          errors.push({
+            row: rowNumber,
+            field: 'enrollmentNumber',
+            value: student.enrollmentNumber,
+            error: `Duplicate enrollment number in file (also found in row ${firstRow})`,
+          });
+        } else {
+          enrollmentFirstOccurrence.set(student.enrollmentNumber, rowNumber);
+        }
 
-        if (existingStudent) {
+        // OPTIMIZATION: O(1) check against pre-fetched existing enrollment numbers
+        if (existingEnrollmentSet.has(student.enrollmentNumber)) {
           errors.push({
             row: rowNumber,
             field: 'enrollmentNumber',
@@ -265,17 +275,11 @@ export class BulkStudentService {
       };
     }
 
-    // Get batch and branch mappings
-    const batches = await this.prisma.batch.findMany({
-      where: { institutionId },
-      select: { id: true, name: true },
-    });
-    const batchMap = new Map(batches.map(b => [b.name.toLowerCase(), b.id]));
-
-    const branches = await this.prisma.branch.findMany({
-      select: { id: true, name: true },
-    });
-    const branchMap = new Map(branches.map(b => [b.name.toLowerCase(), b.id]));
+    // Use domain service for batch/branch mappings (DRY principle)
+    const [batchMap, branchMap] = await Promise.all([
+      this.userService.getBatchMap(institutionId),
+      this.userService.getBranchMap(),
+    ]);
 
     // Process students in batches
     const batchSize = 10;
@@ -332,7 +336,7 @@ export class BulkStudentService {
   }
 
   /**
-   * Create a single student
+   * Create a single student - delegates to domain UserService
    */
   private async createStudent(
     studentDto: BulkStudentRowDto,
@@ -340,12 +344,6 @@ export class BulkStudentService {
     batchMap: Map<string, string>,
     branchMap: Map<string, string>,
   ) {
-    // Generate temporary password (first 4 letters of name + last 4 digits of enrollment)
-    const namePart = studentDto.name.replace(/\s/g, '').substring(0, 4).toLowerCase();
-    const enrollPart = studentDto.enrollmentNumber.slice(-4);
-    const temporaryPassword = `${namePart}${enrollPart}@123`;
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
-
     // Get batch ID
     const batchId = batchMap.get(studentDto.batchName.toLowerCase());
     if (!batchId) {
@@ -353,54 +351,34 @@ export class BulkStudentService {
     }
 
     // Get branch ID (optional)
-    const branchId = studentDto.branchName ? branchMap.get(studentDto.branchName.toLowerCase()) : undefined;
+    const branchId = studentDto.branchName
+      ? branchMap.get(studentDto.branchName.toLowerCase())
+      : undefined;
 
-    // Create user first
-    const user = await this.prisma.user.create({
-      data: {
-        name: studentDto.name,
-        email: studentDto.email,
-        password: hashedPassword,
-        role: Role.STUDENT,
-        phoneNo: studentDto.phone,
-        dob: studentDto.dateOfBirth,
-        institutionId,
-        active: true,
-        hasChangedDefaultPassword: false,
-        rollNumber: studentDto.rollNumber,
-      },
-    });
-
-    // Create student profile
-    const student = await this.prisma.student.create({
-      data: {
-        userId: user.id,
-        name: studentDto.name,
-        email: studentDto.email,
-        admissionNumber: studentDto.enrollmentNumber,
-        rollNumber: studentDto.rollNumber,
-        contact: studentDto.phone,
-        address: studentDto.address,
-        dob: studentDto.dateOfBirth,
-        gender: studentDto.gender,
-        parentName: studentDto.parentName,
-        parentContact: studentDto.parentContact,
-        tenthper: studentDto.tenthPercentage,
-        twelthper: studentDto.twelfthPercentage,
-        currentSemester: studentDto.currentSemester,
-        batchId,
-        branchId,
-        branchName: studentDto.branchName,
-        institutionId,
-        isActive: true,
-      },
-    });
-
-    return {
-      user,
-      student,
-      temporaryPassword,
+    // Map DTO to domain CreateStudentData and delegate to domain service
+    const studentData: CreateStudentData = {
+      name: studentDto.name,
+      email: studentDto.email,
+      phone: studentDto.phone,
+      enrollmentNumber: studentDto.enrollmentNumber,
+      batchId,
+      branchId,
+      branchName: studentDto.branchName,
+      rollNumber: studentDto.rollNumber,
+      dateOfBirth: studentDto.dateOfBirth,
+      gender: studentDto.gender,
+      address: studentDto.address,
+      parentName: studentDto.parentName,
+      parentContact: studentDto.parentContact,
+      tenthPercentage: studentDto.tenthPercentage,
+      twelfthPercentage: studentDto.twelfthPercentage,
+      currentSemester: studentDto.currentSemester,
     };
+
+    // Delegate to domain service (skip validation since bulk already validated)
+    return this.userService.createStudent(institutionId, studentData, {
+      skipValidation: true,
+    });
   }
 
   /**

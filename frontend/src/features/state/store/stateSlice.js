@@ -24,6 +24,12 @@ const initialState = {
     loading: false,
     error: null,
   },
+  staff: {
+    list: [],
+    pagination: null,
+    loading: false,
+    error: null,
+  },
   reports: {
     list: [],
     loading: false,
@@ -82,11 +88,24 @@ const initialState = {
     loading: false,
     error: null,
   },
+  institutionsWithStats: {
+    list: [],
+    pagination: null,
+    month: null,
+    year: null,
+    loading: false,
+    error: null,
+  },
   lastFetched: {
     dashboard: null,
     institutions: null,
     institutionsKey: null,
+    institutionsWithStats: null,
+    institutionsWithStatsKey: null,
     principals: null,
+    principalsKey: null,
+    staff: null,
+    staffKey: null,
     reports: null,
     analytics: null,
     placements: null,
@@ -155,19 +174,67 @@ export const fetchInstitutions = createAsyncThunk(
   }
 );
 
+export const fetchInstitutionsWithStats = createAsyncThunk(
+  'state/fetchInstitutionsWithStats',
+  async (params = {}, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const lastFetched = state.state.lastFetched.institutionsWithStats;
+
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.state.lastFetched.institutionsWithStatsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
+        return { cached: true };
+      }
+
+      const response = await stateService.getInstitutionsWithStats(params);
+      return { ...response, _cacheKey: requestKey };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch institutions stats');
+    }
+  }
+);
+
 export const fetchPrincipals = createAsyncThunk(
   'state/fetchPrincipals',
-  async (params, { getState, rejectWithValue }) => {
+  async (params = {}, { getState, rejectWithValue }) => {
     try {
       const state = getState();
       const lastFetched = state.state.lastFetched.principals;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may randomly show stale data.
+      // Normalize params into a stable key.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        institutionId: params?.institutionId ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.state.lastFetched.principalsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await stateService.getPrincipals(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch principals');
     }
@@ -287,6 +354,104 @@ export const fetchPrincipalById = createAsyncThunk(
       return response;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch principal');
+    }
+  }
+);
+
+// Staff
+export const fetchStaff = createAsyncThunk(
+  'state/fetchStaff',
+  async (params = {}, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const lastFetched = state.state.lastFetched.staff;
+
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        institutionId: params?.institutionId ?? '',
+        role: params?.role ?? '',
+        branchName: params?.branchName ?? '',
+        active: params?.active ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.state.lastFetched.staffKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
+        return { cached: true };
+      }
+
+      const response = await stateService.getStaff(params);
+      return { ...response, _cacheKey: requestKey };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch staff');
+    }
+  }
+);
+
+export const fetchStaffById = createAsyncThunk(
+  'state/fetchStaffById',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await stateService.getStaffById(id);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch staff member');
+    }
+  }
+);
+
+export const createStaff = createAsyncThunk(
+  'state/createStaff',
+  async (data, { rejectWithValue }) => {
+    try {
+      const response = await stateService.createStaff(data);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to create staff');
+    }
+  }
+);
+
+export const updateStaff = createAsyncThunk(
+  'state/updateStaff',
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const response = await stateService.updateStaff(id, data);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update staff');
+    }
+  }
+);
+
+export const deleteStaff = createAsyncThunk(
+  'state/deleteStaff',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await stateService.deleteStaff(id);
+      return { id, ...response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete staff');
+    }
+  }
+);
+
+export const resetStaffPassword = createAsyncThunk(
+  'state/resetStaffPassword',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await stateService.resetStaffPassword(id);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to reset password');
     }
   }
 );
@@ -640,7 +805,9 @@ const stateSlice = createSlice({
     markAllDataStale: (state) => {
       state.lastFetched.dashboard = 0;
       state.lastFetched.institutions = 0;
+      state.lastFetched.institutionsKey = null;
       state.lastFetched.principals = 0;
+      state.lastFetched.principalsKey = null;
       state.lastFetched.reports = 0;
       state.lastFetched.analytics = 0;
     },
@@ -775,6 +942,31 @@ const stateSlice = createSlice({
         state.institutions.loading = false;
         state.institutions.error = action.payload;
       })
+      // Institutions with Stats (for dashboard)
+      .addCase(fetchInstitutionsWithStats.pending, (state) => {
+        state.institutionsWithStats.loading = true;
+        state.institutionsWithStats.error = null;
+      })
+      .addCase(fetchInstitutionsWithStats.fulfilled, (state, action) => {
+        state.institutionsWithStats.loading = false;
+        if (!action.payload.cached) {
+          state.institutionsWithStats.list = action.payload.data || [];
+          state.institutionsWithStats.pagination = {
+            total: action.payload.total ?? 0,
+            page: action.payload.page ?? 1,
+            limit: action.payload.limit ?? 10,
+            totalPages: action.payload.totalPages ?? 1,
+          };
+          state.institutionsWithStats.month = action.payload.month;
+          state.institutionsWithStats.year = action.payload.year;
+          state.lastFetched.institutionsWithStats = Date.now();
+          state.lastFetched.institutionsWithStatsKey = action.payload._cacheKey ?? null;
+        }
+      })
+      .addCase(fetchInstitutionsWithStats.rejected, (state, action) => {
+        state.institutionsWithStats.loading = false;
+        state.institutionsWithStats.error = action.payload;
+      })
       .addCase(createInstitution.pending, (state) => {
         state.institutions.loading = true;
         state.institutions.error = null;
@@ -834,6 +1026,7 @@ const stateSlice = createSlice({
             totalPages: action.payload.totalPages,
           };
           state.lastFetched.principals = Date.now();
+          state.lastFetched.principalsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchPrincipals.rejected, (state, action) => {
@@ -906,6 +1099,98 @@ const stateSlice = createSlice({
       .addCase(resetPrincipalPassword.rejected, (state, action) => {
         state.principals.loading = false;
         state.principals.error = action.payload;
+      })
+
+      // Staff
+      .addCase(fetchStaff.pending, (state) => {
+        state.staff.loading = true;
+        state.staff.error = null;
+      })
+      .addCase(fetchStaff.fulfilled, (state, action) => {
+        state.staff.loading = false;
+        if (!action.payload.cached) {
+          state.staff.list = action.payload.data || action.payload;
+          state.staff.pagination = {
+            total: action.payload.total,
+            page: action.payload.page,
+            limit: action.payload.limit,
+            totalPages: action.payload.totalPages,
+          };
+          state.lastFetched.staff = Date.now();
+          state.lastFetched.staffKey = action.payload._cacheKey ?? null;
+        }
+      })
+      .addCase(fetchStaff.rejected, (state, action) => {
+        state.staff.loading = false;
+        state.staff.error = action.payload;
+      })
+      .addCase(fetchStaffById.pending, (state) => {
+        state.staff.loading = true;
+        state.staff.error = null;
+      })
+      .addCase(fetchStaffById.fulfilled, (state) => {
+        state.staff.loading = false;
+      })
+      .addCase(fetchStaffById.rejected, (state, action) => {
+        state.staff.loading = false;
+        state.staff.error = action.payload;
+      })
+      .addCase(createStaff.pending, (state) => {
+        state.staff.loading = true;
+        state.staff.error = null;
+      })
+      .addCase(createStaff.fulfilled, (state, action) => {
+        state.staff.loading = false;
+        state.staff.list = [action.payload, ...state.staff.list];
+        state.lastFetched.staff = null; // Invalidate cache to force refresh
+        state.lastFetched.staffKey = null;
+      })
+      .addCase(createStaff.rejected, (state, action) => {
+        state.staff.loading = false;
+        state.staff.error = action.payload;
+      })
+      .addCase(updateStaff.pending, (state) => {
+        state.staff.loading = true;
+        state.staff.error = null;
+      })
+      .addCase(updateStaff.fulfilled, (state, action) => {
+        state.staff.loading = false;
+        const updatedStaff = action.payload?.data ?? action.payload;
+        const index = state.staff.list.findIndex(s => s.id === updatedStaff.id);
+        if (index !== -1) {
+          state.staff.list[index] = updatedStaff;
+        }
+        state.lastFetched.staff = null; // Invalidate cache
+        state.lastFetched.staffKey = null;
+      })
+      .addCase(updateStaff.rejected, (state, action) => {
+        state.staff.loading = false;
+        state.staff.error = action.payload;
+      })
+      .addCase(deleteStaff.pending, (state) => {
+        state.staff.loading = true;
+        state.staff.error = null;
+      })
+      .addCase(deleteStaff.fulfilled, (state, action) => {
+        state.staff.loading = false;
+        state.staff.list = state.staff.list.filter(s => s.id !== action.payload.id);
+        state.lastFetched.staff = null; // Invalidate cache
+        state.lastFetched.staffKey = null;
+      })
+      .addCase(deleteStaff.rejected, (state, action) => {
+        state.staff.loading = false;
+        state.staff.error = action.payload;
+      })
+      .addCase(resetStaffPassword.pending, (state) => {
+        state.staff.loading = true;
+        state.staff.error = null;
+      })
+      .addCase(resetStaffPassword.fulfilled, (state) => {
+        state.staff.loading = false;
+      })
+      .addCase(resetStaffPassword.rejected, (state, action) => {
+        state.staff.loading = false;
+        state.staff.error = action.payload;
       })
 
       // Reports
@@ -1225,6 +1510,14 @@ export const selectSelectedInstitution = (state) => state.state.institutions.sel
 export const selectInstitutionsPagination = (state) => state.state.institutions.pagination;
 export const selectInstitutionsLoading = (state) => state.state.institutions.loading;
 export const selectInstitutionsError = (state) => state.state.institutions.error;
+
+// Institutions with Stats selectors (for dashboard)
+export const selectInstitutionsWithStats = (state) => state.state.institutionsWithStats.list;
+export const selectInstitutionsWithStatsPagination = (state) => state.state.institutionsWithStats.pagination;
+export const selectInstitutionsWithStatsLoading = (state) => state.state.institutionsWithStats.loading;
+export const selectInstitutionsWithStatsError = (state) => state.state.institutionsWithStats.error;
+export const selectInstitutionsWithStatsMonth = (state) => state.state.institutionsWithStats.month;
+export const selectInstitutionsWithStatsYear = (state) => state.state.institutionsWithStats.year;
 
 // Principal selectors
 export const selectPrincipals = (state) => state.state.principals.list;

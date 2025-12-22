@@ -19,6 +19,16 @@ export const stateService = {
     return response.data;
   },
 
+  async getInstitutionsWithStats(params = {}) {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    );
+    const queryParams = new URLSearchParams(cleanParams).toString();
+    const url = queryParams ? `/state/institutions/dashboard-stats?${queryParams}` : '/state/institutions/dashboard-stats';
+    const response = await API.get(url);
+    return response.data;
+  },
+
   async getInstitutionById(id) {
     const response = await API.get(`/state/institutions/${id}`);
     return response.data;
@@ -101,6 +111,43 @@ export const stateService = {
 
   async resetPrincipalPassword(id) {
     const response = await API.post(`/state/principals/${id}/reset-password`);
+    return response.data;
+  },
+
+  // Staff
+  async getStaff(params = {}) {
+    // Filter out undefined/null values to prevent "undefined" strings in query
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    );
+    const queryParams = new URLSearchParams(cleanParams).toString();
+    const url = queryParams ? `/state/staff?${queryParams}` : '/state/staff';
+    const response = await API.get(url);
+    return response.data;
+  },
+
+  async getStaffById(id) {
+    const response = await API.get(`/state/staff/${id}`);
+    return response.data;
+  },
+
+  async createStaff(data) {
+    const response = await API.post('/state/staff', data);
+    return response.data;
+  },
+
+  async updateStaff(id, data) {
+    const response = await API.put(`/state/staff/${id}`, data);
+    return response.data;
+  },
+
+  async deleteStaff(id) {
+    const response = await API.delete(`/state/staff/${id}`);
+    return response.data;
+  },
+
+  async resetStaffPassword(id) {
+    const response = await API.post(`/state/staff/${id}/reset-password`);
     return response.data;
   },
 
@@ -249,6 +296,40 @@ export const stateService = {
 
   async removeMentorFromStudent(studentId) {
     const response = await API.delete(`/state/students/${studentId}/mentor`);
+    return response.data;
+  },
+
+  // Users Management
+  async getUsers(params = {}) {
+    // Filter out undefined/null values to prevent "undefined" strings in query
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    );
+    const queryParams = new URLSearchParams(cleanParams).toString();
+    const url = queryParams ? `/state/users?${queryParams}` : '/state/users';
+    const response = await API.get(url);
+    return response.data;
+  },
+
+  async resetUserPassword(userId, role) {
+    // Determine the correct endpoint based on role
+    const isPrincipal = role === 'PRINCIPAL';
+    const isStaff = [
+      'TEACHER', 'FACULTY_SUPERVISOR', 'PLACEMENT_OFFICER',
+      'ACCOUNTANT', 'ADMISSION_OFFICER', 'EXAMINATION_OFFICER',
+      'PMS_OFFICER', 'EXTRACURRICULAR_HEAD'
+    ].includes(role);
+
+    let endpoint;
+    if (isPrincipal) {
+      endpoint = `/state/principals/${userId}/reset-password`;
+    } else if (isStaff) {
+      endpoint = `/state/staff/${userId}/reset-password`;
+    } else {
+      throw new Error('Cannot reset password for this user type');
+    }
+
+    const response = await API.post(endpoint);
     return response.data;
   },
 };

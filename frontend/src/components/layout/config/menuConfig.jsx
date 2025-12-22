@@ -72,6 +72,8 @@ export const menuConfig = {
     items: [
       { key: 'principals-list', label: 'All Principals', icon: <TeamOutlined />, path: '/principals' },
       { key: 'principals-new', label: 'Add Principal', icon: <UserAddOutlined />, path: '/principals/new' },
+      { key: 'state-staff-list', label: 'All Staff', icon: <SolutionOutlined />, path: '/state-staff' },
+      { key: 'state-staff-new', label: 'Add Staff', icon: <UserAddOutlined />, path: '/state-staff/new' },
       { key: 'bulk-user-creation', label: 'Bulk Users', icon: <UsergroupAddOutlined />, path: '/users/bulk-create' },
       { key: 'credentials-reset', label: 'Reset Credentials', icon: <LockOutlined />, path: '/users/reset-credentials' },
     ],

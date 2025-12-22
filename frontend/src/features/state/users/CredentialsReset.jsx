@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -15,6 +15,9 @@ import {
   Typography,
   Divider,
   Badge,
+  Select,
+  Row,
+  Col,
 } from 'antd';
 import {
   SearchOutlined,
@@ -25,16 +28,35 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   UserOutlined,
+  BankOutlined,
+  FilterOutlined,
+  ClearOutlined,
 } from '@ant-design/icons';
 import { credentialsService } from '../../../services/credentials.service';
 import { apiClient } from '../../../services/api';
+import { debounce } from 'lodash';
 
 const { Title, Text, Paragraph } = Typography;
 
 const CredentialsReset = () => {
   const [users, setUsers] = useState([]);
+  const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [institutionsLoading, setInstitutionsLoading] = useState(false);
+
+  // Filters
   const [searchText, setSearchText] = useState('');
+  const [selectedRole, setSelectedRole] = useState(undefined);
+  const [selectedInstitution, setSelectedInstitution] = useState(undefined);
+  const [activeFilter, setActiveFilter] = useState(undefined);
+
+  // Pagination
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
+
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [resetModalVisible, setResetModalVisible] = useState(false);
@@ -47,21 +69,81 @@ const CredentialsReset = () => {
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
-    fetchUsers();
+    fetchInstitutions();
   }, []);
 
-  const fetchUsers = async () => {
+  useEffect(() => {
+    fetchUsers();
+  }, [pagination.current, pagination.pageSize, selectedRole, selectedInstitution, activeFilter]);
+
+  // Debounced search
+  const debouncedSearch = useCallback(
+    debounce((value) => {
+      setPagination(prev => ({ ...prev, current: 1 }));
+      fetchUsers(value);
+    }, 500),
+    [selectedRole, selectedInstitution, activeFilter]
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchText);
+    return () => debouncedSearch.cancel();
+  }, [searchText, debouncedSearch]);
+
+  const fetchInstitutions = async () => {
+    setInstitutionsLoading(true);
+    try {
+      const response = await apiClient.get('/state/institutions', { params: { limit: 500 } });
+      const data = response.data?.data || response.data || [];
+      setInstitutions(data);
+    } catch (error) {
+      console.error('Failed to fetch institutions:', error);
+    } finally {
+      setInstitutionsLoading(false);
+    }
+  };
+
+  const fetchUsers = async (search = searchText) => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/state/users', { params: { limit: 500 } });
+      const params = {
+        page: pagination.current,
+        limit: pagination.pageSize,
+      };
+
+      if (search) params.search = search;
+      if (selectedRole) params.role = selectedRole;
+      if (selectedInstitution) params.institutionId = selectedInstitution;
+      if (activeFilter !== undefined) params.active = activeFilter;
+
+      const response = await apiClient.get('/state/users', { params });
       const usersData = response.data?.data || response.data || [];
+      const total = response.data?.total || usersData.length;
+
       setUsers(usersData);
+      setPagination(prev => ({ ...prev, total }));
     } catch (error) {
       message.error('Failed to fetch users: ' + (error.response?.data?.message || error.message));
       setUsers([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTableChange = (paginationConfig, filters, sorter) => {
+    setPagination({
+      current: paginationConfig.current,
+      pageSize: paginationConfig.pageSize,
+      total: pagination.total,
+    });
+  };
+
+  const clearFilters = () => {
+    setSearchText('');
+    setSelectedRole(undefined);
+    setSelectedInstitution(undefined);
+    setActiveFilter(undefined);
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   const handleSingleReset = (user) => {
@@ -104,7 +186,6 @@ const CredentialsReset = () => {
         errors: [],
       });
       setResultsModalVisible(true);
-      // No need to refetch users - password reset doesn't change displayed data
     } catch (error) {
       message.error('Failed to reset password: ' + (error.response?.data?.message || error.message));
     } finally {
@@ -123,7 +204,6 @@ const CredentialsReset = () => {
     try {
       const userIds = selectedUsers.map(user => user.id);
 
-      // Simulate progress for better UX
       const progressInterval = setInterval(() => {
         setResetProgress(prev => {
           if (prev >= 90) {
@@ -152,7 +232,6 @@ const CredentialsReset = () => {
         if (result.failed > 0) {
           message.warning(`Failed to reset ${result.failed} password(s)`);
         }
-        // No need to refetch users - password reset doesn't change displayed data
       }, 500);
     } catch (error) {
       message.error('Bulk reset failed: ' + (error.response?.data?.message || error.message));
@@ -196,12 +275,16 @@ const CredentialsReset = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const filteredUsers = users.filter(user =>
-    !searchText ||
-    user.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchText.toLowerCase()) ||
-    user.institutionId?.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const roleOptions = [
+    { label: 'System Admin', value: 'SYSTEM_ADMIN' },
+    { label: 'State Directorate', value: 'STATE_DIRECTORATE' },
+    { label: 'Principal', value: 'PRINCIPAL' },
+    { label: 'Teacher', value: 'TEACHER' },
+    { label: 'Faculty Supervisor', value: 'FACULTY_SUPERVISOR' },
+    { label: 'Placement Officer', value: 'PLACEMENT_OFFICER' },
+    { label: 'Student', value: 'STUDENT' },
+    { label: 'Industry', value: 'INDUSTRY' },
+  ];
 
   const columns = [
     {
@@ -222,63 +305,60 @@ const CredentialsReset = () => {
       title: 'Role',
       dataIndex: 'role',
       key: 'role',
+      width: 150,
       render: (role) => {
         const roleColors = {
           SYSTEM_ADMIN: 'red',
           STATE_DIRECTORATE: 'purple',
           PRINCIPAL: 'blue',
           TEACHER: 'green',
+          FACULTY_SUPERVISOR: 'cyan',
+          PLACEMENT_OFFICER: 'geekblue',
           STUDENT: 'default',
           INDUSTRY: 'orange',
         };
-        return <Tag color={roleColors[role] || 'default'}>{role}</Tag>;
+        return <Tag color={roleColors[role] || 'default'}>{role?.replace(/_/g, ' ')}</Tag>;
       },
-      filters: [
-        { text: 'System Admin', value: 'SYSTEM_ADMIN' },
-        { text: 'State Directorate', value: 'STATE_DIRECTORATE' },
-        { text: 'Principal', value: 'PRINCIPAL' },
-        { text: 'Teacher', value: 'TEACHER' },
-        { text: 'Student', value: 'STUDENT' },
-        { text: 'Industry', value: 'INDUSTRY' },
-      ],
-      onFilter: (value, record) => record.role === value,
     },
     {
       title: 'Institution',
-      dataIndex: 'institutionId',
-      key: 'institutionId',
-      render: (institutionId) => institutionId || <Text type="secondary">Not Assigned</Text>,
+      dataIndex: 'Institution',
+      key: 'institution',
+      width: 200,
+      render: (institution) => (
+        institution ? (
+          <Space>
+            <BankOutlined className="text-blue-500" />
+            <span>{institution.name}</span>
+          </Space>
+        ) : (
+          <Text type="secondary">Not Assigned</Text>
+        )
+      ),
     },
     {
       title: 'Last Login',
       dataIndex: 'lastLoginAt',
       key: 'lastLoginAt',
+      width: 160,
       render: (date) => date ? new Date(date).toLocaleString('en-IN') : <Text type="secondary">Never</Text>,
-      sorter: (a, b) => {
-        if (!a.lastLoginAt) return 1;
-        if (!b.lastLoginAt) return -1;
-        return new Date(a.lastLoginAt) - new Date(b.lastLoginAt);
-      },
     },
     {
       title: 'Status',
       dataIndex: 'active',
       key: 'active',
+      width: 100,
       render: (active) => (
         <Badge
           status={active ? 'success' : 'error'}
           text={active ? 'Active' : 'Inactive'}
         />
       ),
-      filters: [
-        { text: 'Active', value: true },
-        { text: 'Inactive', value: false },
-      ],
-      onFilter: (value, record) => record.active === value,
     },
     {
       title: 'Actions',
       key: 'actions',
+      width: 100,
       render: (_, record) => (
         <Tooltip title="Reset Password">
           <Button
@@ -305,6 +385,8 @@ const CredentialsReset = () => {
     }),
   };
 
+  const hasActiveFilters = searchText || selectedRole || selectedInstitution || activeFilter !== undefined;
+
   return (
     <div className="p-6">
       <Card
@@ -319,7 +401,7 @@ const CredentialsReset = () => {
             <Tooltip title="Refresh user list">
               <Button
                 icon={<ReloadOutlined />}
-                onClick={fetchUsers}
+                onClick={() => fetchUsers()}
                 loading={loading}
               >
                 Refresh
@@ -372,29 +454,94 @@ const CredentialsReset = () => {
             />
           )}
 
-          <Input.Search
-            placeholder="Search by name, email, or institution..."
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ maxWidth: 500 }}
-            allowClear
-            size="large"
-          />
+          {/* Filters Section */}
+          <Card size="small" className="bg-gray-50 dark:bg-gray-800">
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} sm={12} md={6}>
+                <Input.Search
+                  placeholder="Search by name or email..."
+                  prefix={<SearchOutlined />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                />
+              </Col>
+              <Col xs={24} sm={12} md={5}>
+                <Select
+                  placeholder="Filter by Role"
+                  value={selectedRole}
+                  onChange={(value) => {
+                    setSelectedRole(value);
+                    setPagination(prev => ({ ...prev, current: 1 }));
+                  }}
+                  allowClear
+                  style={{ width: '100%' }}
+                  options={roleOptions}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Select
+                  placeholder="Filter by Institution"
+                  value={selectedInstitution}
+                  onChange={(value) => {
+                    setSelectedInstitution(value);
+                    setPagination(prev => ({ ...prev, current: 1 }));
+                  }}
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  loading={institutionsLoading}
+                  style={{ width: '100%' }}
+                  options={institutions.map(inst => ({
+                    label: inst.name,
+                    value: inst.id,
+                  }))}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={4}>
+                <Select
+                  placeholder="Status"
+                  value={activeFilter}
+                  onChange={(value) => {
+                    setActiveFilter(value);
+                    setPagination(prev => ({ ...prev, current: 1 }));
+                  }}
+                  allowClear
+                  style={{ width: '100%' }}
+                  options={[
+                    { label: 'Active', value: true },
+                    { label: 'Inactive', value: false },
+                  ]}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={3}>
+                {hasActiveFilters && (
+                  <Button
+                    icon={<ClearOutlined />}
+                    onClick={clearFilters}
+                    type="text"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </Col>
+            </Row>
+          </Card>
 
           <Table
             columns={columns}
-            dataSource={filteredUsers}
+            dataSource={users}
             loading={loading}
             rowKey="id"
             rowSelection={rowSelection}
             pagination={{
-              pageSize: 10,
+              ...pagination,
               showSizeChanger: true,
               showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} users`,
               pageSizeOptions: ['10', '20', '50', '100'],
             }}
-            scroll={{ x: 1200 }}
+            onChange={handleTableChange}
+            scroll={{ x: 1000 }}
           />
         </Space>
       </Card>
@@ -426,6 +573,9 @@ const CredentialsReset = () => {
               <p><strong>Name:</strong> {currentUser.name}</p>
               <p><strong>Email:</strong> {currentUser.email}</p>
               <p><strong>Role:</strong> <Tag color="blue">{currentUser.role}</Tag></p>
+              {currentUser.Institution && (
+                <p><strong>Institution:</strong> {currentUser.Institution.name}</p>
+              )}
             </Card>
             <Alert
               title="This action will:"
@@ -481,6 +631,7 @@ const CredentialsReset = () => {
             {selectedUsers.map(user => (
               <div key={user.id} style={{ padding: '4px 0' }}>
                 <Tag color="blue">{user.role}</Tag> {user.name} - {user.email}
+                {user.Institution && <Text type="secondary"> ({user.Institution.name})</Text>}
               </div>
             ))}
           </div>

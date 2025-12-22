@@ -7,12 +7,22 @@ export class RedlockService implements OnModuleInit {
   private readonly logger = new Logger(RedlockService.name);
   private redlock: Redlock;
   private redis: Redis;
+  private redisUnavailableSince: number | null = null;
+  private redisLastErrorLogAt: number | null = null;
+  private readonly redisErrorDelayMs = 5 * 60 * 1000;
 
   async onModuleInit() {
     this.redis = new Redis({
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
       password: process.env.REDIS_PASSWORD || undefined,
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 1,
+    });
+
+    this.redis.on('ready', () => {
+      this.redisUnavailableSince = null;
+      this.redisLastErrorLogAt = null;
     });
 
     this.redlock = new Redlock([this.redis], {
@@ -24,7 +34,7 @@ export class RedlockService implements OnModuleInit {
     });
 
     this.redlock.on('error', (error) => {
-      this.logger.error('Redlock error', error);
+      this.handleRedlockError(error);
     });
   }
 
@@ -47,6 +57,25 @@ export class RedlockService implements OnModuleInit {
       return await operation();
     } finally {
       await lock.release();
+    }
+  }
+
+  private handleRedlockError(error: unknown): void {
+    const now = Date.now();
+
+    if (this.redisUnavailableSince === null) {
+      this.redisUnavailableSince = now;
+    }
+
+    const unavailableForMs = now - this.redisUnavailableSince;
+    const shouldLog =
+      unavailableForMs >= this.redisErrorDelayMs &&
+      (this.redisLastErrorLogAt === null ||
+        now - this.redisLastErrorLogAt >= this.redisErrorDelayMs);
+
+    if (shouldLog) {
+      this.redisLastErrorLogAt = now;
+      this.logger.error('Redis lock unavailable for 5 minutes', error as Error);
     }
   }
 }

@@ -68,9 +68,10 @@ export class FacultyService {
     return this.cache.getOrSet(
       cacheKey,
       async () => {
+        // Only count self-identified internships (not placement-based)
         const [
           assignedStudents,
-          activeInternships,
+          activeSelfIdentifiedInternships,
           pendingReports,
           pendingVisits,
           totalVisits,
@@ -81,20 +82,24 @@ export class FacultyService {
               isActive: true,
             },
           }),
+          // Count active self-identified internships only
           this.prisma.internshipApplication.count({
             where: {
               mentorId: facultyId,
-              status: { in: [ApplicationStatus.SELECTED, ApplicationStatus.JOINED] },
+              isSelfIdentified: true,
+              status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] },
             },
           }),
           this.prisma.monthlyReport.count({
             where: {
               application: {
                 mentorId: facultyId,
+                isSelfIdentified: true, // Only self-identified internships
               },
               status: MonthlyReportStatus.SUBMITTED,
             },
           }),
+          // Pending self-identified internship approvals (should be 0 with auto-approval)
           this.prisma.internshipApplication.count({
             where: {
               mentorId: facultyId,
@@ -155,7 +160,8 @@ export class FacultyService {
 
         return {
           totalStudents: assignedStudents,
-          activeInternships,
+          // Self-identified internships only (no placement-based)
+          activeInternships: activeSelfIdentifiedInternships,
           pendingReports,
           pendingApprovals: pendingVisits,
           totalVisits,
@@ -239,13 +245,14 @@ export class FacultyService {
   }
 
   /**
-   * Get student progress details
+   * Get student progress details (self-identified internships only)
    */
   async getStudentProgress(studentId: string) {
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
       include: {
         internshipApplications: {
+          where: { isSelfIdentified: true }, // Only self-identified internships
           include: {
             internship: {
               include: {
@@ -272,9 +279,9 @@ export class FacultyService {
       throw new NotFoundException('Student not found');
     }
 
-    // Calculate overall progress
+    // Calculate overall progress (self-identified internships only)
     const currentApplication = student.internshipApplications.find(
-      app => app.status === ApplicationStatus.JOINED || app.status === ApplicationStatus.SELECTED
+      app => app.isSelfIdentified && (app.status === ApplicationStatus.JOINED || app.status === ApplicationStatus.APPROVED)
     );
 
     let overallProgress = 0;

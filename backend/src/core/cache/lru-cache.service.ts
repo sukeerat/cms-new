@@ -16,6 +16,14 @@ export class LruCacheService implements OnModuleInit {
   private redis: Redis;
   private tagStore: Map<string, Set<string>>; // tag -> Set of cache keys
   private redisCircuitBreaker: CircuitBreaker;
+  private redisReady = false;
+  private redisUnavailableSince: number | null = null;
+  private redisLastErrorLogAt: number | null = null;
+  private redisDisabledUntil = 0;
+  private readonly redisErrorDelayMs = 5 * 60 * 1000;
+  private readonly redisCooldownMs = 5 * 60 * 1000;
+  private readonly l1MaxTtlMs = 60000;
+  private readonly l1FallbackTtlMs = 300000;
 
   // Metrics
   private l1Hits = 0;
@@ -60,15 +68,28 @@ export class LruCacheService implements OnModuleInit {
         const delay = Math.min(times * 50, 2000);
         return delay;
       },
+      enableOfflineQueue: false,
       maxRetriesPerRequest: 3,
     });
 
     this.redis.on('error', (err) => {
-      this.logger.error('Redis Client Error:', err);
+      this.handleRedisError(err);
     });
 
     this.redis.on('connect', () => {
       this.logger.log('Redis Client Connected');
+    });
+
+    this.redis.on('ready', () => {
+      this.redisReady = true;
+      this.redisUnavailableSince = null;
+      this.redisLastErrorLogAt = null;
+      this.redisDisabledUntil = 0;
+      this.logger.log('Redis Client Ready');
+    });
+
+    this.redis.on('end', () => {
+      this.redisReady = false;
     });
   }
 
@@ -85,7 +106,7 @@ export class LruCacheService implements OnModuleInit {
     this.l1Misses++;
 
     // Try Redis with circuit breaker
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         const value = await this.redisCircuitBreaker.execute(async () => {
           const data = await this.redis.get(key);
@@ -116,7 +137,8 @@ export class LruCacheService implements OnModuleInit {
 
     // Set in local cache.
     // Newer lru-cache uses an options object with `ttl`, older versions use a numeric `maxAge` as the 3rd arg.
-    const l1TtlMs = Math.min(ttlMs, 60000);
+    const l1TtlLimit = this.isRedisUsable() ? this.l1MaxTtlMs : this.l1FallbackTtlMs;
+    const l1TtlMs = Math.min(ttlMs, l1TtlLimit);
     try {
       this.localCache.set(key, value, { ttl: l1TtlMs });
     } catch {
@@ -124,7 +146,7 @@ export class LruCacheService implements OnModuleInit {
     }
 
     // Set in Redis with circuit breaker
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         await this.redisCircuitBreaker.execute(async () => {
           const serialized = JSON.stringify(value);
@@ -170,7 +192,7 @@ export class LruCacheService implements OnModuleInit {
    */
   async delete(key: string): Promise<void> {
     this.localCache.delete(key);
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         await this.redisCircuitBreaker.execute(async () => {
           await this.redis.del(key);
@@ -195,7 +217,7 @@ export class LruCacheService implements OnModuleInit {
     }
 
     // Clear matching keys from Redis with circuit breaker
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         await this.redisCircuitBreaker.execute(async () => {
           const keys = await this.redis.keys(pattern);
@@ -240,7 +262,7 @@ export class LruCacheService implements OnModuleInit {
   async clear(): Promise<void> {
     this.localCache.clear();
     this.tagStore.clear();
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         await this.redisCircuitBreaker.execute(async () => {
           await this.redis.flushdb();
@@ -278,7 +300,7 @@ export class LruCacheService implements OnModuleInit {
         hitRate: this.l1Hits / (this.l1Hits + this.l1Misses) || 0,
       },
       l2: {
-        connected: !!this.redis,
+        connected: this.redisReady,
         circuitState: this.redisCircuitBreaker.getState(),
         hits: this.l2Hits,
         misses: this.l2Misses,
@@ -300,7 +322,7 @@ export class LruCacheService implements OnModuleInit {
     }
 
     // Store tags in Redis as well for distributed systems
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         await this.redisCircuitBreaker.execute(async () => {
           await this.redis.sadd(`tags:${key}`, ...tags);
@@ -367,7 +389,7 @@ export class LruCacheService implements OnModuleInit {
       return true;
     }
 
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         const exists = await this.redisCircuitBreaker.execute(async () => {
           return await this.redis.exists(key);
@@ -386,7 +408,7 @@ export class LruCacheService implements OnModuleInit {
    * Get remaining TTL for a key
    */
   async ttl(key: string): Promise<number> {
-    if (this.redis && this.redisCircuitBreaker.getState() !== CircuitState.OPEN) {
+    if (this.isRedisUsable()) {
       try {
         return await this.redisCircuitBreaker.execute(async () => {
           return await this.redis.ttl(key);
@@ -397,5 +419,46 @@ export class LruCacheService implements OnModuleInit {
       }
     }
     return -1;
+  }
+
+  private isRedisUsable(): boolean {
+    if (!this.redis) {
+      return false;
+    }
+    if (!this.redisReady) {
+      return false;
+    }
+    if (this.redisCircuitBreaker.getState() === CircuitState.OPEN) {
+      return false;
+    }
+    if (Date.now() < this.redisDisabledUntil) {
+      return false;
+    }
+    return true;
+  }
+
+  private handleRedisError(err: unknown): void {
+    const now = Date.now();
+    this.redisReady = false;
+
+    if (this.redisUnavailableSince === null) {
+      this.redisUnavailableSince = now;
+    }
+
+    this.redisDisabledUntil = Math.max(this.redisDisabledUntil, now + this.redisCooldownMs);
+
+    const unavailableForMs = now - this.redisUnavailableSince;
+    const shouldLog =
+      unavailableForMs >= this.redisErrorDelayMs &&
+      (this.redisLastErrorLogAt === null ||
+        now - this.redisLastErrorLogAt >= this.redisErrorDelayMs);
+
+    if (shouldLog) {
+      this.redisLastErrorLogAt = now;
+      this.logger.error(
+        'Redis unavailable for 5 minutes; using local cache until it recovers',
+        err as Error,
+      );
+    }
   }
 }

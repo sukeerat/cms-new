@@ -53,9 +53,12 @@ export function Cacheable(options: CacheableOptions) {
       // Execute the original method
       const result = await originalMethod.apply(this, args);
 
+      const ttlSeconds = options.ttl ?? 300;
+      const ttlMs = Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds * 1000 : 300000;
+
       // Cache the result
       await cacheService.set(cacheKey, result, {
-        ttl: options.ttl || 300,
+        ttl: ttlMs,
         tags: options.tags,
       });
 

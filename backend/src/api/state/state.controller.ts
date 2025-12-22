@@ -21,6 +21,8 @@ import {
   UpdateInstitutionDto,
   CreatePrincipalDto,
   UpdatePrincipalDto,
+  CreateStaffDto,
+  UpdateStaffDto,
 } from './dto';
 
 @ApiTags('State Directorate')
@@ -45,6 +47,20 @@ export class StateController {
     @Query('search') search?: string,
   ) {
     return this.stateService.getInstitutions({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search,
+    });
+  }
+
+  @Get('institutions/dashboard-stats')
+  @ApiOperation({ summary: 'Get institutions with comprehensive stats for dashboard' })
+  async getInstitutionsWithStats(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.stateService.getInstitutionsWithStats({
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       search,
@@ -123,11 +139,13 @@ export class StateController {
     @Query('institutionId') institutionId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('search') search?: string,
   ) {
     return this.stateService.getPrincipals({
       institutionId,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
+      search,
     });
   }
 
@@ -161,12 +179,67 @@ export class StateController {
     return this.stateService.resetPrincipalPassword(id);
   }
 
+  // ==================== Staff Management ====================
+
+  @Get('staff')
+  @ApiOperation({ summary: 'Get all staff across institutions with filtering' })
+  async getStaff(
+    @Query('institutionId') institutionId?: string,
+    @Query('role') role?: string,
+    @Query('branchName') branchName?: string,
+    @Query('search') search?: string,
+    @Query('active') active?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.stateService.getStaff({
+      institutionId,
+      role,
+      branchName,
+      search,
+      active: active === 'true' ? true : active === 'false' ? false : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @Post('staff')
+  @ApiOperation({ summary: 'Create new staff member for an institution' })
+  async createStaff(@Body() data: CreateStaffDto) {
+    return this.stateService.createStaff(data);
+  }
+
+  @Get('staff/:id')
+  @ApiOperation({ summary: 'Get staff member by ID' })
+  async getStaffById(@Param('id') id: string) {
+    return this.stateService.getStaffById(id);
+  }
+
+  @Put('staff/:id')
+  @ApiOperation({ summary: 'Update staff member by ID' })
+  async updateStaff(@Param('id') id: string, @Body() data: UpdateStaffDto) {
+    return this.stateService.updateStaff(id, data);
+  }
+
+  @Delete('staff/:id')
+  @ApiOperation({ summary: 'Delete staff member by ID' })
+  async deleteStaff(@Param('id') id: string) {
+    return this.stateService.deleteStaff(id);
+  }
+
+  @Post('staff/:id/reset-password')
+  @ApiOperation({ summary: 'Reset staff member password' })
+  async resetStaffPassword(@Param('id') id: string) {
+    return this.stateService.resetStaffPassword(id);
+  }
+
   @Get('users')
   @ApiOperation({ summary: 'Get all users for credentials management' })
   async getUsers(
     @Query('role') role?: string,
     @Query('institutionId') institutionId?: string,
     @Query('search') search?: string,
+    @Query('active') active?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -174,6 +247,7 @@ export class StateController {
       role,
       institutionId,
       search,
+      active: active === 'true' ? true : active === 'false' ? false : undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });

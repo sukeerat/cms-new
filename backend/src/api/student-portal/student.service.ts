@@ -28,11 +28,12 @@ export class StudentService {
     return this.cache.getOrSet(
       cacheKey,
       async () => {
-        // Get current internship
+        // Get current self-identified internship
         const currentInternship = await this.prisma.internshipApplication.findFirst({
           where: {
             studentId,
-            status: { in: [ApplicationStatus.SELECTED, ApplicationStatus.JOINED] },
+            isSelfIdentified: true,
+            status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] },
           },
           include: {
             internship: {
@@ -70,9 +71,9 @@ export class StudentService {
           },
         });
 
-        // Get total applications count
+        // Get total self-identified applications count
         const totalApplications = await this.prisma.internshipApplication.count({
-          where: { studentId },
+          where: { studentId, isSelfIdentified: true },
         });
 
         // Get upcoming deadlines
@@ -88,9 +89,9 @@ export class StudentService {
         // Get recent notifications (placeholder - would integrate with notification system)
         const notifications = [];
 
-        // Get recent activities
+        // Get recent activities (self-identified internships only)
         const recentActivities = await this.prisma.internshipApplication.findMany({
-          where: { studentId },
+          where: { studentId, isSelfIdentified: true },
           take: 5,
           orderBy: { updatedAt: 'desc' },
           include: {

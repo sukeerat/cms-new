@@ -37,13 +37,14 @@ export class PrincipalService {
     return this.cache.getOrSet(
       cacheKey,
       async () => {
+        // Only count self-identified internships (not placement-based)
         const [
           totalStudents,
           activeStudents,
           totalStaff,
           activeStaff,
-          totalApplications,
-          selectedApplications,
+          totalSelfIdentifiedInternships,
+          approvedSelfIdentifiedInternships,
           pendingApprovals,
           totalBatches,
           pendingMonthlyReports,
@@ -55,15 +56,18 @@ export class PrincipalService {
           this.prisma.user.count({
             where: { institutionId, role: { not: Role.STUDENT }, active: true }
           }),
+          // Count self-identified internships only
           this.prisma.internshipApplication.count({
-            where: { student: { institutionId } }
+            where: { student: { institutionId }, isSelfIdentified: true }
           }),
           this.prisma.internshipApplication.count({
             where: {
               student: { institutionId },
-              status: ApplicationStatus.SELECTED,
+              isSelfIdentified: true,
+              status: ApplicationStatus.APPROVED,
             }
           }),
+          // Pending approvals - self-identified with APPLIED status (should be 0 with auto-approval)
           this.prisma.internshipApplication.count({
             where: {
               student: { institutionId },
@@ -86,8 +90,9 @@ export class PrincipalService {
           }),
         ]);
 
-        const placementRate = totalApplications > 0
-          ? Number(((selectedApplications / totalApplications) * 100).toFixed(2))
+        // Approval rate for self-identified internships
+        const approvalRate = totalSelfIdentifiedInternships > 0
+          ? Number(((approvedSelfIdentifiedInternships / totalSelfIdentifiedInternships) * 100).toFixed(2))
           : 0;
 
         return {
@@ -104,10 +109,11 @@ export class PrincipalService {
             total: totalStaff,
             active: activeStaff,
           },
+          // Self-identified internships only (no placement-based)
           internships: {
-            totalApplications,
-            selectedApplications,
-            placementRate,
+            totalApplications: totalSelfIdentifiedInternships,
+            approvedApplications: approvedSelfIdentifiedInternships,
+            approvalRate,
           },
           pending: {
             selfIdentifiedApprovals: pendingApprovals,
@@ -1326,13 +1332,14 @@ export class PrincipalService {
       studentWhere.branchId = query.branchId;
     }
 
-    // Get all students with active internships (JOINED status)
+    // Get all students with active self-identified internships (JOINED status)
     const studentsWithInternships = await this.prisma.student.findMany({
       where: {
         ...studentWhere,
         internshipApplications: {
           some: {
-            status: { in: ['JOINED', 'SELECTED'] },
+            isSelfIdentified: true,
+            status: { in: ['JOINED', 'SELECTED', 'APPROVED'] },
           },
         },
       },
@@ -1344,7 +1351,8 @@ export class PrincipalService {
         branch: { select: { id: true, name: true } },
         internshipApplications: {
           where: {
-            status: { in: ['JOINED', 'SELECTED'] },
+            isSelfIdentified: true,
+            status: { in: ['JOINED', 'SELECTED', 'APPROVED'] },
           },
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -1930,11 +1938,12 @@ export class PrincipalService {
         },
       }),
 
-      // Application status counts using groupBy
+      // Application status counts using groupBy (self-identified only)
       this.prisma.internshipApplication.groupBy({
         by: ['status'],
         where: {
           student: { institutionId },
+          isSelfIdentified: true,
         },
         _count: { status: true },
       }),
@@ -2043,11 +2052,12 @@ export class PrincipalService {
 
     const institutionId = principal.institutionId;
 
-    // Single query with groupBy instead of multiple count queries
+    // Single query with groupBy instead of multiple count queries (self-identified only)
     const statusCounts = await this.prisma.internshipApplication.groupBy({
       by: ['status'],
       where: {
         student: { institutionId },
+        isSelfIdentified: true,
       },
       _count: { status: true },
     });
@@ -2099,7 +2109,7 @@ export class PrincipalService {
 
     const institutionId = principal.institutionId;
 
-    // Run queries in parallel
+    // Run queries in parallel (self-identified internships only)
     const [totalStudents, completedApplications] = await Promise.all([
       this.prisma.student.count({
         where: { institutionId },
@@ -2107,9 +2117,11 @@ export class PrincipalService {
       this.prisma.internshipApplication.findMany({
         where: {
           student: { institutionId },
+          isSelfIdentified: true,
           status: 'COMPLETED',
         },
         select: {
+          companyName: true, // For self-identified, use companyName instead of industry
           internship: {
             select: {
               industry: {

@@ -1,19 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Row, Col, Spin, Typography, message, Card, Modal } from 'antd';
+import { Row, Col, Spin, Typography, message, Card } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchDashboardStats,
-  fetchInstitutions,
+  fetchInstitutionsWithStats,
   fetchTopPerformers,
-  fetchTopIndustries,
   fetchMonthlyAnalytics,
   selectDashboardStats,
   selectDashboardLoading,
-  selectInstitutions,
-  selectInstitutionsLoading,
+  selectInstitutionsWithStats,
+  selectInstitutionsWithStatsLoading,
+  selectInstitutionsWithStatsMonth,
+  selectInstitutionsWithStatsYear,
   selectTopPerformers,
   selectBottomPerformers,
-  selectTopIndustries,
   selectAnalyticsLoading,
   selectMonthlyStats,
 } from '../store/stateSlice';
@@ -23,7 +23,6 @@ import {
   PerformanceMetrics,
   InstitutionsTable,
   TopPerformers,
-  TopIndustriesList,
 } from './components';
 import { PlacementTrendChart } from '../../../components/charts';
 import stateService from '../../../services/state.service';
@@ -54,11 +53,15 @@ const StateDashboard = () => {
   // Use Redux selectors for data
   const stats = useSelector(selectDashboardStats);
   const loading = useSelector(selectDashboardLoading);
-  const institutions = useSelector(selectInstitutions);
-  const institutionsLoading = useSelector(selectInstitutionsLoading);
+
+  // Institutions with comprehensive stats
+  const institutionsWithStats = useSelector(selectInstitutionsWithStats);
+  const institutionsLoading = useSelector(selectInstitutionsWithStatsLoading);
+  const institutionsMonth = useSelector(selectInstitutionsWithStatsMonth);
+  const institutionsYear = useSelector(selectInstitutionsWithStatsYear);
+
   const topPerformersData = useSelector(selectTopPerformers);
   const bottomPerformersData = useSelector(selectBottomPerformers);
-  const topIndustriesData = useSelector(selectTopIndustries);
   const analyticsLoading = useSelector(selectAnalyticsLoading);
   const monthlyAnalytics = useSelector(selectMonthlyStats);
 
@@ -69,21 +72,46 @@ const StateDashboard = () => {
   // Derived performers from institutions as fallback
   const topPerformers = topPerformersData.length > 0
     ? topPerformersData
-    : institutions?.length > 0
-      ? [...institutions].sort((a, b) => (b.placementRate || 0) - (a.placementRate || 0)).slice(0, 5)
+    : institutionsWithStats?.length > 0
+      ? [...institutionsWithStats]
+          .sort((a, b) => {
+            const scoreA = calculateComplianceScore(a.stats);
+            const scoreB = calculateComplianceScore(b.stats);
+            return scoreB - scoreA;
+          })
+          .slice(0, 5)
       : [];
 
   const bottomPerformers = bottomPerformersData.length > 0
     ? bottomPerformersData
-    : institutions?.length > 0
-      ? [...institutions].sort((a, b) => (a.placementRate || 0) - (b.placementRate || 0)).slice(0, 5)
+    : institutionsWithStats?.length > 0
+      ? [...institutionsWithStats]
+          .sort((a, b) => {
+            const scoreA = calculateComplianceScore(a.stats);
+            const scoreB = calculateComplianceScore(b.stats);
+            return scoreA - scoreB;
+          })
+          .slice(0, 5)
       : [];
+
+  // Calculate compliance score for sorting
+  function calculateComplianceScore(stats) {
+    if (!stats) return 0;
+    const { studentsWithInternships, assigned, facultyVisits, reportsSubmitted } = stats;
+    if (studentsWithInternships === 0) return 100;
+
+    const assignmentScore = (assigned / studentsWithInternships) * 100;
+    const visitScore = facultyVisits > 0 ? Math.min((facultyVisits / studentsWithInternships) * 100, 100) : 0;
+    const reportScore = (reportsSubmitted / studentsWithInternships) * 100;
+
+    return Math.round((assignmentScore + visitScore + reportScore) / 3);
+  }
 
   // Prepare trend data for chart
   const trendData = monthlyAnalytics?.trend?.map(item => ({
     month: item.month,
     applications: item.applications || 0,
-    placements: item.placements || Math.floor((item.applications || 0) * 0.6),
+    approved: item.approved || item.placements || Math.floor((item.applications || 0) * 0.6),
   })) || [];
 
   // Fetch initial data
@@ -92,23 +120,21 @@ const StateDashboard = () => {
     setUserName(user?.name || 'Administrator');
 
     dispatch(fetchDashboardStats());
-    dispatch(fetchInstitutions({ limit: 10 }));
+    dispatch(fetchInstitutionsWithStats({ limit: 15 }));
     dispatch(fetchTopPerformers());
-    dispatch(fetchTopIndustries({ limit: 10 }));
     dispatch(fetchMonthlyAnalytics());
   }, [dispatch]);
 
   // Refresh handler
   const handleRefresh = useCallback(() => {
     dispatch(fetchDashboardStats({ forceRefresh: true }));
-    dispatch(fetchInstitutions({ limit: 10, forceRefresh: true }));
+    dispatch(fetchInstitutionsWithStats({ limit: 15, forceRefresh: true }));
     dispatch(fetchTopPerformers({ forceRefresh: true }));
-    dispatch(fetchTopIndustries({ limit: 10, forceRefresh: true }));
     dispatch(fetchMonthlyAnalytics({ forceRefresh: true }));
     message.success('Dashboard refreshed');
   }, [dispatch]);
 
-  // Export handler - Fully implemented
+  // Export handler
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
@@ -118,7 +144,6 @@ const StateDashboard = () => {
         year: selectedMonth?.getFullYear(),
       });
 
-      // Create formatted JSON for download
       const jsonString = JSON.stringify(exportData, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
       const filename = `state_dashboard_report_${new Date().toISOString().split('T')[0]}.json`;
@@ -172,47 +197,32 @@ const StateDashboard = () => {
         exporting={exporting}
       />
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - Primary metrics and focus areas */}
       <div className="mb-6">
         <StatisticsCards stats={stats} />
       </div>
 
-      {/* Two Column Layout */}
-      <Row gutter={[16, 16]}>
-        {/* Left Column - Institutions Table */}
-        <Col xs={24} lg={12}>
-          <InstitutionsTable
-            institutions={institutions}
-            loading={institutionsLoading}
-          />
-        </Col>
-
-        {/* Right Column - Performance Metrics */}
-        <Col xs={24} lg={12}>
-          <PerformanceMetrics stats={stats} />
-        </Col>
-      </Row>
-
-      {/* Performers Section */}
-      <div className="mt-6">
-        <TopPerformers
-          topPerformers={topPerformers}
-          bottomPerformers={bottomPerformers}
-          loading={analyticsLoading}
+      {/* Institution Performance Table - Full width, key focus */}
+      <div className="mb-6">
+        <InstitutionsTable
+          institutions={institutionsWithStats}
+          loading={institutionsLoading}
+          month={institutionsMonth}
+          year={institutionsYear}
         />
       </div>
 
-      {/* Bottom Section - Industries and Trends */}
-      <Row gutter={[16, 16]} className="mt-6">
+      {/* Two Column Layout - Performance and Trends */}
+      <Row gutter={[16, 16]} className="mb-6">
+        {/* Performance Metrics */}
         <Col xs={24} lg={12}>
-          <TopIndustriesList
-            industries={topIndustriesData}
-            loading={analyticsLoading}
-          />
+          <PerformanceMetrics stats={stats} />
         </Col>
+
+        {/* Trend Chart */}
         <Col xs={24} lg={12}>
           <Card
-            title="Application & Placement Trends"
+            title="Internship Application Trends"
             className="shadow-sm border-border rounded-xl h-full"
             loading={analyticsLoading}
           >
@@ -238,62 +248,69 @@ const StateDashboard = () => {
         </Col>
       </Row>
 
+      {/* Top Performers Section */}
+      <div className="mb-6">
+        <TopPerformers
+          topPerformers={topPerformers}
+          bottomPerformers={bottomPerformers}
+          loading={analyticsLoading}
+        />
+      </div>
+
       {/* Monthly Summary Section */}
       {monthlyAnalytics?.metrics && (
-        <div className="mt-6">
-          <Card title="Monthly Summary" className="shadow-sm border-border rounded-xl">
-            <Row gutter={[16, 16]}>
-              <Col xs={12} sm={8} md={4}>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">
-                    {monthlyAnalytics.metrics.newStudents || 0}
-                  </div>
-                  <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">New Students</div>
+        <Card title="Monthly Summary" className="shadow-sm border-border rounded-xl">
+          <Row gutter={[16, 16]}>
+            <Col xs={12} sm={8} md={4}>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">
+                  {monthlyAnalytics.metrics.newStudents || 0}
                 </div>
-              </Col>
-              <Col xs={12} sm={8} md={4}>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-success">
-                    {monthlyAnalytics.metrics.newApplications || 0}
-                  </div>
-                  <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Applications</div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">New Students</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-success">
+                  {monthlyAnalytics.metrics.newApplications || 0}
                 </div>
-              </Col>
-              <Col xs={12} sm={8} md={4}>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-secondary">
-                    {monthlyAnalytics.metrics.selectedApplications || 0}
-                  </div>
-                  <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Placements</div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Applications</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-secondary">
+                  {monthlyAnalytics.metrics.approvedApplications || monthlyAnalytics.metrics.selectedApplications || 0}
                 </div>
-              </Col>
-              <Col xs={12} sm={8} md={4}>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-warning">
-                    {monthlyAnalytics.metrics.newInternships || 0}
-                  </div>
-                  <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">New Internships</div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Approved</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-warning">
+                  {monthlyAnalytics.metrics.newInternships || 0}
                 </div>
-              </Col>
-              <Col xs={12} sm={8} md={4}>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-info">
-                    {monthlyAnalytics.metrics.facultyVisits || 0}
-                  </div>
-                  <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Faculty Visits</div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">New Internships</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-info">
+                  {monthlyAnalytics.metrics.facultyVisits || 0}
                 </div>
-              </Col>
-              <Col xs={12} sm={8} md={4}>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-pink-500">
-                    {monthlyAnalytics.metrics.placementRate || 0}%
-                  </div>
-                  <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Placement Rate</div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Faculty Visits</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-pink-500">
+                  {monthlyAnalytics.metrics.approvalRate || monthlyAnalytics.metrics.placementRate || 0}%
                 </div>
-              </Col>
-            </Row>
-          </Card>
-        </div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Approval Rate</div>
+              </div>
+            </Col>
+          </Row>
+        </Card>
       )}
     </div>
   );

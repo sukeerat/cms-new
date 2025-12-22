@@ -495,7 +495,7 @@ const InstituteManagement = () => {
   ];
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in min-h-screen flex bg-white dark:bg-slate-900">
       {/* Header */}
       <div style={{ marginBottom: "24px" }}>
         <Title level={2} className="!text-slate-800">

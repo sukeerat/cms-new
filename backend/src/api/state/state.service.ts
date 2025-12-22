@@ -36,11 +36,23 @@ export class StateService {
     return this.cache.getOrSet(
       cacheKey,
       async () => {
-        const now = Date.now();
-        const lastWeek = new Date(now - 7 * 24 * 60 * 60 * 1000);
-        const lastMonth = new Date(now - 30 * 24 * 60 * 60 * 1000);
+        const now = new Date();
+        const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const lastMonthDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        // Current and previous month dates for detailed stats
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+        const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+        const prevMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+        // Start of current month and previous month
+        const startOfCurrentMonth = new Date(currentYear, currentMonth - 1, 1);
+        const startOfPrevMonth = new Date(prevMonthYear, prevMonth - 1, 1);
+        const endOfPrevMonth = new Date(currentYear, currentMonth - 1, 0);
 
         // Use parallel queries for efficiency
+        // Only count self-identified internships (not placement-based)
         const [
           totalInstitutions,
           activeInstitutions,
@@ -48,14 +60,26 @@ export class StateService {
           activeStudents,
           totalFaculty,
           activeFaculty,
-          totalInternships,
-          activeInternships,
+          totalSelfIdentifiedInternships,
+          activeSelfIdentifiedInternships,
           totalApplications,
           acceptedApplications,
           totalIndustries,
           approvedIndustries,
+          // Mentor assignments
+          totalAssignments,
+          activeAssignments,
+          // Faculty visits
+          visitsThisMonth,
+          visitsLastMonth,
           totalFacultyVisits,
-          pendingReports,
+          // Monthly reports
+          reportsSubmittedThisMonth,
+          reportsSubmittedLastMonth,
+          reportsPendingReview,
+          reportsApprovedThisMonth,
+          totalReportsSubmitted,
+          // Recent activity
           recentApplications,
           recentIndustryRegistrations,
         ] = await this.prisma.$transaction([
@@ -72,30 +96,89 @@ export class StateService {
               active: true,
             },
           }),
-          this.prisma.internship.count(),
-          this.prisma.internship.count({
+          // Count self-identified internships only
+          this.prisma.internshipApplication.count({
+            where: { isSelfIdentified: true },
+          }),
+          this.prisma.internshipApplication.count({
             where: {
-              status: InternshipStatus.ACTIVE,
-              isActive: true,
+              isSelfIdentified: true,
+              internshipStatus: 'ONGOING',
             },
           }),
-          this.prisma.internshipApplication.count(),
+          // All application counts are for self-identified only
           this.prisma.internshipApplication.count({
-            where: { status: ApplicationStatus.SELECTED },
+            where: { isSelfIdentified: true },
+          }),
+          this.prisma.internshipApplication.count({
+            where: { isSelfIdentified: true, status: ApplicationStatus.APPROVED },
           }),
           this.prisma.industry.count(),
           this.prisma.industry.count({
             where: { isApproved: true, isVerified: true },
           }),
+          // Mentor assignments
+          this.prisma.mentorAssignment.count(),
+          this.prisma.mentorAssignment.count({ where: { isActive: true } }),
+          // Faculty visits - this month
+          this.prisma.facultyVisitLog.count({
+            where: { visitDate: { gte: startOfCurrentMonth } },
+          }),
+          // Faculty visits - last month
+          this.prisma.facultyVisitLog.count({
+            where: { visitDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+          }),
+          // Total faculty visits
           this.prisma.facultyVisitLog.count(),
+          // Monthly reports - submitted this month
+          this.prisma.monthlyReport.count({
+            where: {
+              reportMonth: currentMonth,
+              reportYear: currentYear,
+              status: { in: ['SUBMITTED', 'APPROVED'] },
+            },
+          }),
+          // Monthly reports - submitted last month
+          this.prisma.monthlyReport.count({
+            where: {
+              reportMonth: prevMonth,
+              reportYear: prevMonthYear,
+              status: { in: ['SUBMITTED', 'APPROVED'] },
+            },
+          }),
+          // Monthly reports - pending review
           this.prisma.monthlyReport.count({ where: { status: 'SUBMITTED' } }),
+          // Monthly reports - approved this month
+          this.prisma.monthlyReport.count({
+            where: {
+              reportMonth: currentMonth,
+              reportYear: currentYear,
+              status: 'APPROVED',
+            },
+          }),
+          // Total reports submitted
+          this.prisma.monthlyReport.count({
+            where: { status: { in: ['SUBMITTED', 'APPROVED'] } },
+          }),
+          // Recent activity
           this.prisma.internshipApplication.count({
-            where: { createdAt: { gte: lastWeek } },
+            where: { isSelfIdentified: true, createdAt: { gte: lastWeek } },
           }),
           this.prisma.industry.count({
-            where: { createdAt: { gte: lastMonth } },
+            where: { createdAt: { gte: lastMonthDate } },
           }),
         ]);
+
+        // Calculate students with ongoing internships who need mentor assignments
+        const studentsWithOngoingInternships = activeSelfIdentifiedInternships;
+        const unassignedStudents = Math.max(0, studentsWithOngoingInternships - activeAssignments);
+
+        // Calculate expected reports and visits
+        const expectedReportsThisMonth = activeSelfIdentifiedInternships;
+        const missingReportsThisMonth = Math.max(0, expectedReportsThisMonth - reportsSubmittedThisMonth);
+        const missingReportsLastMonth = Math.max(0, expectedReportsThisMonth - reportsSubmittedLastMonth);
+        const expectedVisitsThisMonth = activeSelfIdentifiedInternships;
+        const pendingVisitsThisMonth = Math.max(0, expectedVisitsThisMonth - visitsThisMonth);
 
         return {
           institutions: {
@@ -110,17 +193,16 @@ export class StateService {
             total: totalFaculty,
             active: activeFaculty,
           },
-          // Backwards-compatible flat fields
           totalFaculty,
           activeFaculty,
           internships: {
-            total: totalInternships,
-            active: activeInternships,
+            total: totalSelfIdentifiedInternships,
+            active: activeSelfIdentifiedInternships,
           },
           applications: {
             total: totalApplications,
             accepted: acceptedApplications,
-            placementRate: totalApplications > 0
+            approvalRate: totalApplications > 0
               ? ((acceptedApplications / totalApplications) * 100).toFixed(2)
               : 0,
           },
@@ -128,9 +210,42 @@ export class StateService {
             total: totalIndustries,
             approved: approvedIndustries,
           },
+          // Mentor Assignments Card
+          assignments: {
+            total: totalAssignments,
+            active: activeAssignments,
+            assigned: activeAssignments,
+            unassigned: unassignedStudents,
+            studentsWithInternships: studentsWithOngoingInternships,
+          },
+          // Faculty Visits Card with details
+          facultyVisits: {
+            total: totalFacultyVisits,
+            thisMonth: visitsThisMonth,
+            lastMonth: visitsLastMonth,
+            expectedThisMonth: expectedVisitsThisMonth,
+            pendingThisMonth: pendingVisitsThisMonth,
+            completionRate: expectedVisitsThisMonth > 0
+              ? ((visitsThisMonth / expectedVisitsThisMonth) * 100).toFixed(1)
+              : '100',
+          },
+          // Monthly Reports Card with details
+          monthlyReports: {
+            total: totalReportsSubmitted,
+            thisMonth: reportsSubmittedThisMonth,
+            lastMonth: reportsSubmittedLastMonth,
+            pendingReview: reportsPendingReview,
+            approvedThisMonth: reportsApprovedThisMonth,
+            expectedThisMonth: expectedReportsThisMonth,
+            missingThisMonth: missingReportsThisMonth,
+            missingLastMonth: missingReportsLastMonth,
+            submissionRate: expectedReportsThisMonth > 0
+              ? ((reportsSubmittedThisMonth / expectedReportsThisMonth) * 100).toFixed(1)
+              : '100',
+          },
           compliance: {
             totalVisits: totalFacultyVisits,
-            pendingReports,
+            pendingReports: reportsPendingReview,
           },
           recentActivity: {
             applicationsLastWeek: recentApplications,
@@ -225,6 +340,145 @@ export class StateService {
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
       nextCursor,
+    };
+  }
+
+  /**
+   * Get institutions with comprehensive statistics for dashboard
+   * Includes: students, internships, assignments, visits, reports
+   */
+  async getInstitutionsWithStats(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    const { page = 1, limit = 10, search } = params;
+    const skip = (page - 1) * limit;
+
+    // Get current month info
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+    const endOfMonth = new Date(currentYear, currentMonth, 0);
+
+    const where: Prisma.InstitutionWhereInput = { isActive: true };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Get institutions with basic info
+    const [institutions, total] = await Promise.all([
+      this.prisma.institution.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          city: true,
+          isActive: true,
+        },
+      }),
+      this.prisma.institution.count({ where }),
+    ]);
+
+    // Enrich each institution with detailed stats
+    const institutionsWithStats = await Promise.all(
+      institutions.map(async (inst) => {
+        const [
+          totalStudents,
+          studentsWithInternships,
+          activeAssignments,
+          facultyVisitsThisMonth,
+          reportsSubmittedThisMonth,
+          totalFaculty,
+        ] = await Promise.all([
+          // Total students
+          this.prisma.student.count({ where: { institutionId: inst.id, isActive: true } }),
+
+          // Students with active self-identified internships
+          this.prisma.internshipApplication.count({
+            where: {
+              student: { institutionId: inst.id },
+              isSelfIdentified: true,
+              internshipStatus: 'ONGOING',
+            },
+          }),
+
+          // Active mentor assignments
+          this.prisma.mentorAssignment.count({
+            where: {
+              student: { institutionId: inst.id },
+              isActive: true,
+            },
+          }),
+
+          // Faculty visits this month
+          this.prisma.facultyVisitLog.count({
+            where: {
+              application: { student: { institutionId: inst.id } },
+              visitDate: { gte: startOfMonth, lte: endOfMonth },
+            },
+          }),
+
+          // Monthly reports submitted this month
+          this.prisma.monthlyReport.count({
+            where: {
+              student: { institutionId: inst.id },
+              reportMonth: currentMonth,
+              reportYear: currentYear,
+              status: { in: ['SUBMITTED', 'APPROVED'] },
+            },
+          }),
+
+          // Total faculty
+          this.prisma.user.count({
+            where: {
+              institutionId: inst.id,
+              role: { in: [Role.TEACHER, Role.FACULTY_SUPERVISOR] },
+              active: true,
+            },
+          }),
+        ]);
+
+        // Calculate unassigned students (those with internships but no mentor)
+        const unassignedStudents = Math.max(0, studentsWithInternships - activeAssignments);
+
+        // Calculate missing reports (students with internships who haven't submitted)
+        const missingReports = Math.max(0, studentsWithInternships - reportsSubmittedThisMonth);
+
+        return {
+          ...inst,
+          stats: {
+            totalStudents,
+            studentsWithInternships,
+            assigned: activeAssignments,
+            unassigned: unassignedStudents,
+            facultyVisits: facultyVisitsThisMonth,
+            reportsSubmitted: reportsSubmittedThisMonth,
+            reportsMissing: missingReports,
+            totalFaculty,
+          },
+        };
+      }),
+    );
+
+    return {
+      data: institutionsWithStats,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      month: currentMonth,
+      year: currentYear,
     };
   }
 
@@ -331,28 +585,31 @@ export class StateService {
         },
       }),
 
-      // Joining reports submitted (applications with joining letter)
+      // Joining reports submitted (self-identified applications with joining letter)
       this.prisma.internshipApplication.count({
         where: {
           student: { institutionId: id },
+          isSelfIdentified: true,
           joiningLetterUrl: { not: null },
         },
       }),
 
-      // Joining reports pending (selected applications without joining letter)
+      // Joining reports pending (approved self-identified applications without joining letter)
       this.prisma.internshipApplication.count({
         where: {
           student: { institutionId: id },
-          status: ApplicationStatus.SELECTED,
+          isSelfIdentified: true,
+          status: ApplicationStatus.APPROVED,
           joiningLetterUrl: null,
         },
       }),
 
-      // Joining reports approved (applications with status SELECTED and joining letter)
+      // Joining reports approved (self-identified applications with status APPROVED and joining letter)
       this.prisma.internshipApplication.count({
         where: {
           student: { institutionId: id },
-          status: ApplicationStatus.SELECTED,
+          isSelfIdentified: true,
+          status: ApplicationStatus.APPROVED,
           joiningLetterUrl: { not: null },
         },
       }),
@@ -771,17 +1028,25 @@ export class StateService {
       throw new BadRequestException(`User with email ${data.email} already exists`);
     }
 
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
     const principal = await this.prisma.user.create({
       data: {
         ...data,
+        password: hashedPassword,
         role: 'PRINCIPAL',
         active: true,
+        hasChangedDefaultPassword: false,
       },
       include: { Institution: true },
     });
 
+    // Remove password from response
+    const { password: _, ...principalWithoutPassword } = principal;
+
     await this.cache.invalidateByTags(['state', 'principals']);
-    return principal;
+    return principalWithoutPassword;
   }
 
   /**
@@ -956,6 +1221,341 @@ export class StateService {
     return password.split('').sort(() => Math.random() - 0.5).join('');
   }
 
+  // ==================== Staff Management ====================
+
+  /**
+   * Get all staff across institutions with filtering
+   */
+  async getStaff(params: {
+    institutionId?: string;
+    role?: string;
+    branchName?: string;
+    search?: string;
+    active?: boolean;
+    page?: number;
+    limit?: number;
+  }) {
+    const { institutionId, role, branchName, search, active, page = 1, limit = 10 } = params;
+    const skip = (page - 1) * limit;
+
+    // Staff roles - TEACHER, FACULTY_SUPERVISOR, PLACEMENT_OFFICER, etc. (excluding PRINCIPAL, STUDENT, STATE_DIRECTORATE, INDUSTRY roles)
+    const staffRoles: Role[] = [
+      Role.TEACHER,
+      Role.FACULTY_SUPERVISOR,
+      Role.PLACEMENT_OFFICER,
+      Role.ACCOUNTANT,
+      Role.ADMISSION_OFFICER,
+      Role.EXAMINATION_OFFICER,
+      Role.PMS_OFFICER,
+      Role.EXTRACURRICULAR_HEAD,
+    ];
+
+    const where: Prisma.UserWhereInput = {
+      role: role ? (role as Role) : { in: staffRoles },
+    };
+
+    if (institutionId) {
+      where.institutionId = institutionId;
+    }
+
+    if (branchName) {
+      where.branchName = { contains: branchName, mode: 'insensitive' };
+    }
+
+    if (active !== undefined) {
+      where.active = active;
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { designation: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [staff, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phoneNo: true,
+          role: true,
+          branchName: true,
+          designation: true,
+          active: true,
+          createdAt: true,
+          lastLoginAt: true,
+          Institution: {
+            select: { id: true, name: true, code: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data: staff,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Create a new staff member
+   */
+  async createStaff(data: {
+    name: string;
+    email: string;
+    password: string;
+    institutionId: string;
+    role: string;
+    phoneNo?: string;
+    branchName?: string;
+    designation?: string;
+  }) {
+    const institution = await this.prisma.institution.findUnique({
+      where: { id: data.institutionId },
+    });
+
+    if (!institution) {
+      throw new NotFoundException(`Institution with ID ${data.institutionId} not found`);
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(`User with email ${data.email} already exists`);
+    }
+
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    const staff = await this.prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        password: hashedPassword,
+        role: data.role as Role,
+        institutionId: data.institutionId,
+        phoneNo: data.phoneNo,
+        branchName: data.branchName,
+        designation: data.designation,
+        active: true,
+        hasChangedDefaultPassword: false,
+      },
+      include: { Institution: true },
+    });
+
+    // Remove password from response
+    const { password: _, ...staffWithoutPassword } = staff;
+
+    await this.cache.invalidateByTags(['state', 'staff']);
+    return staffWithoutPassword;
+  }
+
+  /**
+   * Get staff member by ID
+   */
+  async getStaffById(id: string) {
+    const staffRoles: Role[] = [
+      Role.TEACHER,
+      Role.FACULTY_SUPERVISOR,
+      Role.PLACEMENT_OFFICER,
+      Role.ACCOUNTANT,
+      Role.ADMISSION_OFFICER,
+      Role.EXAMINATION_OFFICER,
+      Role.PMS_OFFICER,
+      Role.EXTRACURRICULAR_HEAD,
+    ];
+
+    const staff = await this.prisma.user.findUnique({
+      where: { id, role: { in: staffRoles } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNo: true,
+        role: true,
+        branchName: true,
+        designation: true,
+        active: true,
+        createdAt: true,
+        lastLoginAt: true,
+        institutionId: true,
+        Institution: {
+          select: { id: true, name: true, code: true, city: true },
+        },
+      },
+    });
+
+    if (!staff) {
+      throw new NotFoundException(`Staff member with ID ${id} not found`);
+    }
+
+    return staff;
+  }
+
+  /**
+   * Update staff member by ID
+   */
+  async updateStaff(id: string, data: {
+    name?: string;
+    email?: string;
+    institutionId?: string;
+    role?: string;
+    phoneNo?: string;
+    branchName?: string;
+    designation?: string;
+    active?: boolean;
+  }) {
+    const staffRoles: Role[] = [
+      Role.TEACHER,
+      Role.FACULTY_SUPERVISOR,
+      Role.PLACEMENT_OFFICER,
+      Role.ACCOUNTANT,
+      Role.ADMISSION_OFFICER,
+      Role.EXAMINATION_OFFICER,
+      Role.PMS_OFFICER,
+      Role.EXTRACURRICULAR_HEAD,
+    ];
+
+    const existingStaff = await this.prisma.user.findUnique({
+      where: { id, role: { in: staffRoles } },
+    });
+
+    if (!existingStaff) {
+      throw new NotFoundException(`Staff member with ID ${id} not found`);
+    }
+
+    if (data.institutionId) {
+      const institution = await this.prisma.institution.findUnique({
+        where: { id: data.institutionId },
+      });
+
+      if (!institution) {
+        throw new NotFoundException(`Institution with ID ${data.institutionId} not found`);
+      }
+    }
+
+    // Check if email is being changed and if it's already in use
+    if (data.email && data.email !== existingStaff.email) {
+      const emailExists = await this.prisma.user.findUnique({
+        where: { email: data.email },
+      });
+
+      if (emailExists) {
+        throw new BadRequestException(`Email ${data.email} is already in use`);
+      }
+    }
+
+    const updateData: Prisma.UserUpdateInput = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.institutionId !== undefined) updateData.Institution = { connect: { id: data.institutionId } };
+    if (data.role !== undefined) updateData.role = data.role as Role;
+    if (data.phoneNo !== undefined) updateData.phoneNo = data.phoneNo;
+    if (data.branchName !== undefined) updateData.branchName = data.branchName;
+    if (data.designation !== undefined) updateData.designation = data.designation;
+    if (data.active !== undefined) updateData.active = data.active;
+
+    const staff = await this.prisma.user.update({
+      where: { id },
+      data: updateData,
+      include: { Institution: true },
+    });
+
+    // Remove password from response
+    const { password: _, ...staffWithoutPassword } = staff;
+
+    await this.cache.invalidateByTags(['state', 'staff']);
+    return staffWithoutPassword;
+  }
+
+  /**
+   * Delete staff member by ID
+   */
+  async deleteStaff(id: string) {
+    const staffRoles: Role[] = [
+      Role.TEACHER,
+      Role.FACULTY_SUPERVISOR,
+      Role.PLACEMENT_OFFICER,
+      Role.ACCOUNTANT,
+      Role.ADMISSION_OFFICER,
+      Role.EXAMINATION_OFFICER,
+      Role.PMS_OFFICER,
+      Role.EXTRACURRICULAR_HEAD,
+    ];
+
+    const existingStaff = await this.prisma.user.findUnique({
+      where: { id, role: { in: staffRoles } },
+    });
+
+    if (!existingStaff) {
+      throw new NotFoundException(`Staff member with ID ${id} not found`);
+    }
+
+    await this.prisma.user.delete({ where: { id } });
+    await this.cache.invalidateByTags(['state', 'staff']);
+
+    return { success: true, message: 'Staff member deleted successfully' };
+  }
+
+  /**
+   * Reset staff member password
+   */
+  async resetStaffPassword(id: string) {
+    const staffRoles: Role[] = [
+      Role.TEACHER,
+      Role.FACULTY_SUPERVISOR,
+      Role.PLACEMENT_OFFICER,
+      Role.ACCOUNTANT,
+      Role.ADMISSION_OFFICER,
+      Role.EXAMINATION_OFFICER,
+      Role.PMS_OFFICER,
+      Role.EXTRACURRICULAR_HEAD,
+    ];
+
+    const existingStaff = await this.prisma.user.findUnique({
+      where: { id, role: { in: staffRoles } },
+    });
+
+    if (!existingStaff) {
+      throw new NotFoundException(`Staff member with ID ${id} not found`);
+    }
+
+    // Generate a new random password
+    const newPassword = this.generateRandomPassword();
+
+    this.logger.log(`Resetting password for staff: ${existingStaff.email}`);
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the user's password
+    await this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword, hasChangedDefaultPassword: false },
+    });
+
+    await this.cache.invalidateByTags(['state', 'staff']);
+
+    return {
+      success: true,
+      message: 'Password reset successfully',
+      newPassword, // Return the plain password so it can be shared with the user
+    };
+  }
+
   /**
    * Get all users for credentials management
    */
@@ -963,10 +1563,11 @@ export class StateService {
     role?: string;
     institutionId?: string;
     search?: string;
+    active?: boolean;
     page?: number;
     limit?: number;
   }) {
-    const { role, institutionId, search, page = 1, limit = 50 } = params;
+    const { role, institutionId, search, active, page = 1, limit = 10 } = params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.UserWhereInput = {};
@@ -977,6 +1578,10 @@ export class StateService {
 
     if (institutionId) {
       where.institutionId = institutionId;
+    }
+
+    if (active !== undefined) {
+      where.active = active;
     }
 
     if (search) {
@@ -1039,8 +1644,10 @@ export class StateService {
     // Use placement service for statistics
     const placementStats = await this.placementService.getPlacementStatistics(institutionId);
 
+    // Only count self-identified internships
     const dateFilter: Prisma.InternshipApplicationWhereInput = {
       student: { institutionId },
+      isSelfIdentified: true,
     };
 
     if (fromDate || toDate) {
@@ -1052,7 +1659,7 @@ export class StateService {
     const [
       totalStudents,
       totalApplications,
-      selectedApplications,
+      approvedApplications,
       completedApplications,
       totalInternships,
       facultyVisits,
@@ -1061,7 +1668,7 @@ export class StateService {
       this.prisma.student.count({ where: { institutionId, isActive: true } }),
       this.prisma.internshipApplication.count({ where: dateFilter }),
       this.prisma.internshipApplication.count({
-        where: { ...dateFilter, status: ApplicationStatus.SELECTED },
+        where: { ...dateFilter, status: ApplicationStatus.APPROVED },
       }),
       this.prisma.internshipApplication.count({
         where: { ...dateFilter, status: ApplicationStatus.COMPLETED },
@@ -1075,12 +1682,12 @@ export class StateService {
       }),
     ]);
 
-    const placementRate = totalApplications > 0
-      ? ((selectedApplications / totalApplications) * 100).toFixed(2)
+    const approvalRate = totalApplications > 0
+      ? ((approvedApplications / totalApplications) * 100).toFixed(2)
       : 0;
 
-    const completionRate = selectedApplications > 0
-      ? ((completedApplications / selectedApplications) * 100).toFixed(2)
+    const completionRate = approvedApplications > 0
+      ? ((completedApplications / approvedApplications) * 100).toFixed(2)
       : 0;
 
     return {
@@ -1092,17 +1699,17 @@ export class StateService {
       metrics: {
         totalStudents,
         totalApplications,
-        selectedApplications,
+        approvedApplications,
         completedApplications,
         totalInternships,
-        placementRate: Number(placementRate),
+        approvalRate: Number(approvalRate),
         completionRate: Number(completionRate),
       },
       compliance: {
         facultyVisits,
         monthlyReports,
-        averageVisitsPerApplication: selectedApplications > 0
-          ? (facultyVisits / selectedApplications).toFixed(2)
+        averageVisitsPerApplication: approvedApplications > 0
+          ? (facultyVisits / approvedApplications).toFixed(2)
           : 0,
       },
       placements: placementStats,
@@ -1390,50 +1997,104 @@ export class StateService {
   async getTopPerformers(params: { limit?: number; month?: number; year?: number }) {
     const { limit = 5, month, year } = params;
 
+    // Get current month info for stats
+    const now = new Date();
+    const currentMonth = month ?? now.getMonth() + 1;
+    const currentYear = year ?? now.getFullYear();
+    const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+    const endOfMonth = new Date(currentYear, currentMonth, 0);
+
     // Use domain service for base performance data
     const institutionPerformance = await this.stateReportService.getInstitutionPerformance();
 
-    // Get placement rates for each institution
-    const performanceWithPlacements = await Promise.all(
+    // Get comprehensive stats for each institution
+    const performanceWithStats = await Promise.all(
       institutionPerformance.slice(0, limit * 2).map(async (inst: any) => {
         const dateFilter: any = {};
         if (month && year) {
-          const startDate = new Date(year, month - 1, 1);
-          const endDate = new Date(year, month, 0);
-          dateFilter.createdAt = { gte: startDate, lte: endDate };
+          dateFilter.createdAt = { gte: startOfMonth, lte: endOfMonth };
         }
 
-        const [totalApplications, selectedApplications] = await Promise.all([
-          this.prisma.internshipApplication.count({
-            where: { student: { institutionId: inst.institutionId }, ...dateFilter },
+        // Get comprehensive stats for the institution
+        const [
+          totalStudents,
+          studentsWithInternships,
+          activeAssignments,
+          facultyVisitsThisMonth,
+          reportsSubmittedThisMonth,
+        ] = await Promise.all([
+          this.prisma.student.count({
+            where: { institutionId: inst.institutionId, isActive: true },
           }),
           this.prisma.internshipApplication.count({
             where: {
               student: { institutionId: inst.institutionId },
-              status: ApplicationStatus.SELECTED,
-              ...dateFilter,
+              isSelfIdentified: true,
+              internshipStatus: 'ONGOING',
+            },
+          }),
+          this.prisma.mentorAssignment.count({
+            where: {
+              student: { institutionId: inst.institutionId },
+              isActive: true,
+            },
+          }),
+          this.prisma.facultyVisitLog.count({
+            where: {
+              application: { student: { institutionId: inst.institutionId } },
+              visitDate: { gte: startOfMonth, lte: endOfMonth },
+            },
+          }),
+          this.prisma.monthlyReport.count({
+            where: {
+              student: { institutionId: inst.institutionId },
+              reportMonth: currentMonth,
+              reportYear: currentYear,
+              status: { in: ['SUBMITTED', 'APPROVED'] },
             },
           }),
         ]);
 
-        const placementRate = totalApplications > 0
-          ? (selectedApplications / totalApplications) * 100
-          : 0;
+        const unassigned = Math.max(0, studentsWithInternships - activeAssignments);
+        const reportsMissing = Math.max(0, studentsWithInternships - reportsSubmittedThisMonth);
+
+        // Calculate compliance score
+        let score = 100;
+        if (studentsWithInternships > 0) {
+          const assignmentScore = (activeAssignments / studentsWithInternships) * 100;
+          const visitScore = facultyVisitsThisMonth > 0
+            ? Math.min((facultyVisitsThisMonth / studentsWithInternships) * 100, 100)
+            : 0;
+          const reportScore = (reportsSubmittedThisMonth / studentsWithInternships) * 100;
+          score = Math.round((assignmentScore + visitScore + reportScore) / 3);
+        }
 
         return {
           id: inst.institutionId,
           name: inst.institutionName,
-          studentsCount: inst.totalStudents,
-          internshipsCount: inst.activeInternships,
-          totalApplications,
-          selectedApplications,
-          placementRate: Number(placementRate.toFixed(2)),
-          performanceScore: inst.performanceScore,
+          city: inst.city,
+          // Stats object for frontend compatibility
+          stats: {
+            totalStudents,
+            studentsWithInternships,
+            assigned: activeAssignments,
+            unassigned,
+            facultyVisits: facultyVisitsThisMonth,
+            reportsSubmitted: reportsSubmittedThisMonth,
+            reportsMissing,
+          },
+          // Direct score for sorting and display
+          score,
+          // Keep these for backwards compatibility
+          placementRate: score,
+          approvalRate: score,
+          studentsCount: totalStudents,
+          internshipsCount: studentsWithInternships,
         };
       }),
     );
 
-    const sorted = performanceWithPlacements.sort((a, b) => b.placementRate - a.placementRate);
+    const sorted = performanceWithStats.sort((a, b) => b.score - a.score);
 
     return {
       topPerformers: sorted.slice(0, limit),
@@ -1653,21 +2314,29 @@ export class StateService {
 
     const dateFilter = { createdAt: { gte: startDate, lte: endDate } };
 
+    // Focus on self-identified internships only
     const [
       newStudents,
       newApplications,
-      selectedApplications,
+      approvedApplications,
       newInternships,
       newIndustries,
       facultyVisits,
       monthlyReports,
     ] = await Promise.all([
       this.prisma.student.count({ where: dateFilter }),
-      this.prisma.internshipApplication.count({ where: dateFilter }),
+      // Self-identified applications only
       this.prisma.internshipApplication.count({
-        where: { ...dateFilter, status: ApplicationStatus.SELECTED },
+        where: { ...dateFilter, isSelfIdentified: true },
       }),
-      this.prisma.internship.count({ where: dateFilter }),
+      // Use APPROVED status for self-identified internships
+      this.prisma.internshipApplication.count({
+        where: { ...dateFilter, isSelfIdentified: true, status: ApplicationStatus.APPROVED },
+      }),
+      // Self-identified internships count
+      this.prisma.internshipApplication.count({
+        where: { ...dateFilter, isSelfIdentified: true, internshipStatus: 'ONGOING' },
+      }),
       this.prisma.industry.count({ where: dateFilter }),
       this.prisma.facultyVisitLog.count({
         where: { visitDate: { gte: startDate, lte: endDate } },
@@ -1677,20 +2346,24 @@ export class StateService {
       }),
     ]);
 
-    // Get trend data (last 6 months)
+    // Get trend data (last 6 months) - focused on self-identified internships
     const trendData = [];
     for (let i = 5; i >= 0; i--) {
       const trendMonth = new Date(targetYear, targetMonth - 1 - i, 1);
       const trendEndDate = new Date(trendMonth.getFullYear(), trendMonth.getMonth() + 1, 0);
 
-      const [applications, placements] = await Promise.all([
+      const [applications, approved] = await Promise.all([
         this.prisma.internshipApplication.count({
-          where: { createdAt: { gte: trendMonth, lte: trendEndDate } },
+          where: {
+            createdAt: { gte: trendMonth, lte: trendEndDate },
+            isSelfIdentified: true,
+          },
         }),
         this.prisma.internshipApplication.count({
           where: {
             createdAt: { gte: trendMonth, lte: trendEndDate },
-            status: ApplicationStatus.SELECTED,
+            isSelfIdentified: true,
+            status: ApplicationStatus.APPROVED,
           },
         }),
       ]);
@@ -1698,7 +2371,9 @@ export class StateService {
       trendData.push({
         month: trendMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         applications,
-        placements,
+        approved,
+        // Keep placements for backwards compatibility
+        placements: approved,
       });
     }
 
@@ -1708,13 +2383,19 @@ export class StateService {
       metrics: {
         newStudents,
         newApplications,
-        selectedApplications,
+        approvedApplications,
+        // Keep for backwards compatibility
+        selectedApplications: approvedApplications,
         newInternships,
         newIndustries,
         facultyVisits,
         monthlyReports,
+        approvalRate: newApplications > 0
+          ? ((approvedApplications / newApplications) * 100).toFixed(2)
+          : 0,
+        // Keep for backwards compatibility
         placementRate: newApplications > 0
-          ? ((selectedApplications / newApplications) * 100).toFixed(2)
+          ? ((approvedApplications / newApplications) * 100).toFixed(2)
           : 0,
       },
       trend: trendData,

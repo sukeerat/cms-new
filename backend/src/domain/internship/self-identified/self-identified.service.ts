@@ -40,6 +40,7 @@ export class SelfIdentifiedService {
         throw new NotFoundException('Student not found');
       }
 
+      // Auto-approve self-identified internships
       const selfIdentified = await this.prisma.internshipApplication.create({
         data: {
           studentId,
@@ -56,7 +57,9 @@ export class SelfIdentifiedService {
           additionalInfo: data.description,
           facultyMentorName: data.mentorName,
           facultyMentorDesignation: data.mentorDesignation,
-          status: ApplicationStatus.APPLIED,
+          status: ApplicationStatus.APPROVED, // Auto-approved
+          internshipStatus: 'ONGOING', // Set internship as ongoing
+          reviewedAt: new Date(), // Mark as reviewed
         },
         include: {
           student: {

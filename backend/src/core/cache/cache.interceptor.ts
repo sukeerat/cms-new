@@ -68,7 +68,9 @@ export class CacheInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(async (data) => {
         // Cache the response
-        await this.cacheService.set(cacheKey, data, { ttl: cacheTTL });
+        const ttlSeconds = cacheTTL ?? 0;
+        const ttlMs = Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds * 1000 : 0;
+        await this.cacheService.set(cacheKey, data, { ttl: ttlMs });
 
         // Set ETag header
         const etag = this.generateETag(data);

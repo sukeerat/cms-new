@@ -56,11 +56,16 @@ const initialState = {
   lastFetched: {
     dashboard: null,
     students: null,
+    studentsKey: null,
     visitLogs: null,
+    visitLogsKey: null,
     monthlyReports: null,
+    monthlyReportsKey: null,
     profile: null,
     applications: null,
+    applicationsKey: null,
     feedbackHistory: null,
+    feedbackHistoryKey: null,
   },
 };
 
@@ -118,12 +123,27 @@ export const fetchAssignedStudents = createAsyncThunk(
       const state = getState();
       const lastFetched = state.faculty.lastFetched.students;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        status: params?.status ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.faculty.lastFetched.studentsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await facultyService.getAssignedStudents(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch students');
     }
@@ -150,12 +170,27 @@ export const fetchVisitLogs = createAsyncThunk(
       const state = getState();
       const lastFetched = state.faculty.lastFetched.visitLogs;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        studentId: params?.studentId ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.faculty.lastFetched.visitLogsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await facultyService.getVisitLogs(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch visit logs');
     }
@@ -218,12 +253,28 @@ export const fetchMonthlyReports = createAsyncThunk(
       const state = getState();
       const lastFetched = state.faculty.lastFetched.monthlyReports;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        status: params?.status ?? '',
+        studentId: params?.studentId ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.faculty.lastFetched.monthlyReportsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await facultyService.getMonthlyReports(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch monthly reports');
     }
@@ -250,12 +301,27 @@ export const fetchApplications = createAsyncThunk(
       const state = getState();
       const lastFetched = state.faculty.lastFetched.applications;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        status: params?.status ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.faculty.lastFetched.applicationsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await facultyService.getSelfIdentifiedApprovals(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch applications');
     }
@@ -315,12 +381,27 @@ export const fetchFeedbackHistory = createAsyncThunk(
       const state = getState();
       const lastFetched = state.faculty.lastFetched.feedbackHistory;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        studentId: params?.studentId ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.faculty.lastFetched.feedbackHistoryKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await facultyService.getFeedbackHistory(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch feedback history');
     }
@@ -346,11 +427,16 @@ const facultySlice = createSlice({
       state.lastFetched = {
         dashboard: null,
         students: null,
+        studentsKey: null,
         visitLogs: null,
+        visitLogsKey: null,
         monthlyReports: null,
+        monthlyReportsKey: null,
         profile: null,
         applications: null,
+        applicationsKey: null,
         feedbackHistory: null,
+        feedbackHistoryKey: null,
       };
     },
   },
@@ -411,6 +497,7 @@ const facultySlice = createSlice({
           state.students.page = action.payload.page || 1;
           state.students.totalPages = action.payload.totalPages || 1;
           state.lastFetched.students = Date.now();
+          state.lastFetched.studentsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchAssignedStudents.rejected, (state, action) => {
@@ -431,6 +518,7 @@ const facultySlice = createSlice({
           state.visitLogs.page = action.payload.page || 1;
           state.visitLogs.totalPages = action.payload.totalPages || 1;
           state.lastFetched.visitLogs = Date.now();
+          state.lastFetched.visitLogsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchVisitLogs.rejected, (state, action) => {
@@ -505,6 +593,7 @@ const facultySlice = createSlice({
           state.monthlyReports.page = action.payload.page || 1;
           state.monthlyReports.totalPages = action.payload.totalPages || 1;
           state.lastFetched.monthlyReports = Date.now();
+          state.lastFetched.monthlyReportsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchMonthlyReports.rejected, (state, action) => {
@@ -540,6 +629,7 @@ const facultySlice = createSlice({
           state.applications.page = action.payload.page || 1;
           state.applications.totalPages = action.payload.totalPages || 1;
           state.lastFetched.applications = Date.now();
+          state.lastFetched.applicationsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchApplications.rejected, (state, action) => {
@@ -588,6 +678,7 @@ const facultySlice = createSlice({
           state.feedbackHistory.list = action.payload.feedback || [];
           state.feedbackHistory.total = action.payload.total || 0;
           state.lastFetched.feedbackHistory = Date.now();
+          state.lastFetched.feedbackHistoryKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchFeedbackHistory.rejected, (state, action) => {

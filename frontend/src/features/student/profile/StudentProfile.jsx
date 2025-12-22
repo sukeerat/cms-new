@@ -59,7 +59,6 @@ export default function StudentProfile() {
   //const {id} = useParams();
   const [id, setId] = useState(null);
   const [student, setStudent] = useState(null);
-  const [semesters, setSemesters] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -188,18 +187,7 @@ export default function StudentProfile() {
     }
   };
 
-  const fetchSemesters = async () => {
-    try {
-      const res = await API.get("/semesters");
-      setSemesters(res.data || []);
-    } catch {
-      // Semesters endpoint may not exist - fail silently
-      setSemesters([]);
-    }
-  };
-  useEffect(() => {
-    fetchSemesters();
-  }, []);
+  // Semesters data is derived from student results - no API call needed
 
   const getInternshipStatusColor = (status) => {
     const statusColors = {
@@ -238,33 +226,42 @@ export default function StudentProfile() {
     });
   };
 
-  // helper to look up semester name if you need it later
-  const getSemesterName = (id) => {
-    const semester = semesters.find((s) => s.id === id);
-    return semester ? `Semester ${semester.number}` : id;
+  // helper to format semester name
+  const getSemesterName = (semesterNumber) => {
+    if (semesterNumber === "Unknown") return "Unknown Semester";
+    return `Semester ${semesterNumber}`;
   };
 
   const fetchStudent = async () => {
-    const loginData = localStorage.getItem("loginResponse");
+    // Try to get user ID from JWT token first, then fallback to loginResponse
+    let userId = null;
 
-    if (!loginData) {
-      setError("Not logged in. Please log in again.");
-      setLoading(false);
-      return;
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      try {
+        // Decode JWT to get user info
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userId = payload?.userId || payload?.id || payload?.sub;
+      } catch (e) {
+        console.error("Failed to decode token:", e);
+      }
     }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(loginData);
-    } catch (e) {
-      setError("Invalid session data. Please log in again.");
-      setLoading(false);
-      return;
-    }
-
-    const userId = parsed?.user?.id || parsed?.userId || parsed?.id;
+    // Fallback to loginResponse if token doesn't have userId
     if (!userId) {
-      setError("User ID not found. Please log in again.");
+      const loginData = localStorage.getItem("loginResponse");
+      if (loginData) {
+        try {
+          const parsed = JSON.parse(loginData);
+          userId = parsed?.user?.id || parsed?.userId || parsed?.id;
+        } catch (e) {
+          console.error("Failed to parse loginResponse:", e);
+        }
+      }
+    }
+
+    if (!userId) {
+      setError("Not logged in. Please log in again.");
       setLoading(false);
       return;
     }
@@ -272,7 +269,8 @@ export default function StudentProfile() {
     setId(userId);
 
     try {
-      const res = await API.get(`/students/profile/${userId}`);
+      // Use /student/profile - backend extracts userId from JWT token
+      const res = await API.get(`/student/profile`);
       setStudent(res.data);
 
       // Check for missing required fields

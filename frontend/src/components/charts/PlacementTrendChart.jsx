@@ -1,4 +1,4 @@
-// PlacementTrendChart - Line chart showing placement trends over time
+// InternshipTrendChart - Line chart showing internship application trends over time
 import React from 'react';
 import {
   LineChart,
@@ -19,7 +19,11 @@ const PlacementTrendChart = ({
   loading = false,
   height = 300,
   showArea = true,
+  // Support both old and new data keys
+  approvedKey = 'approved',
+  applicationsKey = 'applications',
   colors = {
+    approved: '#52c41a',
     placements: '#52c41a',
     applications: '#1890ff',
     rejections: '#ff4d4f',
@@ -88,16 +92,16 @@ const PlacementTrendChart = ({
             <>
               <Area
                 type="monotone"
-                dataKey="placements"
-                name="Placements"
-                stroke={colors.placements}
-                fill={colors.placements}
+                dataKey={approvedKey}
+                name="Approved"
+                stroke={colors.approved || colors.placements}
+                fill={colors.approved || colors.placements}
                 fillOpacity={0.3}
                 strokeWidth={2}
               />
               <Area
                 type="monotone"
-                dataKey="applications"
+                dataKey={applicationsKey}
                 name="Applications"
                 stroke={colors.applications}
                 fill={colors.applications}
@@ -109,16 +113,16 @@ const PlacementTrendChart = ({
             <>
               <Line
                 type="monotone"
-                dataKey="placements"
-                name="Placements"
-                stroke={colors.placements}
+                dataKey={approvedKey}
+                name="Approved"
+                stroke={colors.approved || colors.placements}
                 strokeWidth={2}
-                dot={{ fill: colors.placements, strokeWidth: 2 }}
+                dot={{ fill: colors.approved || colors.placements, strokeWidth: 2 }}
                 activeDot={{ r: 6 }}
               />
               <Line
                 type="monotone"
-                dataKey="applications"
+                dataKey={applicationsKey}
                 name="Applications"
                 stroke={colors.applications}
                 strokeWidth={2}

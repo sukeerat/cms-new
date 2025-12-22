@@ -27,7 +27,8 @@
       "Bash(npm run lint)",
       "Bash(grep:*)",
       "Bash(npx eslint:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(npm run build)"
     ]
   }
 }

@@ -300,15 +300,17 @@ export class MentorService {
             approvedReports,
           ] = await Promise.all([
             this.prisma.mentorAssignment.count({ where: { mentorId, isActive: true } }),
+            // Only count self-identified internships
             this.prisma.internshipApplication.count({
               where: {
                 mentorId,
-                status: { in: [ApplicationStatus.SELECTED, ApplicationStatus.JOINED, ApplicationStatus.APPROVED] },
+                isSelfIdentified: true,
+                status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] },
               },
             }),
             this.prisma.monthlyReport.count({
               where: {
-                application: { mentorId },
+                application: { mentorId, isSelfIdentified: true },
               },
             }),
             this.prisma.facultyVisitLog.count({
@@ -316,13 +318,13 @@ export class MentorService {
             }),
             this.prisma.monthlyReport.count({
               where: {
-                application: { mentorId },
+                application: { mentorId, isSelfIdentified: true },
                 status: { in: [MonthlyReportStatus.SUBMITTED, MonthlyReportStatus.UNDER_REVIEW, MonthlyReportStatus.REVISION_REQUIRED] },
               },
             }),
             this.prisma.monthlyReport.count({
               where: {
-                application: { mentorId },
+                application: { mentorId, isSelfIdentified: true },
                 status: MonthlyReportStatus.APPROVED,
               },
             }),

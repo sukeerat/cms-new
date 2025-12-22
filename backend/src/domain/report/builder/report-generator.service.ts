@@ -60,10 +60,13 @@ export class ReportGeneratorService {
   }
 
   /**
-   * Generate Internship Report
+   * Generate Internship Report (self-identified only)
    */
   async generateInternshipReport(filters: any): Promise<any[]> {
-    const where: Record<string, unknown> = {};
+    // Only include self-identified internships by default
+    const where: Record<string, unknown> = {
+      isSelfIdentified: true,
+    };
 
     if (filters?.institutionId) {
       where.student = { institutionId: filters.institutionId };

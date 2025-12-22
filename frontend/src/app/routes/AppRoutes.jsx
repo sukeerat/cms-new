@@ -41,6 +41,8 @@ import InstitutionBulkUpload from '../../features/state/institutions/BulkUpload'
 import { InstitutionOverview } from '../../features/state/overview';
 import PrincipalList from '../../features/state/principals/PrincipalList';
 import PrincipalForm from '../../features/state/principals/PrincipalForm';
+import StateStaffList from '../../features/state/staff/StaffList';
+import StateStaffForm from '../../features/state/staff/StaffForm';
 import ReportBuilder from '../../features/state/reports/ReportBuilder';
 import ReportBuilderDashboard from '../../features/state/reports/ReportBuilderDashboard';
 import AuditLogs from '../../features/state/audit/AuditLogs';
@@ -248,6 +250,30 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={[ROLES.STATE, ROLES.PRINCIPAL]}>
               <GrievanceList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="state-staff"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
+              <StateStaffList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="state-staff/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
+              <StateStaffForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="state-staff/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
+              <StateStaffForm />
             </ProtectedRoute>
           }
         />

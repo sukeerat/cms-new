@@ -102,14 +102,14 @@ export class PrismaCacheService extends PrismaService {
   }
 
   /**
-   * Cached version of internship lookup
+   * Cached version of internship lookup (self-identified only)
    */
   async findInternshipsCached(studentId: string) {
     return this.cache.getOrSet(
       `internships:student:${studentId}`,
       async () => {
         return this.internshipApplication.findMany({
-          where: { studentId },
+          where: { studentId, isSelfIdentified: true },
           include: {
             internship: {
               include: {

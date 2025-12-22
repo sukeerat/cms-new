@@ -34,7 +34,9 @@ const initialState = {
   lastFetched: {
     dashboard: null,
     postings: null,
+    postingsKey: null,
     applications: null,
+    applicationsKey: null,
     profile: null,
   },
 };
@@ -68,12 +70,27 @@ export const fetchMyPostings = createAsyncThunk(
       const state = getState();
       const lastFetched = state.industry.lastFetched.postings;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        status: params?.status ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.industry.lastFetched.postingsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await industryService.getMyPostings(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch postings');
     }
@@ -87,12 +104,28 @@ export const fetchMyApplications = createAsyncThunk(
       const state = getState();
       const lastFetched = state.industry.lastFetched.applications;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Cache must be param-aware; otherwise pagination/search may show stale data.
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        status: params?.status ?? '',
+        postingId: params?.postingId ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.industry.lastFetched.applicationsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await industryService.getMyApplications(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch applications');
     }
@@ -262,6 +295,7 @@ const industrySlice = createSlice({
         if (!action.payload.cached) {
           state.postings.list = action.payload.data || action.payload;
           state.lastFetched.postings = Date.now();
+          state.lastFetched.postingsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchMyPostings.rejected, (state, action) => {
@@ -336,6 +370,7 @@ const industrySlice = createSlice({
         if (!action.payload.cached) {
           state.applications.list = action.payload.data || action.payload;
           state.lastFetched.applications = Date.now();
+          state.lastFetched.applicationsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchMyApplications.rejected, (state, action) => {

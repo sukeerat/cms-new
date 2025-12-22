@@ -30,8 +30,12 @@ export class StateReportService {
             this.prisma.institution.count(),
             this.prisma.student.count(),
             this.prisma.industry.count({ where: { isApproved: true } }),
+            // Only count self-identified internships
             this.prisma.internshipApplication.count({
-              where: { status: { in: [ApplicationStatus.SELECTED, ApplicationStatus.JOINED] } },
+              where: {
+                isSelfIdentified: true,
+                status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] }
+              },
             }),
             this.prisma.user.count({
               where: { role: { in: [Role.TEACHER, Role.FACULTY_SUPERVISOR] } },
@@ -81,15 +85,18 @@ export class StateReportService {
                     role: { in: [Role.TEACHER, Role.FACULTY_SUPERVISOR] },
                   },
                 }),
+                // Only count self-identified internships
                 this.prisma.internshipApplication.count({
                   where: {
                     student: { institutionId: institution.id },
-                    status: { in: [ApplicationStatus.SELECTED, ApplicationStatus.JOINED] },
+                    isSelfIdentified: true,
+                    status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] },
                   },
                 }),
                 this.prisma.internshipApplication.count({
                   where: {
                     student: { institutionId: institution.id },
+                    isSelfIdentified: true,
                     status: ApplicationStatus.COMPLETED,
                   },
                 }),
@@ -304,18 +311,19 @@ export class StateReportService {
       return await this.cache.getOrSet(
         cacheKey,
         async () => {
+          // Only count self-identified internships
           const [total, pending, approved, rejected] = await Promise.all([
             this.prisma.internshipApplication.count({
-              where: { joiningLetterUrl: { not: null } },
+              where: { isSelfIdentified: true, joiningLetterUrl: { not: null } },
             }),
             this.prisma.internshipApplication.count({
-              where: { joiningLetterUrl: null },
+              where: { isSelfIdentified: true, joiningLetterUrl: null },
             }),
             this.prisma.internshipApplication.count({
-              where: { joiningLetterUrl: { not: null } },
+              where: { isSelfIdentified: true, joiningLetterUrl: { not: null } },
             }),
             this.prisma.internshipApplication.count({
-              where: { joiningLetterUrl: null },
+              where: { isSelfIdentified: true, joiningLetterUrl: null },
             }),
           ]);
 

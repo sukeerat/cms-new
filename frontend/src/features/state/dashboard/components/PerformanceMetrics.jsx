@@ -10,6 +10,10 @@ import {
   BarChartOutlined,
   LineChartOutlined,
   DotChartOutlined,
+  UserSwitchOutlined,
+  CalendarOutlined,
+  FileTextOutlined,
+  BookOutlined,
 } from '@ant-design/icons';
 import {
   BarChart,
@@ -20,14 +24,12 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Cell,
-  PieChart,
-  Pie,
-  Legend,
   RadarChart,
   Radar,
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
+  Legend,
 } from 'recharts';
 
 const { Text } = Typography;
@@ -37,7 +39,7 @@ const MetricItem = ({ label, value, color, icon, description }) => (
     <div className="flex justify-between items-center mb-2">
       <div className="flex items-center gap-2">
         {icon}
-        <Text strong>{label}</Text>
+        <Text strong className="text-sm">{label}</Text>
       </div>
       <Tooltip title={description}>
         <Text className="font-semibold">
@@ -49,6 +51,7 @@ const MetricItem = ({ label, value, color, icon, description }) => (
       percent={value}
       showInfo={false}
       size="small"
+      strokeColor={color}
     />
   </div>
 );
@@ -71,65 +74,70 @@ const CustomTooltip = ({ active, payload }) => {
 const PerformanceMetrics = ({ stats }) => {
   const [viewMode, setViewMode] = useState('progress');
 
-  const placementRateRaw = stats?.placementRate ?? stats?.applications?.placementRate;
-  const placementRate = Number.isFinite(Number(placementRateRaw)) ? Number(placementRateRaw) : 0;
+  // Self-identified internship rate
+  const totalStudents = Number(stats?.students?.total ?? stats?.totalStudents ?? 0) || 0;
+  const activeInternships = Number(stats?.internships?.active ?? stats?.activeInternships ?? 0) || 0;
+  const internshipRate = totalStudents > 0 ? Math.round((activeInternships / totalStudents) * 100) : 0;
 
-  const totalApplications = Number(stats?.applications?.total ?? 0) || 0;
-  const acceptedApplications = Number(stats?.applications?.accepted ?? 0) || 0;
-  const acceptanceRate = totalApplications > 0 ? Math.round((acceptedApplications / totalApplications) * 100) : 0;
+  // Mentor assignment rate
+  const assignments = stats?.assignments || {};
+  const studentsWithInternships = Number(assignments?.studentsWithInternships ?? activeInternships) || 0;
+  const assignedStudents = Number(assignments?.assigned ?? 0) || 0;
+  const assignmentRate = studentsWithInternships > 0 ? Math.round((assignedStudents / studentsWithInternships) * 100) : 0;
 
-  const totalIndustries = Number(stats?.industries?.total ?? 0) || 0;
-  const approvedIndustries = Number(stats?.industries?.approved ?? 0) || 0;
-  const industryApprovalRate = totalIndustries > 0 ? Math.round((approvedIndustries / totalIndustries) * 100) : 0;
+  // Faculty visit rate (this month)
+  const facultyVisits = stats?.facultyVisits || {};
+  const visitsThisMonth = Number(facultyVisits?.thisMonth ?? 0) || 0;
+  const expectedVisits = Number(facultyVisits?.expectedThisMonth ?? studentsWithInternships) || 0;
+  const visitRate = expectedVisits > 0 ? Math.round((visitsThisMonth / expectedVisits) * 100) : 0;
 
-  const totalVisits = Number(stats?.compliance?.totalVisits ?? 0) || 0;
-  const pendingReports = Number(stats?.compliance?.pendingReports ?? 0) || 0;
-  const pendingReportsRate = totalVisits > 0 ? Math.round((pendingReports / totalVisits) * 100) : 0;
+  // Monthly report submission rate
+  const monthlyReports = stats?.monthlyReports || {};
+  const reportsSubmitted = Number(monthlyReports?.thisMonth ?? 0) || 0;
+  const expectedReports = Number(monthlyReports?.expectedThisMonth ?? studentsWithInternships) || 0;
+  const reportRate = expectedReports > 0 ? Math.round((reportsSubmitted / expectedReports) * 100) : 0;
 
   const metrics = [
     {
-      label: 'Student Placement Rate',
-      value: placementRate,
-      icon: <TrophyOutlined className="text-success" />,
-      description: 'Percentage of students placed in internships',
+      label: 'Internship Coverage',
+      value: internshipRate,
+      color: '#ec4899',
+      icon: <BookOutlined className="text-pink-500" />,
+      description: 'Percentage of students with active self-identified internships',
     },
     {
-      label: 'Application Acceptance Rate',
-      value: acceptanceRate,
-      icon: <CheckCircleOutlined className="text-primary" />,
-      description: 'Accepted applications as a percentage of total applications',
+      label: 'Mentor Assignment',
+      value: assignmentRate,
+      color: '#8b5cf6',
+      icon: <UserSwitchOutlined className="text-purple-500" />,
+      description: 'Percentage of interns with assigned mentors',
     },
     {
-      label: 'Industry Approval Rate',
-      value: industryApprovalRate,
-      icon: <SyncOutlined className="text-secondary" />,
-      description: 'Approved industries as a percentage of total industries',
+      label: 'Faculty Visit Compliance',
+      value: visitRate,
+      color: '#06b6d4',
+      icon: <CalendarOutlined className="text-cyan-500" />,
+      description: 'Faculty visits completed this month vs expected',
     },
     {
-      label: 'Pending Reports Rate',
-      value: pendingReportsRate,
-      icon: <ClockCircleOutlined className="text-warning" />,
-      description: 'Pending reports relative to total compliance visits',
+      label: 'Report Submission',
+      value: reportRate,
+      color: '#f97316',
+      icon: <FileTextOutlined className="text-orange-500" />,
+      description: 'Monthly reports submitted this month vs expected',
     },
   ];
 
   // Data for bar chart
   const barChartData = metrics.map((m) => ({
-    label: m.label.replace(' Rate', '').replace('Student ', '').replace('Application ', '').replace('Industry ', ''),
-    value: m.value,
-    color: m.color,
-  }));
-
-  // Data for pie chart
-  const pieChartData = metrics.map((m) => ({
-    name: m.label.split(' ')[0],
+    label: m.label.split(' ')[0],
     value: m.value,
     color: m.color,
   }));
 
   // Data for radar chart
   const radarData = metrics.map((m) => ({
-    subject: m.label.replace(' Rate', '').replace('Student ', '').replace('Application ', '').replace('Industry ', ''),
+    subject: m.label.split(' ')[0],
     current: m.value,
     target: 85,
   }));
@@ -180,8 +188,8 @@ const PerformanceMetrics = ({ stats }) => {
           <Radar
             name="Current"
             dataKey="current"
-            stroke="#1890ff"
-            fill="#1890ff"
+            stroke="#3b82f6"
+            fill="#3b82f6"
             fillOpacity={0.4}
             strokeWidth={2}
           />
@@ -202,9 +210,12 @@ const PerformanceMetrics = ({ stats }) => {
 
   const hasData = metrics.some((m) => m.value > 0);
 
+  // Calculate overall compliance score
+  const overallScore = Math.round((internshipRate + assignmentRate + visitRate + reportRate) / 4);
+
   return (
     <Card
-      title="System Performance Overview"
+      title="Compliance Overview"
       className="shadow-sm h-full"
       extra={
         <Segmented
@@ -228,20 +239,34 @@ const PerformanceMetrics = ({ stats }) => {
       )}
 
       {/* Summary Stats */}
-      <div className="mt-6 pt-4 border-t border-border">
+      <div className="mt-4 pt-4 border-t border-border">
         <Row gutter={16}>
-          <Col span={12}>
+          <Col span={8}>
             <Statistic
-              title="Applications (Last Week)"
-              value={stats?.recentActivity?.applicationsLastWeek || 0}
-              prefix={<ArrowUpOutlined />}
+              title={<span className="text-xs">Overall Score</span>}
+              value={overallScore}
+              suffix="%"
+              valueStyle={{
+                color: overallScore >= 75 ? '#52c41a' : overallScore >= 50 ? '#faad14' : '#f5222d',
+                fontSize: '20px'
+              }}
             />
           </Col>
-          <Col span={12}>
+          <Col span={8}>
             <Statistic
-              title="Industries (Last Month)"
-              value={stats?.recentActivity?.industriesLastMonth || 0}
-              prefix={<ArrowUpOutlined />}
+              title={<span className="text-xs">Active Interns</span>}
+              value={activeInternships}
+              valueStyle={{ fontSize: '20px' }}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic
+              title={<span className="text-xs">Pending Actions</span>}
+              value={(assignments?.unassigned || 0) + (monthlyReports?.missingThisMonth || 0)}
+              valueStyle={{
+                color: '#f5222d',
+                fontSize: '20px'
+              }}
             />
           </Col>
         </Row>

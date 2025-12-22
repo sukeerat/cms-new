@@ -1,7 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import {
   HealthCheckService,
-  HttpHealthIndicator,
   HealthCheck,
   MemoryHealthIndicator,
   DiskHealthIndicator,
@@ -10,17 +9,35 @@ import {
 } from '@nestjs/terminus';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/database/prisma.service';
+import Redis from 'ioredis';
 
 @Controller('health')
 export class HealthController {
+  private readonly redisHealthClient: Redis;
+
   constructor(
     private health: HealthCheckService,
-    private http: HttpHealthIndicator,
     private memory: MemoryHealthIndicator,
     private disk: DiskHealthIndicator,
     private configService: ConfigService,
     private prisma: PrismaService,
-  ) {}
+  ) {
+    const redisHost = this.configService.get('REDIS_HOST', 'localhost');
+    const redisPort = this.configService.get('REDIS_PORT', 6379);
+    const redisPassword = this.configService.get('REDIS_PASSWORD');
+
+    this.redisHealthClient = new Redis({
+      host: redisHost,
+      port: redisPort,
+      password: redisPassword,
+      connectTimeout: 1000,
+      commandTimeout: 1000,
+      enableOfflineQueue: false,
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
+    });
+  }
 
   private async prismaPing(): Promise<HealthIndicatorResult> {
     try {
@@ -30,6 +47,23 @@ export class HealthController {
     } catch (error) {
       throw new HealthCheckError('Database check failed', {
         database: { status: 'down' as const },
+      });
+    }
+  }
+
+  private async redisPing(): Promise<HealthIndicatorResult> {
+    try {
+      if (this.redisHealthClient.status === 'end') {
+        await this.redisHealthClient.connect();
+      }
+      const result = await this.redisHealthClient.ping();
+      if (result !== 'PONG') {
+        throw new Error('Redis ping failed');
+      }
+      return { redis: { status: 'up' as const } };
+    } catch (error) {
+      throw new HealthCheckError('Redis check failed', {
+        redis: { status: 'down' as const },
       });
     }
   }
@@ -62,15 +96,8 @@ export class HealthController {
   @Get('redis')
   @HealthCheck()
   async checkRedis() {
-    const redisHost = this.configService.get('REDIS_HOST', 'localhost');
-    const redisPort = this.configService.get('REDIS_PORT', 6379);
-
     return this.health.check([
-      () =>
-        this.http.pingCheck(
-          'redis',
-          `http://${redisHost}:${redisPort}`,
-        ),
+      () => this.redisPing(),
     ]);
   }
 
@@ -80,9 +107,6 @@ export class HealthController {
   @Get('detailed')
   @HealthCheck()
   async checkDetailed() {
-    const redisHost = this.configService.get('REDIS_HOST', 'localhost');
-    const redisPort = this.configService.get('REDIS_PORT', 6379);
-
     return this.health.check([
       // Database check
       () => this.prismaPing(),
@@ -100,12 +124,8 @@ export class HealthController {
           thresholdPercent: 0.5,
         }),
 
-      // Redis check (commented out as HTTP check might not work for Redis)
-      // () =>
-      //   this.http.pingCheck(
-      //     'redis',
-      //     `http://${redisHost}:${redisPort}`,
-      //   ),
+      // Redis check
+      () => this.redisPing(),
     ]);
   }
 

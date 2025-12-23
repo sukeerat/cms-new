@@ -1,50 +1,33 @@
 import API from './api';
 
 /**
- * Helper to unwrap response if it has TransformInterceptor wrapper structure.
- * The wrapper has: { data: T, statusCode: number, message: string, timestamp: string }
- */
-const unwrapIfWrapped = (data) => {
-  if (
-    data &&
-    typeof data === 'object' &&
-    'statusCode' in data &&
-    'message' in data &&
-    'timestamp' in data &&
-    'data' in data
-  ) {
-    return data.data;
-  }
-  return data;
-};
-
-/**
  * State Service
  * API methods for state-level operations
+ * Note: Response unwrapping is handled centrally in api.js interceptor
  */
 export const stateService = {
   // Dashboard
   async getDashboard() {
     const response = await API.get('/state/dashboard');
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Dashboard - Critical Alerts
   async getCriticalAlerts() {
     const response = await API.get('/state/dashboard/critical-alerts');
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Dashboard - Action Items
   async getActionItems() {
     const response = await API.get('/state/dashboard/actions');
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Compliance Summary
   async getComplianceSummary() {
     const response = await API.get('/state/compliance/summary');
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Institutions
@@ -52,7 +35,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/institutions?${queryParams}` : '/state/institutions';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getInstitutionsWithStats(params = {}) {
@@ -62,33 +45,33 @@ export const stateService = {
     const queryParams = new URLSearchParams(cleanParams).toString();
     const url = queryParams ? `/state/institutions/dashboard-stats?${queryParams}` : '/state/institutions/dashboard-stats';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getInstitutionById(id) {
     const response = await API.get(`/state/institutions/${id}`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async createInstitution(data) {
     const response = await API.post('/state/institutions', data);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async updateInstitution(id, data) {
     const response = await API.put(`/state/institutions/${id}`, data);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async deleteInstitution(id) {
     const response = await API.delete(`/state/institutions/${id}`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Institution Details
   async getInstitutionOverview(id) {
     const response = await API.get(`/state/institutions/${id}/overview`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getInstitutionStudents(id, params = {}) {
@@ -101,7 +84,7 @@ export const stateService = {
       ? `/state/institutions/${id}/students?${queryParams}`
       : `/state/institutions/${id}/students`;
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getInstitutionCompanies(id, params = {}) {
@@ -114,12 +97,12 @@ export const stateService = {
       ? `/state/institutions/${id}/companies?${queryParams}`
       : `/state/institutions/${id}/companies`;
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getInstitutionFacultyPrincipal(id) {
     const response = await API.get(`/state/institutions/${id}/faculty-principal`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Principals
@@ -127,32 +110,32 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/principals?${queryParams}` : '/state/principals';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async createPrincipal(data) {
     const response = await API.post('/state/principals', data);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async updatePrincipal(id, data) {
     const response = await API.put(`/state/principals/${id}`, data);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getPrincipalById(id) {
     const response = await API.get(`/state/principals/${id}`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async deletePrincipal(id) {
     const response = await API.delete(`/state/principals/${id}`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async resetPrincipalPassword(id) {
     const response = await API.post(`/state/principals/${id}/reset-password`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Staff
@@ -164,32 +147,32 @@ export const stateService = {
     const queryParams = new URLSearchParams(cleanParams).toString();
     const url = queryParams ? `/state/staff?${queryParams}` : '/state/staff';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getStaffById(id) {
     const response = await API.get(`/state/staff/${id}`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async createStaff(data) {
     const response = await API.post('/state/staff', data);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async updateStaff(id, data) {
     const response = await API.put(`/state/staff/${id}`, data);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async deleteStaff(id) {
     const response = await API.delete(`/state/staff/${id}`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async resetStaffPassword(id) {
     const response = await API.post(`/state/staff/${id}/reset-password`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Reports
@@ -197,12 +180,12 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/reports/institutions?${queryParams}` : '/state/reports/institutions';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getReportById(id) {
     const response = await API.get(`/state/reports/${id}`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Statistics
@@ -210,7 +193,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/statistics?${queryParams}` : '/state/statistics';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Analytics - Top Performers
@@ -218,7 +201,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/analytics/performers?${queryParams}` : '/state/analytics/performers';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Analytics - Top Industries
@@ -226,7 +209,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/analytics/industries?${queryParams}` : '/state/analytics/industries';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Analytics - Monthly Stats
@@ -234,7 +217,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/analytics/monthly?${queryParams}` : '/state/analytics/monthly';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Analytics - Institution Performance
@@ -244,7 +227,7 @@ export const stateService = {
       ? `/state/analytics/institution/${id}?${queryParams}`
       : `/state/analytics/institution/${id}`;
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Analytics - Monthly Report Stats
@@ -252,7 +235,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/analytics/reports?${queryParams}` : '/state/analytics/reports';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Analytics - Faculty Visit Stats
@@ -260,7 +243,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/analytics/visits?${queryParams}` : '/state/analytics/visits';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Audit Logs
@@ -268,26 +251,26 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/audit-logs?${queryParams}` : '/state/audit-logs';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Placement Statistics
   async getPlacementStats() {
     const response = await API.get('/state/placements/stats');
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async getPlacementTrends(params = {}) {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/placements/trends?${queryParams}` : '/state/placements/trends';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Joining Letter Stats
   async getJoiningLetterStats() {
     const response = await API.get('/state/joining-letters/stats');
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Industry Approvals
@@ -295,17 +278,17 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/industries/pending?${queryParams}` : '/state/industries/pending';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async approveIndustry(id, approvedBy) {
     const response = await API.post(`/state/industries/${id}/approve`, { approvedBy });
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async rejectIndustry(id, reason) {
     const response = await API.post(`/state/industries/${id}/reject`, { reason });
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Export Dashboard Report
@@ -313,7 +296,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(params).toString();
     const url = queryParams ? `/state/export/dashboard?${queryParams}` : '/state/export/dashboard';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Export as Blob for download
@@ -327,17 +310,17 @@ export const stateService = {
   // Mentor Management
   async getInstitutionMentors(institutionId) {
     const response = await API.get(`/state/institutions/${institutionId}/mentors`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async assignMentorToStudent(studentId, mentorId) {
     const response = await API.post(`/state/students/${studentId}/assign-mentor`, { mentorId });
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async removeMentorFromStudent(studentId) {
     const response = await API.delete(`/state/students/${studentId}/mentor`);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   // Users Management
@@ -349,7 +332,7 @@ export const stateService = {
     const queryParams = new URLSearchParams(cleanParams).toString();
     const url = queryParams ? `/state/users?${queryParams}` : '/state/users';
     const response = await API.get(url);
-    return unwrapIfWrapped(response.data);
+    return response.data;
   },
 
   async resetUserPassword(userId, role) {
@@ -371,7 +354,26 @@ export const stateService = {
     }
 
     const response = await API.post(endpoint);
-    return unwrapIfWrapped(response.data);
+    return response.data;
+  },
+
+  // ==================== STATE-WIDE COMPANIES OVERVIEW ====================
+
+  // Get all companies across all institutions
+  async getAllCompanies(params = {}) {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    );
+    const queryParams = new URLSearchParams(cleanParams).toString();
+    const url = queryParams ? `/state/companies?${queryParams}` : '/state/companies';
+    const response = await API.get(url);
+    return response.data;
+  },
+
+  // Get company details with all institutions and students
+  async getCompanyDetails(companyId) {
+    const response = await API.get(`/state/companies/${encodeURIComponent(companyId)}`);
+    return response.data;
   },
 };
 

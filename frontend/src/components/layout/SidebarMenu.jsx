@@ -90,8 +90,8 @@ const SidebarMenu = ({ sections, collapsed, onMobileClose, isMobile }) => {
       <div
         className={`
           px-3 py-4
-          border-t border-slate-200 dark:border-slate-800
-          bg-slate-50/50 dark:bg-slate-800/50
+          border-t border-border
+          bg-background-tertiary/50
         `}
       >
         {!collapsed ? (
@@ -102,9 +102,9 @@ const SidebarMenu = ({ sections, collapsed, onMobileClose, isMobile }) => {
               icon={<BugOutlined className="text-sm" />}
               className="
                 h-10 rounded-xl
-                bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600
-                border border-slate-200 dark:border-slate-600
-                text-slate-900 dark:text-slate-300
+                bg-surface hover:bg-surface-hover
+                border border-border
+                text-text-primary
                 font-medium text-[13px]
                 transition-all duration-200
                 flex items-center justify-center gap-2
@@ -124,9 +124,9 @@ const SidebarMenu = ({ sections, collapsed, onMobileClose, isMobile }) => {
                   icon={<BugOutlined className="text-sm" />}
                   className="
                     w-10 h-10
-                    bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600
-                    border border-slate-200 dark:border-slate-600
-                    text-slate-900 dark:text-slate-300
+                    bg-surface hover:bg-surface-hover
+                    border border-border
+                    text-text-primary
                     transition-all duration-200
                     flex items-center justify-center
                   "

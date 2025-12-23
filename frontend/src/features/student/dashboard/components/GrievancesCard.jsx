@@ -1,11 +1,15 @@
 import React from 'react';
-import { Card, List, Tag, Button, Typography, Empty, Avatar, Badge } from 'antd';
+import { Card, List, Tag, Button, Typography, Empty, Avatar, Badge, Tooltip } from 'antd';
 import {
   ExclamationCircleOutlined,
   PlusOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   RightOutlined,
+  UserOutlined,
+  TeamOutlined,
+  GlobalOutlined,
+  RiseOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -15,7 +19,9 @@ const { Text } = Typography;
 const getStatusConfig = (status) => {
   const configs = {
     SUBMITTED: { color: 'blue', icon: <ClockCircleOutlined />, label: 'Submitted' },
+    IN_REVIEW: { color: 'orange', icon: <ClockCircleOutlined />, label: 'In Review' },
     IN_PROGRESS: { color: 'orange', icon: <ClockCircleOutlined />, label: 'In Progress' },
+    ESCALATED: { color: 'red', icon: <RiseOutlined />, label: 'Escalated' },
     RESOLVED: { color: 'green', icon: <CheckCircleOutlined />, label: 'Resolved' },
     CLOSED: { color: 'default', icon: <CheckCircleOutlined />, label: 'Closed' },
   };
@@ -25,10 +31,17 @@ const getStatusConfig = (status) => {
 const getPriorityColor = (priority) => {
   const colors = {
     HIGH: 'red',
+    URGENT: 'red',
     MEDIUM: 'orange',
     LOW: 'blue',
   };
   return colors[priority] || 'default';
+};
+
+const ESCALATION_LEVELS = {
+  MENTOR: { label: 'Mentor', color: 'blue', icon: <UserOutlined /> },
+  PRINCIPAL: { label: 'Principal', color: 'orange', icon: <TeamOutlined /> },
+  STATE_DIRECTORATE: { label: 'State', color: 'red', icon: <GlobalOutlined /> },
 };
 
 const GrievancesCard = ({ grievances = [], loading, onCreateNew, onViewAll }) => {
@@ -72,6 +85,7 @@ const GrievancesCard = ({ grievances = [], loading, onCreateNew, onViewAll }) =>
             size="small"
             renderItem={(grievance) => {
               const statusConfig = getStatusConfig(grievance.status);
+              const escalationConfig = ESCALATION_LEVELS[grievance.escalationLevel];
 
               return (
                 <List.Item className="!px-0">
@@ -86,10 +100,25 @@ const GrievancesCard = ({ grievances = [], loading, onCreateNew, onViewAll }) =>
                         <Text className="text-sm font-medium block truncate">
                           {grievance.title || grievance.subject}
                         </Text>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Tag color={getPriorityColor(grievance.severity || grievance.priority)} className="text-xs">
                             {grievance.severity || grievance.priority || 'MEDIUM'}
                           </Tag>
+                          {escalationConfig && (
+                            <Tooltip title={`At ${escalationConfig.label} level`}>
+                              <Tag color={escalationConfig.color} className="text-xs" icon={escalationConfig.icon}>
+                                {escalationConfig.label}
+                              </Tag>
+                            </Tooltip>
+                          )}
+                          {grievance.assignedTo && (
+                            <Tooltip title={`Assigned to ${grievance.assignedTo.name}`}>
+                              <Text className="text-xs text-text-tertiary">
+                                <UserOutlined className="mr-1" />
+                                {grievance.assignedTo.name.split(' ')[0]}
+                              </Text>
+                            </Tooltip>
+                          )}
                           <Text className="text-xs text-text-tertiary">
                             {dayjs(grievance.createdAt).format('MMM DD')}
                           </Text>

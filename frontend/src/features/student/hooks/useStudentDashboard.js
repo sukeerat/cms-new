@@ -87,14 +87,19 @@ export const useStudentDashboard = () => {
     !!(dashboard.error || profile.error || applications.error || reports.error)
   ), [dashboard.error, profile.error, applications.error, reports.error]);
 
-  // Fetch all dashboard data
-  const fetchDashboardData = useCallback((forceRefresh = false) => {
+  // Fetch all dashboard data - optimized to reduce redundant calls
+  const fetchDashboardData = useCallback(async (forceRefresh = false) => {
+    // Fetch dashboard and profile in parallel
     dispatch(fetchStudentDashboard({ forceRefresh }));
-    dispatch(fetchStudentProfile({ forceRefresh }));
-    dispatch(fetchMyInternships({ forceRefresh }));
+    await dispatch(fetchStudentProfile({ forceRefresh }));
+
+    // After profile is loaded, fetch mentor (uses cached profile data)
+    dispatch(fetchMentor());
+
+    // Fetch remaining data in parallel
+    // Note: /student/applications returns ALL applications including self-identified
     dispatch(fetchApplications({ forceRefresh }));
     dispatch(fetchMyReports({ forceRefresh }));
-    dispatch(fetchMentor());
     dispatch(fetchGrievances());
   }, [dispatch]);
 
@@ -119,22 +124,44 @@ export const useStudentDashboard = () => {
     return grievances.list?.grievances || [];
   }, [grievances.list]);
 
+  // Filter self-identified from applications (applications already contains all)
+  const selfIdentifiedApplications = useMemo(() => (
+    normalizedApplications.filter(app => app.isSelfIdentified)
+  ), [normalizedApplications]);
+
+  // Filter platform applications (non self-identified)
+  const platformApplications = useMemo(() => (
+    normalizedApplications.filter(app => !app.isSelfIdentified)
+  ), [normalizedApplications]);
+
   // Calculate statistics from data
+  // For self-identified internships: APPROVED is the active status
+  // For regular internships: SELECTED is the active status
   const stats = useMemo(() => ({
     totalApplications: normalizedApplications.length,
     activeApplications: normalizedApplications.filter(app =>
       ['APPLIED', 'SHORTLISTED', 'UNDER_REVIEW'].includes(app.status)
     ).length,
-    selectedApplications: normalizedApplications.filter(app => app.status === 'SELECTED').length,
+    // Include APPROVED for self-identified internships
+    selectedApplications: normalizedApplications.filter(app =>
+      app.status === 'SELECTED' || app.status === 'APPROVED'
+    ).length,
     completedInternships: normalizedApplications.filter(app => app.status === 'COMPLETED').length,
     totalInternships: (internships.list || []).length,
     grievances: normalizedGrievances.length,
-  }), [normalizedApplications, internships.list, normalizedGrievances]);
+    // Self-identified specific stats
+    selfIdentifiedCount: selfIdentifiedApplications.length,
+    ongoingInternships: normalizedApplications.filter(app =>
+      ['SELECTED', 'APPROVED', 'JOINED', 'ACTIVE'].includes(app.status)
+    ).length,
+  }), [normalizedApplications, selfIdentifiedApplications, internships.list, normalizedGrievances]);
 
   // Get active internship(s)
+  // Include APPROVED status for self-identified internships
   const activeInternships = useMemo(() => (
     normalizedApplications.filter(app =>
-      app.status === 'SELECTED' || app.status === 'ACTIVE' || app.status === 'JOINED'
+      app.status === 'SELECTED' || app.status === 'ACTIVE' ||
+      app.status === 'JOINED' || app.status === 'APPROVED'
     )
   ), [normalizedApplications]);
 
@@ -151,8 +178,8 @@ export const useStudentDashboard = () => {
       (app.monthlyReports || []).map(report => ({
         ...report,
         applicationId: app.id,
-        internshipTitle: app.internship?.title,
-        companyName: app.internship?.industry?.companyName,
+        internshipTitle: app.internship?.title || app.title,
+        companyName: app.internship?.industry?.companyName || app.companyName,
       }))
     )
   ), [normalizedApplications]);
@@ -189,15 +216,28 @@ export const useStudentDashboard = () => {
     fetchDashboardData(true);
   }, [fetchDashboardData]);
 
+  // Extract mentor from profile or fallback to mentor state
+  const mentorData = useMemo(() => {
+    // First try from profile's mentorAssignments
+    if (profile.data?.mentorAssignments?.length > 0) {
+      const activeAssignment = profile.data.mentorAssignments.find(a => a.isActive);
+      return activeAssignment?.mentor || null;
+    }
+    // Fallback to mentor state
+    return mentor.data;
+  }, [profile.data, mentor.data]);
+
   return {
     // State
     isLoading,
     loadingStates,
     dashboard: dashboard.stats,
     profile: profile.data,
-    mentor: mentor.data,
+    mentor: mentorData,
     grievances: normalizedGrievances,
-    applications: normalizedApplications,
+    applications: normalizedApplications, // All applications (platform + self-identified)
+    selfIdentified: selfIdentifiedApplications, // Filtered self-identified only
+    platformApplications, // Filtered platform only
     internships: internships.list || [],
     reports: reports.list || [],
 

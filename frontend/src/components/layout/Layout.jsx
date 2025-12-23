@@ -81,7 +81,7 @@ const Layouts = () => {
           collapsedWidth={72}
           collapsible
           theme="light"
-          className="hide-scrollbar sidebar-enhanced h-full z-50 overflow-hidden bg-white dark:bg-slate-900 dark:border-r dark:border-slate-800 shadow-sm"
+          className="hide-scrollbar sidebar-enhanced h-full z-50 overflow-hidden bg-surface border-r border-border shadow-sm"
           collapsed={collapsed}
           trigger={null}
         >
@@ -97,14 +97,14 @@ const Layouts = () => {
           closable
           onClose={() => setMobileOpen(false)}
           open={mobileOpen}
-          width={280}
+          styles={{ wrapper: { width: 280 } }}
           classNames={{
-            body: 'p-0 bg-white dark:bg-slate-900 flex flex-col',
-            header: 'bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3',
+            body: 'p-0 bg-surface flex flex-col',
+            header: 'bg-surface border-b border-border px-4 py-3',
             wrapper: 'shadow-2xl',
           }}
           title={
-            <span className="font-bold text-base text-black dark:text-white">Navigation</span>
+            <span className="font-bold text-base text-text-primary">Navigation</span>
           }
         >
           <div className="flex flex-col h-full">
@@ -122,7 +122,7 @@ const Layouts = () => {
       <Layout
         className={`
           transition-all duration-300 ease-in-out
-          bg-slate-100 dark:bg-slate-950
+          bg-background-secondary
           min-h-screen
         `}
       >

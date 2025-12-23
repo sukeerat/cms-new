@@ -154,14 +154,14 @@ body {
   width: 95% !important;
   margin-left: 0 !important;
   transition: all 0.2s ease !important;
-  color: #000000 !important; /* Pitch black for unselected */
+  color: rgb(var(--color-text-secondary)) !important;
   opacity: 1 !important; /* Force full visibility */
 }
 
 /* Icons for unselected */
 .custom-sidebar-menu .ant-menu-item .anticon,
 .custom-sidebar-menu .ant-menu-submenu-title .anticon {
-  color: #000000 !important;
+  color: rgb(var(--color-text-secondary)) !important;
   opacity: 1 !important;
 }
 
@@ -169,14 +169,14 @@ body {
 .custom-sidebar-menu .ant-menu-item a,
 .custom-sidebar-menu .ant-menu-item span,
 .custom-sidebar-menu .ant-menu-submenu-title span {
-  color: #000000 !important;
+  color: rgb(var(--color-text-secondary)) !important;
   opacity: 1 !important;
 }
 
 /* Selected Item State (including submenus when active) */
 .custom-sidebar-menu .ant-menu-item-selected,
 .custom-sidebar-menu .ant-menu-submenu-selected > .ant-menu-submenu-title {
-  background-color: rgb(var(--color-primary-100)) !important; /* Light blue bg */
+  background-color: rgba(var(--color-primary), 0.1) !important;
 }
 
 .custom-sidebar-menu .ant-menu-item-selected,
@@ -184,44 +184,44 @@ body {
 .custom-sidebar-menu .ant-menu-item-selected span,
 .custom-sidebar-menu .ant-menu-submenu-selected > .ant-menu-submenu-title,
 .custom-sidebar-menu .ant-menu-submenu-selected > .ant-menu-submenu-title span {
-  color: rgb(30 64 175) !important; /* Dark blue text (blue-800) */
+  color: rgb(var(--color-primary-700)) !important;
   font-weight: 600 !important;
 }
 
 .custom-sidebar-menu .ant-menu-item-selected .anticon,
 .custom-sidebar-menu .ant-menu-submenu-selected > .ant-menu-submenu-title .anticon {
-  color: rgb(30 64 175) !important; /* Dark blue icon */
+  color: rgb(var(--color-primary-700)) !important;
   opacity: 1 !important;
 }
 
 /* Hover State */
 .custom-sidebar-menu .ant-menu-item:hover:not(.ant-menu-item-selected),
 .custom-sidebar-menu .ant-menu-submenu-title:hover {
-  background-color: rgba(0, 0, 0, 0.04) !important;
+  background-color: rgb(var(--color-hover-bg)) !important;
 }
 
 /* Dark Mode Adjustments */
 .dark .custom-sidebar-menu .ant-menu-item,
 .dark .custom-sidebar-menu .ant-menu-submenu-title {
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: rgb(var(--color-text-secondary)) !important;
 }
 .dark .custom-sidebar-menu .ant-menu-item a,
 .dark .custom-sidebar-menu .ant-menu-item span,
 .dark .custom-sidebar-menu .ant-menu-submenu-title span,
 .dark .custom-sidebar-menu .ant-menu-item .anticon,
 .dark .custom-sidebar-menu .ant-menu-submenu-title .anticon {
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: rgb(var(--color-text-secondary)) !important;
 }
 
 .dark .custom-sidebar-menu .ant-menu-item-selected,
 .dark .custom-sidebar-menu .ant-menu-submenu-selected > .ant-menu-submenu-title {
-  background-color: rgba(59, 130, 246, 0.2) !important;
-  color: rgb(96, 165, 250) !important;
+  background-color: rgba(var(--color-primary), 0.2) !important;
+  color: rgb(var(--color-primary)) !important;
 }
 
 .dark .custom-sidebar-menu .ant-menu-item-selected *,
 .dark .custom-sidebar-menu .ant-menu-submenu-selected > .ant-menu-submenu-title * {
-  color: rgb(96, 165, 250) !important;
+  color: rgb(var(--color-primary)) !important;
 }
 
 /* ============================================

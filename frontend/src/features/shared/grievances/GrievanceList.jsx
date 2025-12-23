@@ -22,6 +22,7 @@ import {
   Empty,
   Divider,
   message,
+  Steps,
 } from 'antd';
 import {
   AlertOutlined,
@@ -37,6 +38,8 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   CalendarOutlined,
+  TeamOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import { grievanceService } from '../../../services/grievance.service';
 import toast from 'react-hot-toast';
@@ -46,6 +49,13 @@ const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+
+// Escalation level labels and order
+const ESCALATION_LEVELS = {
+  MENTOR: { label: 'Faculty Mentor', color: 'blue', icon: <UserOutlined />, order: 0 },
+  PRINCIPAL: { label: 'Principal', color: 'orange', icon: <TeamOutlined />, order: 1 },
+  STATE_DIRECTORATE: { label: 'State Directorate', color: 'red', icon: <GlobalOutlined />, order: 2 },
+};
 
 // Constants for categories, statuses, and priorities
 const CATEGORIES = [
@@ -349,6 +359,36 @@ const GrievanceList = () => {
             status={config.badge}
             text={config.label}
           />
+        );
+      },
+    },
+    {
+      title: 'Escalation Level',
+      dataIndex: 'escalationLevel',
+      key: 'escalationLevel',
+      width: 150,
+      render: (level) => {
+        if (!level) return <Tag>Not Assigned</Tag>;
+        const config = ESCALATION_LEVELS[level];
+        return (
+          <Tag color={config?.color} icon={config?.icon}>
+            {config?.label || level}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Assigned To',
+      dataIndex: 'assignedTo',
+      key: 'assignedTo',
+      width: 150,
+      render: (assignedTo) => {
+        if (!assignedTo) return <Text type="secondary">Unassigned</Text>;
+        return (
+          <Space>
+            <UserOutlined />
+            <Text>{assignedTo.name}</Text>
+          </Space>
         );
       },
     },
@@ -722,18 +762,89 @@ const GrievanceList = () => {
                 />
               </div>
 
+              {/* Escalation Chain */}
+              <Divider />
+              <div>
+                <Title level={5}>Escalation Chain</Title>
+                <Steps
+                  current={ESCALATION_LEVELS[selectedGrievance.escalationLevel]?.order ?? -1}
+                  size="small"
+                  items={[
+                    {
+                      title: 'Faculty Mentor',
+                      description: selectedGrievance.escalationLevel === 'MENTOR' ? 'Current Level' : '',
+                      icon: <UserOutlined />,
+                    },
+                    {
+                      title: 'Principal',
+                      description: selectedGrievance.escalationLevel === 'PRINCIPAL' ? 'Current Level' : '',
+                      icon: <TeamOutlined />,
+                    },
+                    {
+                      title: 'State Directorate',
+                      description: selectedGrievance.escalationLevel === 'STATE_DIRECTORATE' ? 'Current Level' : '',
+                      icon: <GlobalOutlined />,
+                    },
+                  ]}
+                />
+              </div>
+
               {/* Assigned To */}
               {selectedGrievance.assignedTo && (
                 <>
                   <Divider />
-                  <Descriptions title="Assignment" column={1} bordered size="small">
+                  <Descriptions title="Current Assignment" column={1} bordered size="small">
                     <Descriptions.Item label="Assigned To">
                       <Space>
                         <UserOutlined />
-                        {selectedGrievance.assignedTo.name} ({selectedGrievance.assignedTo.role})
+                        {selectedGrievance.assignedTo.name}
                       </Space>
                     </Descriptions.Item>
+                    <Descriptions.Item label="Role">
+                      <Tag color="blue">{selectedGrievance.assignedTo.role}</Tag>
+                    </Descriptions.Item>
+                    {selectedGrievance.assignedTo.email && (
+                      <Descriptions.Item label="Email">
+                        {selectedGrievance.assignedTo.email}
+                      </Descriptions.Item>
+                    )}
                   </Descriptions>
+                </>
+              )}
+
+              {/* Status History from API */}
+              {selectedGrievance.statusHistory && selectedGrievance.statusHistory.length > 0 && (
+                <>
+                  <Divider />
+                  <div>
+                    <Title level={5}>Complete Status History</Title>
+                    <Timeline
+                      items={selectedGrievance.statusHistory.map((history, index) => ({
+                        color: history.toStatus === 'RESOLVED' ? 'green' :
+                               history.toStatus === 'ESCALATED' ? 'red' :
+                               history.toStatus === 'IN_REVIEW' ? 'orange' : 'blue',
+                        children: (
+                          <div key={index}>
+                            <Text strong>{history.action}</Text>
+                            {history.fromStatus && (
+                              <Text type="secondary"> ({history.fromStatus} → {history.toStatus})</Text>
+                            )}
+                            <br />
+                            <Text type="secondary" className="text-xs">
+                              {history.changedBy?.name && `By: ${history.changedBy.name} • `}
+                              {dayjs(history.createdAt).format("MMM DD, YYYY HH:mm")}
+                            </Text>
+                            {history.remarks && (
+                              <>
+                                <br />
+                                <Text className="text-xs italic">"{history.remarks}"</Text>
+                              </>
+                            )}
+                          </div>
+                        ),
+                      }))}
+                    />
+                  </div>
                 </>
               )}
 

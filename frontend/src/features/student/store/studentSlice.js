@@ -49,6 +49,11 @@ const initialState = {
     loading: false,
     error: null,
   },
+  selfIdentified: {
+    list: [],
+    loading: false,
+    error: null,
+  },
   lastFetched: {
     dashboard: null,
     profile: null,
@@ -59,6 +64,7 @@ const initialState = {
     applications: null,
     mentor: null,
     grievances: null,
+    selfIdentified: null,
   },
 };
 
@@ -265,14 +271,23 @@ export const updateMonthlyReport = updateReport;
 // Alias for fetchAvailableInternships
 export const fetchInternships = fetchAvailableInternships;
 
-// Mentor - fetches assigned mentor information from student profile
+// Mentor - extracted from profile data (no separate API call needed)
 export const fetchMentor = createAsyncThunk(
   'student/fetchMentor',
-  async (_, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     try {
-      // Mentor info is included in student profile
+      const state = getState();
+      // If profile is already loaded, extract mentor from it
+      if (state.student.profile.data) {
+        const profile = state.student.profile.data;
+        // Mentor is in mentorAssignments array - get active assignment
+        const activeAssignment = profile.mentorAssignments?.find(a => a.isActive);
+        return activeAssignment?.mentor || null;
+      }
+      // Only fetch profile if not already loaded
       const response = await apiClient.get('/student/profile');
-      return response.data?.mentor || null;
+      const activeAssignment = response.data?.mentorAssignments?.find(a => a.isActive);
+      return activeAssignment?.mentor || null;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch mentor');
     }
@@ -300,6 +315,26 @@ export const createGrievance = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create grievance');
+    }
+  }
+);
+
+// Self-identified internships
+export const fetchSelfIdentified = createAsyncThunk(
+  'student/fetchSelfIdentified',
+  async (params, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const lastFetched = state.student.lastFetched.selfIdentified;
+
+      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+        return { cached: true };
+      }
+
+      const response = await apiClient.get('/student/self-identified', { params });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch self-identified internships');
     }
   }
 );
@@ -523,7 +558,7 @@ const studentSlice = createSlice({
         state.enrollments.error = action.payload;
       })
 
-      // Applications
+      // Applications - handle response structure: { applications, total, page, limit, totalPages }
       .addCase(fetchApplications.pending, (state) => {
         state.applications.loading = true;
         state.applications.error = null;
@@ -531,7 +566,8 @@ const studentSlice = createSlice({
       .addCase(fetchApplications.fulfilled, (state, action) => {
         state.applications.loading = false;
         if (!action.payload.cached) {
-          state.applications.list = action.payload.data || action.payload;
+          // Handle backend response structure
+          state.applications.list = action.payload.applications || action.payload.data || action.payload;
           state.lastFetched.applications = Date.now();
         }
       })
@@ -637,6 +673,24 @@ const studentSlice = createSlice({
       .addCase(uploadReportFile.rejected, (state, action) => {
         state.reports.loading = false;
         state.reports.error = action.payload;
+      })
+
+      // Self-identified internships
+      .addCase(fetchSelfIdentified.pending, (state) => {
+        state.selfIdentified.loading = true;
+        state.selfIdentified.error = null;
+      })
+      .addCase(fetchSelfIdentified.fulfilled, (state, action) => {
+        state.selfIdentified.loading = false;
+        if (!action.payload.cached) {
+          // Handle response structure: { applications, total, page, limit, totalPages }
+          state.selfIdentified.list = action.payload.applications || action.payload.data || action.payload;
+          state.lastFetched.selfIdentified = Date.now();
+        }
+      })
+      .addCase(fetchSelfIdentified.rejected, (state, action) => {
+        state.selfIdentified.loading = false;
+        state.selfIdentified.error = action.payload;
       });
   },
 });

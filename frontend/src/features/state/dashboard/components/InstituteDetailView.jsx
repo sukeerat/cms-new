@@ -629,13 +629,37 @@ const InstituteDetailView = () => {
       },
     },
     {
-      title: 'Company', key: 'company', width: 150,
+      title: 'Company', key: 'company', width: 180,
       render: (_, record) => {
-        const company = record.company || record.internshipApplications?.find(app => app.status === 'SELECTED' || app.status === 'APPROVED')?.internship?.industry;
-        return company ? <Tooltip title={company.city}><Tag color="blue" className="max-w-[130px] truncate">{company.companyName}</Tag></Tooltip> : <Text type="secondary">-</Text>;
+        // Prefer company object, then selfIdentifiedData
+        const company = record.company;
+        const selfId = record.selfIdentifiedData;
+
+        if (company?.companyName) {
+          return (
+            <Tooltip title={company.isSelfIdentified ? `${company.jobProfile || 'Self-identified'}` : (company.city || '')}>
+              <div className="flex items-center gap-1">
+                <Tag color={company.isSelfIdentified ? 'purple' : 'blue'} className="max-w-[140px] truncate m-0">
+                  {company.companyName}
+                </Tag>
+                {company.isSelfIdentified && <Tag color="green" className="text-[9px] px-1 m-0">Self</Tag>}
+              </div>
+            </Tooltip>
+          );
+        }
+        if (selfId?.companyName) {
+          return (
+            <Tooltip title={selfId.jobProfile || 'Self-identified internship'}>
+              <div className="flex items-center gap-1">
+                <Tag color="purple" className="max-w-[140px] truncate m-0">{selfId.companyName}</Tag>
+                <Tag color="green" className="text-[9px] px-1 m-0">Self</Tag>
+              </div>
+            </Tooltip>
+          );
+        }
+        return <Text type="secondary">-</Text>;
       },
     },
-    { title: 'Self-ID', key: 'selfIdentified', width: 80, align: 'center', render: (_, record) => record.hasSelfIdentifiedInternship ? <CheckCircleOutlined className="text-green-500" /> : <CloseCircleOutlined className="text-gray-300" /> },
     {
       title: 'Joining Letter', key: 'joiningLetter', width: 120,
       render: (_, record) => {
@@ -649,43 +673,144 @@ const InstituteDetailView = () => {
     { title: 'Action', key: 'action', width: 60, fixed: 'right', render: (_, record) => <Dropdown menu={{ items: getStudentActionItems(record) }} trigger={['click']} placement="bottomRight"><Button type="text" icon={<MoreOutlined />} /></Dropdown> },
   ], [getStudentActionItems]);
 
-  // Memoized company columns
+  // Memoized company columns - Enhanced design
   const companyColumns = useMemo(() => [
     {
-      title: 'Company', key: 'company',
+      title: 'Company', key: 'company', width: 260, fixed: 'left',
       render: (_, record) => (
-        <div className="flex items-center gap-2">
-          <Avatar icon={<BankOutlined />} className="bg-blue-500" size="small" />
-          <div>
-            <Text strong className="text-sm">{record.companyName}</Text><br />
-            <Text type="secondary" className="text-xs">{record.city}, {record.state}</Text>
+        <div className="flex items-center gap-3">
+          <Avatar
+            icon={<BankOutlined />}
+            className={record.isSelfIdentifiedCompany
+              ? 'bg-gradient-to-br from-purple-500 to-pink-500'
+              : 'bg-gradient-to-br from-blue-500 to-cyan-500'}
+            size={40}
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Text strong className="text-sm truncate max-w-[160px]" title={record.companyName}>
+                {record.companyName || 'Unknown Company'}
+              </Text>
+              {record.isSelfIdentifiedCompany && (
+                <Tag color="purple" className="text-[10px] px-1.5 py-0 m-0 rounded-full">
+                  Self-Identified
+                </Tag>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+              <EnvironmentOutlined className="text-[10px]" />
+              <span className="truncate max-w-[180px]">
+                {record.isSelfIdentifiedCompany
+                  ? (record.companyAddress || 'Address not provided')
+                  : `${record.city || 'N/A'}${record.state ? `, ${record.state}` : ''}`}
+              </span>
+            </div>
           </div>
         </div>
       ),
     },
-    { title: 'Type', dataIndex: 'industryType', key: 'industryType', render: (type) => <Tag>{type || 'N/A'}</Tag> },
-    { title: 'Students', dataIndex: 'studentCount', key: 'studentCount', render: (count) => <Badge count={count || 0} className="[&_.ant-badge-count]:!bg-blue-600" showZero /> },
-    { title: 'Self-ID', dataIndex: 'selfIdentifiedCount', key: 'selfIdentifiedCount', render: (count) => <Badge count={count || 0} className="[&_.ant-badge-count]:!bg-green-600" showZero /> },
     {
-      title: 'Branches', key: 'branches',
+      title: 'Industry', dataIndex: 'industryType', key: 'industryType', width: 130,
+      render: (type, record) => (
+        <Tag
+          color={record.isSelfIdentifiedCompany ? 'purple' : 'cyan'}
+          className="font-medium"
+        >
+          {type || 'General'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Contact', key: 'contact', width: 180,
       render: (_, record) => (
-        <div className="flex flex-wrap gap-1">
-          {record.branchWiseData?.slice(0, 3).map((b, i) => <Tag key={i} className="text-xs">{b.branch}: {b.total}</Tag>)}
-          {record.branchWiseData?.length > 3 && <Tag className="text-xs">+{record.branchWiseData.length - 3} more</Tag>}
+        <div className="space-y-1">
+          {(record.email || record.companyEmail) && (
+            <div className="flex items-center gap-1 text-xs">
+              <MailOutlined className="text-gray-400 text-[10px]" />
+              <span className="truncate max-w-[140px]" title={record.email || record.companyEmail}>
+                {record.email || record.companyEmail}
+              </span>
+            </div>
+          )}
+          {(record.phoneNo || record.companyContact) && (
+            <div className="flex items-center gap-1 text-xs">
+              <PhoneOutlined className="text-gray-400 text-[10px]" />
+              <span>{record.phoneNo || record.companyContact}</span>
+            </div>
+          )}
+          {!record.email && !record.companyEmail && !record.phoneNo && !record.companyContact && (
+            <Text type="secondary" className="text-xs">No contact info</Text>
+          )}
         </div>
       ),
     },
     {
-      title: 'Status', key: 'status',
+      title: 'Students', key: 'students', width: 100, align: 'center',
       render: (_, record) => (
-        <Space>
-          {record.isApproved && <Tag color="green">Approved</Tag>}
-          {record.isVerified && <Tag color="blue">Verified</Tag>}
-          {!record.isApproved && !record.isVerified && <Tag color="default">Pending</Tag>}
-        </Space>
+        <div className="flex flex-col items-center">
+          <div className="text-lg font-bold text-blue-600">{record.studentCount || 0}</div>
+          <div className="text-[10px] text-gray-500">placed</div>
+        </div>
       ),
     },
-    { title: 'Action', key: 'action', render: (_, record) => <Button type="link" size="small" onClick={() => { setSelectedCompany(record); setCompanyModalVisible(true); }}>View Students</Button> },
+    {
+      title: 'Branches', key: 'branches', width: 200,
+      render: (_, record) => (
+        <div className="flex flex-wrap gap-1">
+          {record.branchWiseData?.slice(0, 2).map((b, i) => (
+            <Tag key={i} className="text-xs m-0" color="blue">
+              {b.branch}: <strong>{b.total}</strong>
+            </Tag>
+          ))}
+          {record.branchWiseData?.length > 2 && (
+            <Tooltip title={record.branchWiseData.slice(2).map(b => `${b.branch}: ${b.total}`).join(', ')}>
+              <Tag className="text-xs m-0 cursor-pointer" color="default">
+                +{record.branchWiseData.length - 2} more
+              </Tag>
+            </Tooltip>
+          )}
+          {(!record.branchWiseData || record.branchWiseData.length === 0) && (
+            <Text type="secondary" className="text-xs">-</Text>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: 'Status', key: 'status', width: 130, align: 'center',
+      render: (_, record) => (
+        <div className="flex flex-col items-center gap-1">
+          {record.isSelfIdentifiedCompany ? (
+            <Tag icon={<CheckCircleOutlined />} color="success" className="m-0">
+              Auto-Approved
+            </Tag>
+          ) : (
+            <>
+              {record.isApproved ? (
+                <Tag icon={<CheckCircleOutlined />} color="success" className="m-0">Approved</Tag>
+              ) : record.isVerified ? (
+                <Tag icon={<SafetyCertificateOutlined />} color="processing" className="m-0">Verified</Tag>
+              ) : (
+                <Tag icon={<ClockCircleOutlined />} color="warning" className="m-0">Pending</Tag>
+              )}
+            </>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: 'Action', key: 'action', width: 120, fixed: 'right', align: 'center',
+      render: (_, record) => (
+        <Button
+          type="primary"
+          ghost
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => { setSelectedCompany(record); setCompanyModalVisible(true); }}
+        >
+          Details
+        </Button>
+      ),
+    },
   ], []);
 
   // No institute selected
@@ -791,22 +916,109 @@ const InstituteDetailView = () => {
           key: 'companies',
           label: <><BankOutlined /> Companies ({companies.total})</>,
           children: (
-            <>
-              {companies.summary && (
-                <Card size="small" className="mb-4 bg-blue-50 dark:bg-slate-800">
-                  <Row gutter={[16, 16]}>
-                    <Col span={8}><Statistic title="Total Students" value={companies.summary.totalStudents || 0} className="dark:text-slate-200 [&_.ant-statistic-title]:dark:text-slate-400" /></Col>
-                    <Col span={8}><Statistic title="Self-Identified" value={companies.summary.totalSelfIdentified || 0} valueStyle={{ color: '#3f8600' }} className="[&_.ant-statistic-title]:text-slate-600 [&_.ant-statistic-title]:dark:text-slate-400" /></Col>
-                    <Col span={8}><Statistic title="Self-ID Rate" value={companies.summary.selfIdentifiedRate || 0} suffix="%" className="dark:text-slate-200 [&_.ant-statistic-title]:dark:text-slate-400" /></Col>
-                  </Row>
-                </Card>
-              )}
-              <div className="mb-4">
-                <Input.Search placeholder="Search companies..." value={companySearchInput} onChange={(e) => setCompanySearchInput(e.target.value)} style={{ width: 250 }} allowClear />
+            <div className="space-y-4">
+              {/* Summary Cards */}
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={8}>
+                  <Card size="small" className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-slate-800 dark:to-slate-700 border-blue-200 dark:border-slate-600">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center">
+                        <BankOutlined className="text-white text-xl" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-blue-600">{companies.total || 0}</div>
+                        <div className="text-xs text-gray-500">Total Companies</div>
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card size="small" className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-slate-800 dark:to-slate-700 border-green-200 dark:border-slate-600">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                        <TeamOutlined className="text-white text-xl" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-green-600">{companies.summary?.totalStudents || 0}</div>
+                        <div className="text-xs text-gray-500">Students Placed</div>
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Card size="small" className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-slate-800 dark:to-slate-700 border-purple-200 dark:border-slate-600">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center">
+                        <SafetyCertificateOutlined className="text-white text-xl" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-purple-600">
+                          {companies.summary?.totalSelfIdentified || 0}
+                          <span className="text-sm font-normal text-gray-400 ml-1">
+                            ({companies.summary?.selfIdentifiedRate || 0}%)
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">Self-Identified</div>
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Search and Filters */}
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <Input.Search
+                  placeholder="Search companies by name..."
+                  value={companySearchInput}
+                  onChange={(e) => setCompanySearchInput(e.target.value)}
+                  style={{ width: 300 }}
+                  allowClear
+                  enterButton
+                />
+                <div className="flex items-center gap-2">
+                  <Text type="secondary" className="text-xs">
+                    {companies.list?.filter(c => c.isSelfIdentifiedCompany).length || 0} self-identified companies
+                  </Text>
+                </div>
               </div>
-              {companies.error && <Alert type="error" message={companies.error} className="mb-4" showIcon closable />}
-              <Table columns={companyColumns} dataSource={companies.list} rowKey="id" loading={companies.loading} pagination={{ pageSize: 10 }} size="small" />
-            </>
+
+              {/* Error Alert */}
+              {companies.error && <Alert type="error" message={companies.error} showIcon closable />}
+
+              {/* Empty State */}
+              {!companies.loading && companies.list?.length === 0 && (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    <div className="text-center">
+                      <Text type="secondary">No companies found</Text>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Companies with placed students will appear here
+                      </div>
+                    </div>
+                  }
+                />
+              )}
+
+              {/* Companies Table */}
+              {(companies.loading || companies.list?.length > 0) && (
+                <Table
+                  columns={companyColumns}
+                  dataSource={companies.list}
+                  rowKey="id"
+                  loading={companies.loading}
+                  pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} companies`,
+                  }}
+                  size="middle"
+                  scroll={{ x: 1100 }}
+                  className="[&_.ant-table-thead>tr>th]:bg-gray-50 dark:[&_.ant-table-thead>tr>th]:bg-slate-800"
+                  rowClassName={(record) => record.isSelfIdentifiedCompany ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''}
+                />
+              )}
+            </div>
           ),
         },
         {
@@ -819,44 +1031,184 @@ const InstituteDetailView = () => {
       {/* Student Detail Modal */}
       <StudentDetailModal visible={studentModalVisible} student={selectedStudent} onClose={() => setStudentModalVisible(false)} />
 
-      {/* Company Detail Modal */}
-      <Modal title={`Students at ${selectedCompany?.companyName || 'Company'}`} open={companyModalVisible} onCancel={() => setCompanyModalVisible(false)} footer={null} width={800} destroyOnClose>
+      {/* Company Detail Modal - Enhanced */}
+      <Modal
+        title={
+          <div className="flex items-center gap-3">
+            <Avatar
+              icon={<BankOutlined />}
+              className={selectedCompany?.isSelfIdentifiedCompany
+                ? 'bg-gradient-to-br from-purple-500 to-pink-500'
+                : 'bg-gradient-to-br from-blue-500 to-cyan-500'}
+              size={40}
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{selectedCompany?.companyName || 'Company Details'}</span>
+                {selectedCompany?.isSelfIdentifiedCompany && (
+                  <Tag color="purple" className="text-xs">Self-Identified</Tag>
+                )}
+              </div>
+              <Text type="secondary" className="text-xs font-normal">
+                {selectedCompany?.studentCount || 0} students placed
+              </Text>
+            </div>
+          </div>
+        }
+        open={companyModalVisible}
+        onCancel={() => setCompanyModalVisible(false)}
+        footer={null}
+        width={900}
+        destroyOnClose
+      >
         {selectedCompany && (
-          <div className="space-y-4">
-            <Card size="small">
-              <Row gutter={[16, 16]}>
-                <Col span={8}><Text type="secondary">Type:</Text><div><Tag>{selectedCompany.industryType || 'N/A'}</Tag></div></Col>
-                <Col span={8}><Text type="secondary">Location:</Text><div>{selectedCompany.city}, {selectedCompany.state}</div></Col>
-                <Col span={8}><Text type="secondary">Status:</Text><div>{selectedCompany.isApproved && <Tag color="green">Approved</Tag>}{selectedCompany.isVerified && <Tag color="blue">Verified</Tag>}</div></Col>
+          <div className="space-y-4 mt-4">
+            {/* Company Info Card */}
+            <Card
+              size="small"
+              className={selectedCompany.isSelfIdentifiedCompany
+                ? 'border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20'
+                : 'border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20'}
+            >
+              <Row gutter={[24, 16]}>
+                <Col xs={24} sm={8}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <AuditOutlined className="text-gray-400" />
+                    <Text type="secondary" className="text-xs">Industry Type</Text>
+                  </div>
+                  <Tag color={selectedCompany.isSelfIdentifiedCompany ? 'purple' : 'cyan'} className="font-medium">
+                    {selectedCompany.industryType || 'General'}
+                  </Tag>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <EnvironmentOutlined className="text-gray-400" />
+                    <Text type="secondary" className="text-xs">Location</Text>
+                  </div>
+                  <Text>
+                    {selectedCompany.isSelfIdentifiedCompany
+                      ? (selectedCompany.companyAddress || 'Not specified')
+                      : `${selectedCompany.city || 'N/A'}${selectedCompany.state ? `, ${selectedCompany.state}` : ''}`}
+                  </Text>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <SafetyCertificateOutlined className="text-gray-400" />
+                    <Text type="secondary" className="text-xs">Status</Text>
+                  </div>
+                  {selectedCompany.isSelfIdentifiedCompany ? (
+                    <Tag icon={<CheckCircleOutlined />} color="success">Auto-Approved</Tag>
+                  ) : (
+                    <Space>
+                      {selectedCompany.isApproved && <Tag icon={<CheckCircleOutlined />} color="success">Approved</Tag>}
+                      {selectedCompany.isVerified && <Tag icon={<SafetyCertificateOutlined />} color="processing">Verified</Tag>}
+                      {!selectedCompany.isApproved && !selectedCompany.isVerified && <Tag color="warning">Pending</Tag>}
+                    </Space>
+                  )}
+                </Col>
+                {(selectedCompany.email || selectedCompany.companyEmail || selectedCompany.phoneNo || selectedCompany.companyContact) && (
+                  <>
+                    <Col xs={24} sm={12}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <MailOutlined className="text-gray-400" />
+                        <Text type="secondary" className="text-xs">Email</Text>
+                      </div>
+                      <Text>{selectedCompany.email || selectedCompany.companyEmail || 'N/A'}</Text>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <PhoneOutlined className="text-gray-400" />
+                        <Text type="secondary" className="text-xs">Phone</Text>
+                      </div>
+                      <Text>{selectedCompany.phoneNo || selectedCompany.companyContact || 'N/A'}</Text>
+                    </Col>
+                  </>
+                )}
               </Row>
             </Card>
+
+            {/* Branch-wise Distribution */}
             {selectedCompany.branchWiseData?.length > 0 && (
-              <Card size="small" title="Branch-wise Distribution">
-                <Row gutter={[8, 8]}>
+              <Card size="small" title={<><TeamOutlined className="mr-2" />Branch-wise Distribution</>}>
+                <Row gutter={[12, 12]}>
                   {selectedCompany.branchWiseData.map((b, i) => (
                     <Col xs={12} sm={8} md={6} key={i}>
-                      <div className="p-2 rounded bg-gray-50 dark:bg-slate-700 text-center">
-                        <div className="text-lg font-bold text-blue-600">{b.total}</div>
-                        <div className="text-xs text-gray-500">{b.branch}{b.selfIdentified > 0 && <span className="text-green-600 ml-1">({b.selfIdentified} self-ID)</span>}</div>
+                      <div className="p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-700 dark:to-slate-600 text-center border border-gray-200 dark:border-slate-500">
+                        <div className="text-xl font-bold text-blue-600">{b.total}</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-300 font-medium">{b.branch}</div>
+                        {b.selfIdentified > 0 && (
+                          <div className="text-[10px] text-purple-600 mt-1">
+                            {b.selfIdentified} self-identified
+                          </div>
+                        )}
                       </div>
                     </Col>
                   ))}
                 </Row>
               </Card>
             )}
-            <Table
-              dataSource={selectedCompany.students || []}
-              columns={[
-                { title: 'Name', dataIndex: 'name', key: 'name' },
-                { title: 'Roll Number', dataIndex: 'rollNumber', key: 'rollNumber' },
-                { title: 'Branch', dataIndex: 'branch', key: 'branch', render: (text) => <Tag>{text}</Tag> },
-                { title: 'Self-ID', dataIndex: 'isSelfIdentified', key: 'isSelfIdentified', render: (val) => val ? <CheckCircleOutlined className="text-green-500" /> : <CloseCircleOutlined className="text-gray-300" /> },
-                { title: 'Joining Letter', dataIndex: 'joiningLetterStatus', key: 'joiningLetterStatus', render: (status) => status ? <Tag color={getStatusColor(status)}>{status}</Tag> : <Text type="secondary">-</Text> },
-              ]}
-              rowKey="id"
-              pagination={{ pageSize: 10 }}
-              size="small"
-            />
+
+            {/* Students Table */}
+            <Card size="small" title={<><UserOutlined className="mr-2" />Placed Students ({selectedCompany.students?.length || 0})</>}>
+              <Table
+                dataSource={selectedCompany.students || []}
+                columns={[
+                  {
+                    title: 'Student', key: 'student', width: 200,
+                    render: (_, record) => (
+                      <div className="flex items-center gap-2">
+                        <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
+                        <div>
+                          <div className="font-medium text-sm">{record.name}</div>
+                          <div className="text-xs text-gray-500">{record.email}</div>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  { title: 'Roll No.', dataIndex: 'rollNumber', key: 'rollNumber', width: 100 },
+                  {
+                    title: 'Branch', dataIndex: 'branch', key: 'branch', width: 120,
+                    render: (text) => <Tag color="blue">{text || 'N/A'}</Tag>,
+                  },
+                  ...(selectedCompany.isSelfIdentifiedCompany ? [
+                    {
+                      title: 'Job Profile', dataIndex: 'jobProfile', key: 'jobProfile', width: 150,
+                      render: (text) => text ? <Text className="text-sm">{text}</Text> : <Text type="secondary">-</Text>,
+                    },
+                    {
+                      title: 'Stipend', dataIndex: 'stipend', key: 'stipend', width: 100,
+                      render: (val) => val ? (
+                        <Text className="font-medium text-green-600">₹{Number(val).toLocaleString()}/mo</Text>
+                      ) : <Text type="secondary">-</Text>,
+                    },
+                  ] : [
+                    {
+                      title: 'Type', dataIndex: 'isSelfIdentified', key: 'isSelfIdentified', width: 100,
+                      render: (val) => val ? (
+                        <Tag color="purple" icon={<CheckCircleOutlined />}>Self-ID</Tag>
+                      ) : (
+                        <Tag color="blue">College</Tag>
+                      ),
+                    },
+                  ]),
+                  {
+                    title: 'Joining Letter', dataIndex: 'joiningLetterStatus', key: 'joiningLetterStatus', width: 120,
+                    render: (status) => status ? (
+                      <Tag
+                        icon={status === 'APPROVED' ? <CheckCircleOutlined /> : status === 'PENDING' ? <ClockCircleOutlined /> : <CloseCircleOutlined />}
+                        color={getStatusColor(status)}
+                      >
+                        {status}
+                      </Tag>
+                    ) : <Text type="secondary">Not uploaded</Text>,
+                  },
+                ]}
+                rowKey="id"
+                pagination={{ pageSize: 8, showSizeChanger: false }}
+                size="small"
+                scroll={{ x: 700 }}
+              />
+            </Card>
           </div>
         )}
       </Modal>

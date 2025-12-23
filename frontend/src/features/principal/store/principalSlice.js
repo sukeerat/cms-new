@@ -247,12 +247,10 @@ export const fetchDepartments = createAsyncThunk(
         return { cached: true };
       }
 
-      // Fetch branches/departments from institution
-      const response = await apiClient.get('/principal/subjects');
-      // Extract unique branches as departments
-      const subjects = response.data?.data || response.data || [];
-      const branches = [...new Set(subjects.map(s => s.branch).filter(Boolean))];
-      return { data: branches.map(b => ({ id: b, name: b })) };
+      // Fetch branches/departments directly from the dedicated endpoint
+      const response = await apiClient.get('/principal/branches');
+      const branches = response.data?.data || response.data || [];
+      return { data: branches };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch departments');
     }

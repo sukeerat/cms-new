@@ -166,11 +166,10 @@ const PrincipalDashboard = () => {
     };
   }, [dashboardStats]);
 
-  // Calculate total pending items
+  // Calculate total pending items (self-identified internships are auto-approved)
   const totalPendingItems = useMemo(() => {
     if (!stats?.pending) return 0;
-    return (stats.pending.selfIdentifiedApprovals || 0) +
-           (stats.pending.monthlyReports || 0) +
+    return (stats.pending.monthlyReports || 0) +
            (stats.pending.grievances || 0);
   }, [stats?.pending]);
 
@@ -232,22 +231,22 @@ const PrincipalDashboard = () => {
       title: 'Students',
       ...stats.students,
       icon: <ReadOutlined />,
-      bgClass: 'bg-blue-500/10',
-      colorClass: 'text-blue-500',
+      bgClass: 'bg-primary/10',
+      colorClass: 'text-primary',
     },
     {
       title: 'Teachers',
       ...stats.teachers,
       icon: <UserOutlined />,
-      bgClass: 'bg-emerald-500/10',
-      colorClass: 'text-emerald-500',
+      bgClass: 'bg-success/10',
+      colorClass: 'text-success',
     },
     {
       title: 'Staff',
       ...stats.staff,
       icon: <TeamOutlined />,
-      bgClass: 'bg-amber-500/10',
-      colorClass: 'text-amber-500',
+      bgClass: 'bg-warning/10',
+      colorClass: 'text-warning',
     },
     {
       title: 'Batches',
@@ -255,8 +254,8 @@ const PrincipalDashboard = () => {
       active: stats.batches.active,
       inactive: stats.batches.inactive,
       icon: <BookOutlined />,
-      bgClass: 'bg-rose-500/10',
-      colorClass: 'text-rose-500',
+      bgClass: 'bg-error/10',
+      colorClass: 'text-error',
     },
   ];
 
@@ -310,8 +309,8 @@ const PrincipalDashboard = () => {
             <Card
               title={
                 <div className="flex items-center gap-2">
-                  <SolutionOutlined className="text-purple-500" />
-                  <span>Internship Statistics</span>
+                  <SolutionOutlined className="text-primary" />
+                  <span>Self-Identified Internships</span>
                 </div>
               }
               className="border-border shadow-sm rounded-xl h-full"
@@ -319,45 +318,45 @@ const PrincipalDashboard = () => {
             >
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
+                  <div className="text-center p-3 bg-primary/10 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">
                       {stats.internships?.totalApplications || 0}
                     </div>
                     <div className="text-xs text-text-secondary uppercase font-semibold">Total</div>
                   </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {stats.internships?.approvedApplications || 0}
+                  <div className="text-center p-3 bg-info/10 rounded-lg">
+                    <div className="text-2xl font-bold text-info">
+                      {stats.internships?.ongoingInternships || 0}
                     </div>
-                    <div className="text-xs text-text-secondary uppercase font-semibold">Approved</div>
+                    <div className="text-xs text-text-secondary uppercase font-semibold">Ongoing</div>
                   </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {stats.internships?.approvalRate || 0}%
+                  <div className="text-center p-3 bg-success/10 rounded-lg">
+                    <div className="text-2xl font-bold text-success">
+                      {stats.internships?.completedInternships || 0}
                     </div>
-                    <div className="text-xs text-text-secondary uppercase font-semibold">Rate</div>
+                    <div className="text-xs text-text-secondary uppercase font-semibold">Completed</div>
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between mb-1">
-                    <Text className="text-text-secondary">Approval Progress</Text>
-                    <Text strong className="text-green-600">
-                      {stats.internships?.approvedApplications || 0} / {stats.internships?.totalApplications || 0}
+                    <Text className="text-text-secondary">Completion Progress</Text>
+                    <Text strong className="text-success">
+                      {stats.internships?.completedInternships || 0} / {stats.internships?.totalApplications || 0}
                     </Text>
                   </div>
                   <Progress
-                    percent={stats.internships?.approvalRate || 0}
+                    percent={stats.internships?.completionRate || 0}
                     strokeColor={{
-                      '0%': '#9333ea',
-                      '100%': '#22c55e',
+                      '0%': 'rgb(var(--color-primary))',
+                      '100%': 'rgb(var(--color-success))',
                     }}
                     showInfo={false}
                   />
                 </div>
                 {stats.internships?.totalApplications > 0 && (
                   <div className="flex items-center gap-2 text-sm text-text-secondary">
-                    <RiseOutlined className="text-green-500" />
-                    <span>Self-identified internships only</span>
+                    <CheckCircleOutlined className="text-success" />
+                    <span>Auto-approved on submission</span>
                   </div>
                 )}
               </div>
@@ -370,11 +369,11 @@ const PrincipalDashboard = () => {
               title={
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-2">
-                    <AuditOutlined className="text-orange-500" />
+                    <AuditOutlined className="text-warning" />
                     <span>Pending Items</span>
                   </div>
                   {totalPendingItems > 0 && (
-                    <Badge count={totalPendingItems} style={{ backgroundColor: '#f97316' }} />
+                    <Badge count={totalPendingItems} style={{ backgroundColor: 'rgb(var(--color-warning))' }} />
                   )}
                 </div>
               }
@@ -382,26 +381,18 @@ const PrincipalDashboard = () => {
               styles={{ body: { padding: '20px' } }}
             >
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <Tooltip title="Self-identified internship approvals pending">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg cursor-help">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {stats.pending?.selfIdentifiedApprovals || 0}
-                      </div>
-                      <div className="text-xs text-text-secondary uppercase font-semibold">Approvals</div>
-                    </div>
-                  </Tooltip>
+                <div className="grid grid-cols-2 gap-3">
                   <Tooltip title="Monthly reports awaiting review">
-                    <div className="text-center p-3 bg-amber-50 rounded-lg cursor-help">
-                      <div className="text-2xl font-bold text-amber-600">
+                    <div className="text-center p-3 bg-warning/10 rounded-lg cursor-help">
+                      <div className="text-2xl font-bold text-warning">
                         {stats.pending?.monthlyReports || 0}
                       </div>
                       <div className="text-xs text-text-secondary uppercase font-semibold">Reports</div>
                     </div>
                   </Tooltip>
                   <Tooltip title="Student grievances requiring attention">
-                    <div className="text-center p-3 bg-red-50 rounded-lg cursor-help">
-                      <div className="text-2xl font-bold text-red-600">
+                    <div className="text-center p-3 bg-error/10 rounded-lg cursor-help">
+                      <div className="text-2xl font-bold text-error">
                         {stats.pending?.grievances || 0}
                       </div>
                       <div className="text-xs text-text-secondary uppercase font-semibold">Grievances</div>
@@ -410,12 +401,12 @@ const PrincipalDashboard = () => {
                 </div>
                 {totalPendingItems === 0 ? (
                   <div className="text-center py-4">
-                    <CheckCircleOutlined className="text-4xl text-green-500 mb-2" />
+                    <CheckCircleOutlined className="text-4xl text-success mb-2" />
                     <div className="text-text-secondary text-sm">All items processed!</div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-sm">
-                    <AlertOutlined className="text-orange-500" />
+                    <AlertOutlined className="text-warning" />
                     <span className="text-text-secondary">
                       {totalPendingItems} item{totalPendingItems !== 1 ? 's' : ''} require{totalPendingItems === 1 ? 's' : ''} attention
                     </span>
@@ -433,7 +424,7 @@ const PrincipalDashboard = () => {
             <Card
               title={
                 <div className="flex items-center gap-2">
-                  <TeamOutlined className="text-blue-500" />
+                  <TeamOutlined className="text-primary" />
                   <span>Mentor Coverage</span>
                 </div>
               }
@@ -444,14 +435,14 @@ const PrincipalDashboard = () => {
               {mentorCoverage ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-center p-3 bg-primary/10 rounded-lg">
+                      <div className="text-2xl font-bold text-primary">
                         {mentorCoverage.totalMentors || 0}
                       </div>
                       <div className="text-xs text-text-secondary uppercase font-semibold">Total Mentors</div>
                     </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">
+                    <div className="text-center p-3 bg-success/10 rounded-lg">
+                      <div className="text-2xl font-bold text-success">
                         {mentorCoverage.studentsWithMentors || 0}
                       </div>
                       <div className="text-xs text-text-secondary uppercase font-semibold">Students Assigned</div>
@@ -492,7 +483,7 @@ const PrincipalDashboard = () => {
             <Card
               title={
                 <div className="flex items-center gap-2">
-                  <CheckCircleOutlined className="text-green-500" />
+                  <CheckCircleOutlined className="text-success" />
                   <span>Compliance Metrics</span>
                 </div>
               }
@@ -791,8 +782,8 @@ const PrincipalDashboard = () => {
                 styles={{ body: { padding: '20px' } }}
               >
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 rounded-lg bg-indigo-500/10">
-                    <BookOutlined className="text-lg text-indigo-500" />
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <BookOutlined className="text-lg text-primary" />
                   </div>
                   <Title level={4} className="!mb-0 !text-text-primary text-lg">
                     Student Distribution
@@ -808,8 +799,8 @@ const PrincipalDashboard = () => {
                 styles={{ body: { padding: '20px' } }}
               >
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 rounded-lg bg-emerald-500/10">
-                    <TeamOutlined className="text-lg text-emerald-500" />
+                  <div className="p-2 rounded-lg bg-success/10">
+                    <TeamOutlined className="text-lg text-success" />
                   </div>
                   <Title level={4} className="!mb-0 !text-text-primary text-lg">
                     Staff Distribution

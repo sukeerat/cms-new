@@ -18,6 +18,8 @@ import {
   Descriptions,
   Timeline,
   Upload,
+  Steps,
+  Empty,
   message as antdMessage,
 } from 'antd';
 import {
@@ -28,6 +30,10 @@ import {
   AlertOutlined,
   FileTextOutlined,
   CalendarOutlined,
+  UserOutlined,
+  TeamOutlined,
+  GlobalOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { grievanceService } from '../../../services/grievance.service';
 import toast from 'react-hot-toast';
@@ -37,6 +43,13 @@ const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 const { Dragger } = Upload;
+
+// Escalation level labels and order
+const ESCALATION_LEVELS = {
+  MENTOR: { label: 'Faculty Mentor', color: 'blue', icon: <UserOutlined />, order: 0 },
+  PRINCIPAL: { label: 'Principal', color: 'orange', icon: <TeamOutlined />, order: 1 },
+  STATE_DIRECTORATE: { label: 'State Directorate', color: 'red', icon: <GlobalOutlined />, order: 2 },
+};
 
 // Constants
 const CATEGORIES = [
@@ -95,7 +108,8 @@ const SubmitGrievance = () => {
   const fetchMyGrievances = async () => {
     try {
       setLoading(true);
-      const response = await grievanceService.getByUser(userInfo.id);
+      // Use student-specific endpoint for better data including escalation chain
+      const response = await grievanceService.getByStudentId(userInfo.id);
       setGrievances(response || []);
     } catch (error) {
       console.error('Error fetching grievances:', error);
@@ -204,6 +218,34 @@ const SubmitGrievance = () => {
       render: (status) => {
         const config = getStatusConfig(status);
         return <Badge status={config.badge} text={config.label} />;
+      },
+    },
+    {
+      title: 'Current Level',
+      dataIndex: 'escalationLevel',
+      key: 'escalationLevel',
+      render: (level) => {
+        if (!level) return <Tag>Pending</Tag>;
+        const config = ESCALATION_LEVELS[level];
+        return (
+          <Tag color={config?.color} icon={config?.icon}>
+            {config?.label || level}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Assigned To',
+      dataIndex: 'assignedTo',
+      key: 'assignedTo',
+      render: (assignedTo) => {
+        if (!assignedTo) return <Text type="secondary">-</Text>;
+        return (
+          <Space size="small">
+            <UserOutlined />
+            <Text>{assignedTo.name}</Text>
+          </Space>
+        );
       },
     },
     {
@@ -507,6 +549,44 @@ const SubmitGrievance = () => {
                   className="rounded-xl border-0 shadow-sm"
                 />
 
+                {/* Escalation Chain Visualization */}
+                <div className="bg-background-tertiary/30 p-5 rounded-2xl border border-border/60">
+                  <Title level={5} className="!mb-4 text-xs uppercase tracking-widest text-text-tertiary font-bold">
+                    Escalation Progress
+                  </Title>
+                  <Steps
+                    current={ESCALATION_LEVELS[selectedGrievance.escalationLevel]?.order ?? -1}
+                    size="small"
+                    items={[
+                      {
+                        title: 'Faculty Mentor',
+                        description: selectedGrievance.escalationLevel === 'MENTOR' ? 'Current Level' : '',
+                        icon: <UserOutlined />,
+                      },
+                      {
+                        title: 'Principal',
+                        description: selectedGrievance.escalationLevel === 'PRINCIPAL' ? 'Current Level' : '',
+                        icon: <TeamOutlined />,
+                      },
+                      {
+                        title: 'State Directorate',
+                        description: selectedGrievance.escalationLevel === 'STATE_DIRECTORATE' ? 'Current Level' : '',
+                        icon: <GlobalOutlined />,
+                      },
+                    ]}
+                  />
+                  {selectedGrievance.assignedTo && (
+                    <div className="mt-4 pt-4 border-t border-border/50">
+                      <Text className="text-xs text-text-tertiary">Currently Assigned To:</Text>
+                      <div className="flex items-center gap-2 mt-1">
+                        <UserOutlined className="text-primary" />
+                        <Text strong>{selectedGrievance.assignedTo.name}</Text>
+                        <Tag color="blue" className="ml-2">{selectedGrievance.assignedTo.role}</Tag>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="bg-surface rounded-xl border border-border/60 overflow-hidden">
                   <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border/60">
                     <div className="p-4">
@@ -553,70 +633,102 @@ const SubmitGrievance = () => {
                 <div className="pt-4 border-t border-border/50">
                   <Title level={5} className="!mb-6 text-xs uppercase tracking-widest text-text-tertiary font-bold">Status History</Title>
                   <div className="px-2">
-                    <Timeline
-                      items={[
-                        {
-                          color: "blue",
+                    {/* Show detailed status history from API if available */}
+                    {selectedGrievance.statusHistory && selectedGrievance.statusHistory.length > 0 ? (
+                      <Timeline
+                        items={selectedGrievance.statusHistory.map((history, index) => ({
+                          color: history.toStatus === 'RESOLVED' ? 'green' :
+                                 history.toStatus === 'ESCALATED' ? 'red' :
+                                 history.toStatus === 'IN_REVIEW' ? 'orange' : 'blue',
                           children: (
-                            <div className="pb-4">
-                              <Text strong className="text-text-primary">Submitted</Text>
+                            <div key={index} className="pb-2">
+                              <Text strong className="text-text-primary">{history.action}</Text>
+                              {history.escalationLevel && (
+                                <Tag color={ESCALATION_LEVELS[history.escalationLevel]?.color} className="ml-2" size="small">
+                                  {ESCALATION_LEVELS[history.escalationLevel]?.label}
+                                </Tag>
+                              )}
                               <br />
                               <Text className="text-xs text-text-secondary">
-                                {dayjs(selectedGrievance.submittedDate || selectedGrievance.createdAt).format("MMMM DD, YYYY HH:mm")}
+                                {history.changedBy?.name && `By: ${history.changedBy.name} • `}
+                                {dayjs(history.createdAt).format("MMMM DD, YYYY HH:mm")}
                               </Text>
+                              {history.remarks && (
+                                <>
+                                  <br />
+                                  <Text className="text-xs italic text-text-tertiary">"{history.remarks}"</Text>
+                                </>
+                              )}
                             </div>
                           ),
-                        },
-                        ...(selectedGrievance.addressedDate
-                          ? [
-                              {
-                                color: "orange",
-                                children: (
-                                  <div className="pb-4">
-                                    <Text strong className="text-text-primary">Under Review</Text>
-                                    <br />
-                                    <Text className="text-xs text-text-secondary">
-                                      {dayjs(selectedGrievance.addressedDate).format("MMMM DD, YYYY HH:mm")}
-                                    </Text>
-                                  </div>
-                                ),
-                              },
-                            ]
-                          : []),
-                        ...(selectedGrievance.escalatedAt
-                          ? [
-                              {
-                                color: "red",
-                                children: (
-                                  <div className="pb-4">
-                                    <Text strong className="text-text-primary">Escalated</Text>
-                                    <br />
-                                    <Text className="text-xs text-text-secondary">
-                                      {dayjs(selectedGrievance.escalatedAt).format("MMMM DD, YYYY HH:mm")}
-                                    </Text>
-                                  </div>
-                                ),
-                              },
-                            ]
-                          : []),
-                        ...(selectedGrievance.resolvedDate
-                          ? [
-                              {
-                                color: "green",
-                                children: (
-                                  <div>
-                                    <Text strong className="text-text-primary">Resolved</Text>
-                                    <br />
-                                    <Text className="text-xs text-text-secondary">
-                                      {dayjs(selectedGrievance.resolvedDate).format("MMMM DD, YYYY HH:mm")}
-                                    </Text>
-                                  </div>
-                                ),
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
+                        }))}
+                      />
+                    ) : (
+                      <Timeline
+                        items={[
+                          {
+                            color: "blue",
+                            children: (
+                              <div className="pb-4">
+                                <Text strong className="text-text-primary">Submitted</Text>
+                                <br />
+                                <Text className="text-xs text-text-secondary">
+                                  {dayjs(selectedGrievance.submittedDate || selectedGrievance.createdAt).format("MMMM DD, YYYY HH:mm")}
+                                </Text>
+                              </div>
+                            ),
+                          },
+                          ...(selectedGrievance.addressedDate
+                            ? [
+                                {
+                                  color: "orange",
+                                  children: (
+                                    <div className="pb-4">
+                                      <Text strong className="text-text-primary">Under Review</Text>
+                                      <br />
+                                      <Text className="text-xs text-text-secondary">
+                                        {dayjs(selectedGrievance.addressedDate).format("MMMM DD, YYYY HH:mm")}
+                                      </Text>
+                                    </div>
+                                  ),
+                                },
+                              ]
+                            : []),
+                          ...(selectedGrievance.escalatedAt
+                            ? [
+                                {
+                                  color: "red",
+                                  children: (
+                                    <div className="pb-4">
+                                      <Text strong className="text-text-primary">Escalated</Text>
+                                      <br />
+                                      <Text className="text-xs text-text-secondary">
+                                        {dayjs(selectedGrievance.escalatedAt).format("MMMM DD, YYYY HH:mm")}
+                                      </Text>
+                                    </div>
+                                  ),
+                                },
+                              ]
+                            : []),
+                          ...(selectedGrievance.resolvedDate
+                            ? [
+                                {
+                                  color: "green",
+                                  children: (
+                                    <div>
+                                      <Text strong className="text-text-primary">Resolved</Text>
+                                      <br />
+                                      <Text className="text-xs text-text-secondary">
+                                        {dayjs(selectedGrievance.resolvedDate).format("MMMM DD, YYYY HH:mm")}
+                                      </Text>
+                                    </div>
+                                  ),
+                                },
+                              ]
+                            : []),
+                        ]}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

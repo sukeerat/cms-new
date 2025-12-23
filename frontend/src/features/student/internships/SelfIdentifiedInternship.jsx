@@ -14,8 +14,9 @@ import {
   Spin,
   Row,
   Col,
+  Typography,
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { UploadOutlined, PlusOutlined } from "@ant-design/icons";
 import { useDispatch, useSelector } from "react-redux";
 import API from "../../../services/api";
 import {
@@ -27,6 +28,7 @@ import { toast } from "react-hot-toast";
 
 const { TextArea } = Input;
 const { Option } = Select;
+const { Title, Paragraph, Text } = Typography;
 
 const SelfIdentifiedInternship = () => {
   const dispatch = useDispatch();
@@ -120,7 +122,7 @@ const SelfIdentifiedInternship = () => {
       // an active application. Only applications with status === 'WITHDRAWN'
       // are allowed to be replaced.
       try {
-        const res = await API.get(`/internship-applications/my-applications`);
+        const res = await API.get(`/student/applications`);
         const apps = (res.data && (res.data.data || res.data)) || [];
         const hasActive = apps.some((a) => (a.status || "").toUpperCase() !== "WITHDRAWN");
         if (hasActive) {
@@ -218,9 +220,9 @@ const SelfIdentifiedInternship = () => {
         }
       }
 
-      // Submit to backend
+      // Submit to backend - correct endpoint is /student/self-identified
       const response = await API.post(
-        "/self-identified-internships",
+        "/student/self-identified",
         formData,
         {
           headers: {
@@ -438,6 +440,67 @@ const SelfIdentifiedInternship = () => {
 
             <div className="mb-8">
               <Divider plain className="!m-0 !mb-6">
+                <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest px-2">HR / Contact Person Details</Text>
+              </Divider>
+
+              <Row gutter={24}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">HR / Contact Person Name</span>}
+                    name="hrName"
+                    rules={[{ required: true, message: "Please enter HR/contact name" }]}
+                  >
+                    <Input placeholder="e.g., John Smith" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">HR Contact Number</span>}
+                    name="hrContact"
+                    rules={[{ required: true, message: "Please enter HR contact number" }]}
+                  >
+                    <Input placeholder="Phone number" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">HR Email</span>}
+                    name="hrEmail"
+                    rules={[{ type: "email", message: "Please enter a valid email" }]}
+                  >
+                    <Input placeholder="hr@company.com" className="rounded-lg h-11 bg-background border-border" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span className="font-medium text-text-primary">Faculty Mentor</span>}
+                    name="mentorId"
+                    extra={<Text className="text-[10px] text-text-tertiary">Optional - Select your faculty mentor if assigned</Text>}
+                  >
+                    <Select
+                      placeholder="Select faculty mentor (optional)"
+                      allowClear
+                      showSearch
+                      optionFilterProp="children"
+                      loading={instituteLoading}
+                      className="rounded-lg h-11"
+                    >
+                      {facultyMentors.map((mentor) => (
+                        <Option key={mentor.id} value={mentor.id}>
+                          {mentor.name} {mentor.designation ? `(${mentor.designation})` : ''}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            <div className="mb-8">
+              <Divider plain className="!m-0 !mb-6">
                 <Text className="text-[10px] uppercase font-black text-text-tertiary tracking-widest px-2">Verification Documents</Text>
               </Divider>
 
@@ -485,8 +548,5 @@ const SelfIdentifiedInternship = () => {
     </div>
   );
 };
-    );
-
-  };
 
 export default SelfIdentifiedInternship;

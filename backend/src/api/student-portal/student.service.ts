@@ -689,11 +689,14 @@ export class StudentService {
       throw new BadRequestException('You already have an active internship application');
     }
 
+    // Self-identified internships are auto-approved
     const application = await this.prisma.internshipApplication.create({
       data: {
         studentId,
         isSelfIdentified: true,
-        status: ApplicationStatus.APPLIED,
+        status: ApplicationStatus.APPROVED,
+        internshipStatus: 'ONGOING',
+        reviewedAt: new Date(),
         ...selfIdentifiedDto,
       },
     });
@@ -729,6 +732,36 @@ export class StudentService {
         where,
         skip,
         take: limit,
+        include: {
+          mentor: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phoneNo: true,
+              designation: true,
+            },
+          },
+          internship: {
+            include: {
+              industry: {
+                select: {
+                  id: true,
+                  companyName: true,
+                  industryType: true,
+                  city: true,
+                  state: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              monthlyReports: true,
+              facultyVisitLogs: true,
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.internshipApplication.count({ where }),
@@ -929,8 +962,8 @@ export class StudentService {
   /**
    * Get monthly reports
    */
-  async getMonthlyReports(userId: string, params: { page?: number; limit?: number }) {
-    const { page = 1, limit = 10 } = params;
+  async getMonthlyReports(userId: string, params: { page?: number; limit?: number; applicationId?: string }) {
+    const { page = 1, limit = 10, applicationId } = params;
     const skip = (page - 1) * limit;
 
     const student = await this.prisma.student.findUnique({
@@ -944,9 +977,15 @@ export class StudentService {
 
     const studentId = student.id;
 
+    // Build where clause with optional applicationId filter
+    const where: any = { studentId };
+    if (applicationId) {
+      where.applicationId = applicationId;
+    }
+
     const [reports, total] = await Promise.all([
       this.prisma.monthlyReport.findMany({
-        where: { studentId },
+        where,
         skip,
         take: limit,
         include: {
@@ -969,7 +1008,7 @@ export class StudentService {
           { reportMonth: 'desc' },
         ],
       }),
-      this.prisma.monthlyReport.count({ where: { studentId } }),
+      this.prisma.monthlyReport.count({ where }),
     ]);
 
     return {

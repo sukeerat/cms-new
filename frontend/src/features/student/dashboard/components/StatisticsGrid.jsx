@@ -4,37 +4,37 @@ import {
   LaptopOutlined,
   CheckCircleOutlined,
   StarOutlined,
-  TrophyOutlined,
+  RocketOutlined,
 } from '@ant-design/icons';
 import StatCard from './StatCard';
 
 const StatisticsGrid = ({ stats }) => {
   const cardConfigs = [
     {
-      title: 'Active Applications',
+      title: 'Total Applications',
       value: stats?.totalApplications || 0,
       icon: <LaptopOutlined />,
       bgClass: 'bg-purple-500/10',
       colorClass: 'text-purple-500',
     },
     {
-      title: 'Selected',
-      value: stats?.selectedApplications || 0,
+      title: 'Ongoing Internships',
+      value: stats?.ongoingInternships || stats?.selectedApplications || 0,
       icon: <CheckCircleOutlined />,
       bgClass: 'bg-green-500/10',
       colorClass: 'text-green-500',
     },
     {
-      title: 'Completed Internships',
+      title: 'Completed',
       value: stats?.completedInternships || 0,
       icon: <StarOutlined />,
       bgClass: 'bg-pink-500/10',
       colorClass: 'text-pink-500',
     },
     {
-      title: 'Achievements',
-      value: stats?.totalAchievements || 0,
-      icon: <TrophyOutlined />,
+      title: 'Self-Identified',
+      value: stats?.selfIdentifiedCount || 0,
+      icon: <RocketOutlined />,
       bgClass: 'bg-cyan-500/10',
       colorClass: 'text-cyan-500',
     },

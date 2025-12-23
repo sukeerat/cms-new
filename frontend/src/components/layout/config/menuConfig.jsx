@@ -36,6 +36,9 @@ import {
   UploadOutlined,
   SettingOutlined,
   CarOutlined,
+  CustomerServiceOutlined,
+  QuestionCircleOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import React from 'react';
 
@@ -50,6 +53,7 @@ export const menuConfig = {
     items: [
       { key: 'state-dashboard', label: 'Dashboard', icon: <DashboardOutlined />, path: '/dashboard' },
       { key: 'institutions-overview', label: 'Institutions Overview', icon: <BankOutlined />, path: '/institutions-overview' },
+      { key: 'companies-overview', label: 'Companies Overview', icon: <ShopOutlined />, path: '/companies-overview' },
       { key: 'report-builder', label: 'Report Builder', icon: <BarChartOutlined />, path: '/reports/builder' },
       { key: 'audit-logs', label: 'Audit Logs', icon: <AuditOutlined />, path: '/audit-logs' },
     ],
@@ -193,9 +197,24 @@ export const menuConfig = {
   SUPPORT: {
     key: 'support',
     title: 'Help & Support',
-    icon: <ExclamationCircleOutlined />,
+    icon: <CustomerServiceOutlined />,
     items: [
-      { key: 'my-queries', label: 'My Queries', icon: <FileTextOutlined />, path: '/support/queries' },
+      { key: 'help-center', label: 'Help Center', icon: <QuestionCircleOutlined />, path: '/help' },
+      { key: 'my-queries', label: 'My Queries', icon: <MessageOutlined />, path: '/my-queries' },
+    ],
+  },
+
+  // ==========================================
+  // SUPPORT ADMIN (STATE_DIRECTORATE Only)
+  // ==========================================
+  SUPPORT_ADMIN: {
+    key: 'support-admin',
+    title: 'Support Management',
+    icon: <CustomerServiceOutlined />,
+    items: [
+      { key: 'support-dashboard', label: 'Support Dashboard', icon: <DashboardOutlined />, path: '/support-dashboard' },
+      { key: 'help-center', label: 'Help Center', icon: <QuestionCircleOutlined />, path: '/help' },
+      { key: 'my-queries', label: 'My Queries', icon: <MessageOutlined />, path: '/my-queries' },
     ],
   },
 };
@@ -246,8 +265,13 @@ export const getMenuSectionsForRole = (role) => {
   }
 
   // Add Support menu for all logged-in users
+  // STATE_DIRECTORATE gets the admin version with Support Dashboard
   if (role) {
-    sections.push(menuConfig.SUPPORT);
+    if (role === 'STATE_DIRECTORATE') {
+      sections.push(menuConfig.SUPPORT_ADMIN);
+    } else {
+      sections.push(menuConfig.SUPPORT);
+    }
   }
 
   return sections;

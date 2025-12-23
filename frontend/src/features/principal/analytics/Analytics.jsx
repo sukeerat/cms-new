@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { EyeOutlined, MailOutlined } from '@ant-design/icons';
+import { Modal, Descriptions } from 'antd';
 import {
   Card,
   Row,
@@ -107,9 +109,9 @@ const Analytics = () => {
     token.colorWarning,
     token.colorError,
     token.colorInfo,
-    '#722ed1',
-    '#eb2f96',
-    '#13c2c2',
+    'rgb(114, 46, 209)', // Purple
+    'rgb(235, 47, 150)', // Pink
+    'rgb(19, 194, 194)', // Cyan
   ];
 
   const [loading, setLoading] = useState(true);
@@ -120,6 +122,12 @@ const Analytics = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [chartView, setChartView] = useState('monthly');
   const [exporting, setExporting] = useState(false);
+
+  // Modal states for detailed views
+  const [mentorDetailModal, setMentorDetailModal] = useState({ visible: false, mentor: null });
+  const [companyDetailModal, setCompanyDetailModal] = useState({ visible: false, company: null });
+  const [allMentorsModal, setAllMentorsModal] = useState(false);
+  const [allCompaniesModal, setAllCompaniesModal] = useState(false);
 
   // Get institution ID from localStorage
   const getInstitutionId = () => {
@@ -151,18 +159,17 @@ const Analytics = () => {
       setLoading(true);
       const institutionId = getInstitutionId();
 
-      const [analyticsData, internshipStatsData, placementStats, dashboard] = await Promise.all([
+      // All services now return unwrapped data
+      const [analyticsData, internshipStatsData, dashboard] = await Promise.all([
         analyticsService.getInstitutionAnalytics(institutionId),
         analyticsService.getInternshipStats(institutionId),
-        analyticsService.getPlacementStats(institutionId),
         principalService.getDashboard(),
       ]);
 
       setAnalytics({
-        ...(analyticsData.data || analyticsData),
-        internshipStats: internshipStatsData.data || internshipStatsData,
-        placementStats: placementStats.data || placementStats,
-        dashboard: dashboard.data || dashboard,
+        ...analyticsData,
+        internshipStats: internshipStatsData,
+        dashboard: dashboard,
       });
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
@@ -250,46 +257,43 @@ const Analytics = () => {
   // Overview Tab Content
   const renderOverviewTab = () => (
     <div className="space-y-6">
-      {/* Key Metrics */}
+      {/* Key Metrics - Self-Identified Internships Focus */}
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <KPICard
             title="Total Students"
-            value={analytics?.totalStudents || 0}
+            value={analytics?.dashboard?.students?.total || analytics?.totalStudents || 0}
             icon={<UserOutlined />}
             color={token.colorPrimary}
-            trend={calculateTrend(analytics?.totalStudents, analytics?.previousStudents)}
-            subValue={`${analytics?.activeInternships || 0} in active internship`}
+            subValue={`${analytics?.dashboard?.internships?.totalApplications || 0} with internships`}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <KPICard
-            title="Active Internships"
-            value={analytics?.activeInternships || 0}
+            title="Total Internships"
+            value={analytics?.dashboard?.internships?.totalApplications || 0}
             icon={<BankOutlined />}
             color={token.colorSuccess}
-            trend={calculateTrend(analytics?.activeInternships, analytics?.previousInternships)}
-            subValue={`${internshipStats?.byStatus?.find(s => s.status === 'Completed')?.count || 0} completed`}
+            subValue="Self-identified (auto-approved)"
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <KPICard
-            title="Completion Rate"
-            value={analytics?.completionRate || 0}
-            suffix="%"
-            icon={<CheckCircleOutlined />}
+            title="Ongoing"
+            value={analytics?.dashboard?.internships?.ongoingInternships || 0}
+            icon={<ClockCircleOutlined />}
             color={token.colorWarning}
-            trend={calculateTrend(analytics?.completionRate, analytics?.previousCompletionRate)}
+            subValue="Currently in progress"
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <KPICard
-            title="Placement Rate"
-            value={analytics?.placementRate || 0}
-            suffix="%"
-            icon={<TrophyOutlined />}
-            color="#722ed1"
-            trend={calculateTrend(analytics?.placementRate, analytics?.previousPlacementRate)}
+            title="Completed"
+            value={analytics?.dashboard?.internships?.completedInternships || 0}
+            icon={<CheckCircleOutlined />}
+            color="rgb(114, 46, 209)"
+            suffix={analytics?.dashboard?.internships?.totalApplications > 0 ? ` (${analytics?.dashboard?.internships?.completionRate || 0}%)` : ''}
+            subValue="Successfully finished"
           />
         </Col>
       </Row>
@@ -302,23 +306,23 @@ const Analytics = () => {
             value={mentorCoverage?.coveragePercentage || 0}
             suffix="%"
             icon={<TeamOutlined />}
-            color="#13c2c2"
+            color="rgb(19, 194, 194)"
             subValue={`${mentorCoverage?.totalMentors || 0} mentors assigned`}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <KPICard
             title="Report Submission"
-            value={complianceMetrics?.reportSubmission || 0}
+            value={complianceMetrics?.currentMonth?.reportComplianceRate || 0}
             suffix="%"
             icon={<FileTextOutlined />}
-            color="#eb2f96"
+            color="rgb(235, 47, 150)"
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <KPICard
             title="Faculty Visits"
-            value={complianceMetrics?.facultyVisits || 0}
+            value={complianceMetrics?.currentMonth?.visitComplianceRate || 0}
             suffix="%"
             icon={<CarOutlined />}
             color={token.colorInfo}
@@ -327,7 +331,7 @@ const Analytics = () => {
         <Col xs={24} sm={12} lg={6}>
           <KPICard
             title="Overall Compliance"
-            value={complianceMetrics?.overallCompliance || 0}
+            value={complianceMetrics?.currentMonth?.overallScore || 0}
             suffix="%"
             icon={<SafetyCertificateOutlined />}
             color={token.colorSuccess}
@@ -623,6 +627,16 @@ const Analytics = () => {
               <span className="font-semibold">Top Hiring Companies</span>
             </div>
           }
+          extra={
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => setAllCompaniesModal(true)}
+              className="text-primary"
+            >
+              View All ({companyData.length})
+            </Button>
+          }
         >
           <Table
             dataSource={companyData.slice(0, 10)}
@@ -673,6 +687,22 @@ const Analytics = () => {
                 key: 'location',
                 render: (loc) => <Text className="text-text-secondary text-sm">{loc || 'N/A'}</Text>,
               },
+              {
+                title: '',
+                key: 'action',
+                width: 60,
+                render: (_, record) => (
+                  <Tooltip title="View Details">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={() => setCompanyDetailModal({ visible: true, company: record })}
+                      className="text-primary"
+                    />
+                  </Tooltip>
+                ),
+              },
             ]}
           />
         </Card>
@@ -682,9 +712,13 @@ const Analytics = () => {
 
   // Compliance Tab Content
   const renderComplianceTab = () => {
+    const reportRate = complianceMetrics?.currentMonth?.reportComplianceRate || 0;
+    const visitRate = complianceMetrics?.currentMonth?.visitComplianceRate || 0;
+    const overallScore = complianceMetrics?.currentMonth?.overallScore || 0;
+
     const complianceData = [
-      { subject: 'Report Submission', A: complianceMetrics?.reportSubmission || 0, fullMark: 100 },
-      { subject: 'Faculty Visits', A: complianceMetrics?.facultyVisits || 0, fullMark: 100 },
+      { subject: 'Report Submission', A: reportRate, fullMark: 100 },
+      { subject: 'Faculty Visits', A: visitRate, fullMark: 100 },
       { subject: 'Mentor Coverage', A: mentorCoverage?.coveragePercentage || 0, fullMark: 100 },
       { subject: 'Document Completion', A: 85, fullMark: 100 },
       { subject: 'Timely Submissions', A: 78, fullMark: 100 },
@@ -731,13 +765,13 @@ const Analytics = () => {
               <Card className="rounded-2xl border-border shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <Text className="font-semibold text-text-primary">Report Submission Rate</Text>
-                  <Tag color={complianceMetrics?.reportSubmission >= 80 ? 'success' : 'warning'}>
-                    {complianceMetrics?.reportSubmission >= 80 ? 'On Track' : 'Needs Attention'}
+                  <Tag color={reportRate >= 80 ? 'success' : 'warning'}>
+                    {reportRate >= 80 ? 'On Track' : 'Needs Attention'}
                   </Tag>
                 </div>
                 <Progress
-                  percent={complianceMetrics?.reportSubmission || 0}
-                  strokeColor={complianceMetrics?.reportSubmission >= 80 ? token.colorSuccess : token.colorWarning}
+                  percent={reportRate}
+                  strokeColor={reportRate >= 80 ? token.colorSuccess : token.colorWarning}
                   strokeWidth={12}
                   className="mb-2"
                 />
@@ -746,13 +780,13 @@ const Analytics = () => {
               <Card className="rounded-2xl border-border shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <Text className="font-semibold text-text-primary">Faculty Visit Compliance</Text>
-                  <Tag color={complianceMetrics?.facultyVisits >= 80 ? 'success' : 'warning'}>
-                    {complianceMetrics?.facultyVisits >= 80 ? 'On Track' : 'Needs Attention'}
+                  <Tag color={visitRate >= 80 ? 'success' : 'warning'}>
+                    {visitRate >= 80 ? 'On Track' : 'Needs Attention'}
                   </Tag>
                 </div>
                 <Progress
-                  percent={complianceMetrics?.facultyVisits || 0}
-                  strokeColor={complianceMetrics?.facultyVisits >= 80 ? token.colorSuccess : token.colorWarning}
+                  percent={visitRate}
+                  strokeColor={visitRate >= 80 ? token.colorSuccess : token.colorWarning}
                   strokeWidth={12}
                   className="mb-2"
                 />
@@ -762,11 +796,11 @@ const Analytics = () => {
                 <div className="flex items-center justify-between mb-3">
                   <Text className="font-semibold text-text-primary">Overall Compliance Score</Text>
                   <Text className="text-2xl font-bold" style={{ color: token.colorSuccess }}>
-                    {complianceMetrics?.overallCompliance || 0}%
+                    {overallScore}%
                   </Text>
                 </div>
                 <Progress
-                  percent={complianceMetrics?.overallCompliance || 0}
+                  percent={overallScore}
                   strokeColor={{
                     '0%': token.colorWarning,
                     '50%': token.colorPrimary,
@@ -796,8 +830,8 @@ const Analytics = () => {
               <YAxis tick={{ fontSize: 12, fill: '#666' }} domain={[0, 100]} />
               <RechartsTooltip />
               <Legend />
-              <Bar dataKey="reportSubmission" name="Report Submission" fill={token.colorPrimary} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="facultyVisits" name="Faculty Visits" fill={token.colorSuccess} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="reportCompliance" name="Report Submission" fill={token.colorPrimary} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="visitCompliance" name="Faculty Visits" fill={token.colorSuccess} radius={[4, 4, 0, 0]} />
               <Line type="monotone" dataKey="overallScore" name="Overall Score" stroke={token.colorWarning} strokeWidth={3} dot={{ r: 4 }} />
             </ComposedChart>
           </ResponsiveContainer>
@@ -808,7 +842,14 @@ const Analytics = () => {
 
   // Mentor Tab Content
   const renderMentorTab = () => {
-    const mentorLoad = mentorCoverage?.mentorLoad || [];
+    // Fix: Use mentorLoadDistribution from API response
+    const mentorLoad = mentorCoverage?.mentorLoadDistribution || mentorCoverage?.mentorLoad || [];
+    // Transform data for chart - API returns assignedStudents, chart expects studentCount
+    const chartData = mentorLoad.map(m => ({
+      ...m,
+      name: m.mentorName || m.name,
+      studentCount: m.assignedStudents ?? m.studentCount ?? 0,
+    }));
 
     return (
       <div className="space-y-6">
@@ -827,7 +868,7 @@ const Analytics = () => {
             <Card className="rounded-2xl border-border shadow-sm text-center">
               <Statistic
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Students Assigned</Text>}
-                value={mentorCoverage?.assignedStudents || 0}
+                value={mentorCoverage?.studentsWithMentors || mentorCoverage?.assignedStudents || 0}
                 prefix={<UserOutlined className="text-success mr-2" />}
                 valueStyle={{ color: token.colorSuccess, fontWeight: 'bold' }}
               />
@@ -857,9 +898,19 @@ const Analytics = () => {
                   <span className="font-semibold">Mentor Load Distribution</span>
                 </div>
               }
+              extra={
+                <Button
+                  type="text"
+                  icon={<EyeOutlined />}
+                  onClick={() => setAllMentorsModal(true)}
+                  className="text-primary"
+                >
+                  View All ({mentorLoad.length})
+                </Button>
+              }
             >
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={mentorLoad.slice(0, 10)}>
+                <BarChart data={chartData.slice(0, 10)}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#666' }} angle={-45} textAnchor="end" height={60} />
                   <YAxis tick={{ fontSize: 12, fill: '#666' }} />
@@ -869,7 +920,7 @@ const Analytics = () => {
                     name="Students"
                     radius={[6, 6, 0, 0]}
                   >
-                    {mentorLoad.slice(0, 10).map((entry, index) => {
+                    {chartData.slice(0, 10).map((entry, index) => {
                       let color = token.colorSuccess;
                       if (entry.studentCount > 20) color = token.colorError;
                       else if (entry.studentCount > 15) color = token.colorWarning;
@@ -895,7 +946,7 @@ const Analytics = () => {
               styles={{ body: { maxHeight: 350, overflow: 'auto' } }}
             >
               <List
-                dataSource={mentorLoad.slice(0, 10)}
+                dataSource={chartData.slice(0, 10)}
                 renderItem={(mentor) => {
                   const loadStatus = mentor.studentCount > 20 ? 'error' : mentor.studentCount > 15 ? 'warning' : 'success';
                   const loadLabel = mentor.studentCount > 20 ? 'Overloaded' : mentor.studentCount > 15 ? 'Heavy' : mentor.studentCount > 10 ? 'Optimal' : 'Light';
@@ -907,135 +958,30 @@ const Analytics = () => {
                           <Avatar icon={<UserOutlined />} className="bg-primary/10 text-primary" />
                           <div>
                             <Text className="font-medium text-text-primary block">{mentor.name}</Text>
-                            <Text className="text-xs text-text-tertiary">{mentor.department || 'Faculty'}</Text>
+                            <Text className="text-xs text-text-tertiary">{mentor.mentorEmail || mentor.department || 'Faculty'}</Text>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
+                        <div className="flex items-center gap-2">
+                          <div className="text-right mr-2">
                             <Text className="font-bold text-text-primary block">{mentor.studentCount}</Text>
                             <Text className="text-[10px] text-text-tertiary uppercase">Students</Text>
                           </div>
                           <Tag color={loadStatus} className="rounded-full px-3">{loadLabel}</Tag>
+                          <Tooltip title="View Details">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EyeOutlined />}
+                              onClick={() => setMentorDetailModal({ visible: true, mentor })}
+                              className="text-primary"
+                            />
+                          </Tooltip>
                         </div>
                       </div>
                     </List.Item>
                   );
                 }}
               />
-            </Card>
-          </Col>
-        </Row>
-      </div>
-    );
-  };
-
-  // Placement Tab Content
-  const renderPlacementTab = () => {
-    const placementData = analytics?.placementBySector || [];
-
-    return (
-      <div className="space-y-6">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={8}>
-            <Card className="rounded-2xl border-border shadow-sm text-center">
-              <Statistic
-                title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Placed</Text>}
-                value={analytics?.placementStats?.totalPlaced || 0}
-                prefix={<TrophyOutlined className="text-success mr-2" />}
-                valueStyle={{ color: token.colorSuccess, fontWeight: 'bold' }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card className="rounded-2xl border-border shadow-sm text-center">
-              <Statistic
-                title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Placement Rate</Text>}
-                value={analytics?.placementRate || 0}
-                suffix="%"
-                prefix={<RiseOutlined className="text-primary mr-2" />}
-                valueStyle={{ color: token.colorPrimary, fontWeight: 'bold' }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card className="rounded-2xl border-border shadow-sm text-center">
-              <Statistic
-                title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Avg. Package (LPA)</Text>}
-                value={analytics?.placementStats?.avgPackage || 0}
-                precision={1}
-                prefix={<FundOutlined className="text-warning mr-2" />}
-                valueStyle={{ color: token.colorWarning, fontWeight: 'bold' }}
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        <Row gutter={[24, 24]}>
-          {/* Placement by Sector */}
-          <Col xs={24} lg={12}>
-            <Card
-              className="rounded-2xl border-border shadow-sm h-full"
-              title={
-                <div className="flex items-center gap-2 text-text-primary">
-                  <PieChartOutlined className="text-primary" />
-                  <span className="font-semibold">Placement by Industry Sector</span>
-                </div>
-              }
-            >
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={placementData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={120}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {placementData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip />
-                  <Legend verticalAlign="bottom" />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card>
-          </Col>
-
-          {/* Placement Trend */}
-          <Col xs={24} lg={12}>
-            <Card
-              className="rounded-2xl border-border shadow-sm h-full"
-              title={
-                <div className="flex items-center gap-2 text-text-primary">
-                  <LineChartOutlined className="text-success" />
-                  <span className="font-semibold">Placement Trend</span>
-                </div>
-              }
-            >
-              <ResponsiveContainer width="100%" height={350}>
-                <AreaChart
-                  data={[
-                    { month: 'Jul', placed: 5, target: 10 },
-                    { month: 'Aug', placed: 12, target: 15 },
-                    { month: 'Sep', placed: 25, target: 20 },
-                    { month: 'Oct', placed: 38, target: 30 },
-                    { month: 'Nov', placed: 52, target: 45 },
-                    { month: 'Dec', placed: 68, target: 60 },
-                  ]}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#666' }} />
-                  <YAxis tick={{ fontSize: 12, fill: '#666' }} />
-                  <RechartsTooltip />
-                  <Legend />
-                  <Area type="monotone" dataKey="target" name="Target" stroke="#999" fill="rgba(0,0,0,0.1)" strokeDasharray="5 5" />
-                  <Area type="monotone" dataKey="placed" name="Placed" stroke={token.colorSuccess} fill={`${token.colorSuccess}40`} />
-                </AreaChart>
-              </ResponsiveContainer>
             </Card>
           </Col>
         </Row>
@@ -1060,7 +1006,7 @@ const Analytics = () => {
       label: (
         <span className="flex items-center gap-2">
           <BankOutlined />
-          Internships
+          Self-Identified Internships
         </span>
       ),
       children: renderInternshipsTab(),
@@ -1084,16 +1030,6 @@ const Analytics = () => {
         </span>
       ),
       children: renderMentorTab(),
-    },
-    {
-      key: 'placements',
-      label: (
-        <span className="flex items-center gap-2">
-          <TrophyOutlined />
-          Placements
-        </span>
-      ),
-      children: renderPlacementTab(),
     },
   ];
 
@@ -1199,6 +1135,240 @@ const Analytics = () => {
         size="large"
         className="analytics-tabs"
       />
+
+      {/* Mentor Detail Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <Avatar icon={<UserOutlined />} className="bg-primary/10 text-primary" />
+            <span>Mentor Details</span>
+          </div>
+        }
+        open={mentorDetailModal.visible}
+        onCancel={() => setMentorDetailModal({ visible: false, mentor: null })}
+        footer={null}
+        width={500}
+      >
+        {mentorDetailModal.mentor && (
+          <Descriptions column={1} bordered size="small" className="mt-4">
+            <Descriptions.Item label="Name">
+              <Text strong>{mentorDetailModal.mentor.mentorName || mentorDetailModal.mentor.name}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Email">
+              <a href={`mailto:${mentorDetailModal.mentor.mentorEmail}`}>
+                <MailOutlined className="mr-2" />
+                {mentorDetailModal.mentor.mentorEmail || 'N/A'}
+              </a>
+            </Descriptions.Item>
+            <Descriptions.Item label="Mentor ID">
+              <Text copyable className="text-xs font-mono">
+                {mentorDetailModal.mentor.mentorId || 'N/A'}
+              </Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Students Assigned">
+              <Tag color="blue" className="text-lg px-3 py-1">
+                {mentorDetailModal.mentor.assignedStudents ?? mentorDetailModal.mentor.studentCount ?? 0}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Load Status">
+              {(() => {
+                const count = mentorDetailModal.mentor.assignedStudents ?? mentorDetailModal.mentor.studentCount ?? 0;
+                const status = count > 20 ? 'error' : count > 15 ? 'warning' : 'success';
+                const label = count > 20 ? 'Overloaded' : count > 15 ? 'Heavy' : count > 10 ? 'Optimal' : 'Light';
+                return <Tag color={status}>{label}</Tag>;
+              })()}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* All Mentors Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <TeamOutlined className="text-primary" />
+            <span>All Mentors ({mentorCoverage?.mentorLoadDistribution?.length || 0})</span>
+          </div>
+        }
+        open={allMentorsModal}
+        onCancel={() => setAllMentorsModal(false)}
+        footer={null}
+        width={800}
+      >
+        <Table
+          dataSource={mentorCoverage?.mentorLoadDistribution || []}
+          rowKey="mentorId"
+          size="small"
+          pagination={{ pageSize: 10 }}
+          columns={[
+            {
+              title: 'Mentor',
+              key: 'mentor',
+              render: (_, record) => (
+                <div className="flex items-center gap-2">
+                  <Avatar size="small" icon={<UserOutlined />} className="bg-primary/10 text-primary" />
+                  <div>
+                    <Text className="font-medium block">{record.mentorName}</Text>
+                    <Text className="text-xs text-text-tertiary">{record.mentorEmail}</Text>
+                  </div>
+                </div>
+              ),
+            },
+            {
+              title: 'Students',
+              dataIndex: 'assignedStudents',
+              key: 'students',
+              width: 100,
+              sorter: (a, b) => a.assignedStudents - b.assignedStudents,
+              render: (val) => <Tag color="blue">{val}</Tag>,
+            },
+            {
+              title: 'Load',
+              key: 'load',
+              width: 100,
+              render: (_, record) => {
+                const count = record.assignedStudents;
+                const status = count > 20 ? 'error' : count > 15 ? 'warning' : count > 5 ? 'processing' : 'success';
+                const label = count > 20 ? 'Overloaded' : count > 15 ? 'Heavy' : count > 5 ? 'Optimal' : 'Light';
+                return <Tag color={status}>{label}</Tag>;
+              },
+            },
+            {
+              title: 'Action',
+              key: 'action',
+              width: 80,
+              render: (_, record) => (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EyeOutlined />}
+                  onClick={() => {
+                    setAllMentorsModal(false);
+                    setMentorDetailModal({ visible: true, mentor: record });
+                  }}
+                />
+              ),
+            },
+          ]}
+        />
+      </Modal>
+
+      {/* Company Detail Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <BankOutlined className="text-success" />
+            <span>Company Details</span>
+          </div>
+        }
+        open={companyDetailModal.visible}
+        onCancel={() => setCompanyDetailModal({ visible: false, company: null })}
+        footer={null}
+        width={500}
+      >
+        {companyDetailModal.company && (
+          <Descriptions column={1} bordered size="small" className="mt-4">
+            <Descriptions.Item label="Company Name">
+              <Text strong>{companyDetailModal.company.name}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Location">
+              {companyDetailModal.company.location || 'N/A'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Industry Type">
+              <Tag color="blue">{companyDetailModal.company.industryType || 'Other'}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Interns Count">
+              <Tag color="green" className="text-lg px-3 py-1">
+                {companyDetailModal.company.count || 0}
+              </Tag>
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* All Companies Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <BankOutlined className="text-success" />
+            <span>All Partner Companies ({internshipStats?.byCompany?.length || 0})</span>
+          </div>
+        }
+        open={allCompaniesModal}
+        onCancel={() => setAllCompaniesModal(false)}
+        footer={null}
+        width={900}
+      >
+        <Table
+          dataSource={internshipStats?.byCompany || []}
+          rowKey="name"
+          size="small"
+          pagination={{ pageSize: 10 }}
+          columns={[
+            {
+              title: 'Rank',
+              key: 'rank',
+              width: 60,
+              render: (_, __, index) => (
+                <Badge
+                  count={index + 1}
+                  color={index < 3 ? ['#faad14', '#a0a0a0', '#d48806'][index] : 'default'}
+                  showZero
+                />
+              ),
+            },
+            {
+              title: 'Company',
+              dataIndex: 'name',
+              key: 'name',
+              render: (text) => (
+                <div className="flex items-center gap-2">
+                  <Avatar size="small" icon={<BankOutlined />} className="bg-success/10 text-success" />
+                  <Text className="font-medium">{text}</Text>
+                </div>
+              ),
+            },
+            {
+              title: 'Interns',
+              dataIndex: 'count',
+              key: 'count',
+              width: 80,
+              sorter: (a, b) => a.count - b.count,
+              render: (count) => <Tag color="blue">{count}</Tag>,
+            },
+            {
+              title: 'Industry',
+              dataIndex: 'industryType',
+              key: 'industryType',
+              width: 100,
+              render: (type) => <Tag>{type || 'Other'}</Tag>,
+            },
+            {
+              title: 'Location',
+              dataIndex: 'location',
+              key: 'location',
+              ellipsis: true,
+              render: (loc) => <Text className="text-text-secondary text-sm">{loc || 'N/A'}</Text>,
+            },
+            {
+              title: 'Action',
+              key: 'action',
+              width: 80,
+              render: (_, record) => (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EyeOutlined />}
+                  onClick={() => {
+                    setAllCompaniesModal(false);
+                    setCompanyDetailModal({ visible: true, company: record });
+                  }}
+                />
+              ),
+            },
+          ]}
+        />
+      </Modal>
     </div>
   );
 };
@@ -1208,11 +1378,9 @@ const getMockData = () => ({
   totalStudents: 450,
   activeInternships: 325,
   completionRate: 72,
-  placementRate: 68,
   previousStudents: 420,
   previousInternships: 300,
   previousCompletionRate: 65,
-  previousPlacementRate: 62,
   studentsByBatch: [
     { batch: '2021', students: 95 },
     { batch: '2022', students: 120 },
@@ -1233,17 +1401,6 @@ const getMockData = () => ({
     { month: 'Nov', completed: 65, inProgress: 70 },
     { month: 'Dec', completed: 75, inProgress: 80 },
   ],
-  placementBySector: [
-    { name: 'IT Services', value: 120 },
-    { name: 'Manufacturing', value: 80 },
-    { name: 'Healthcare', value: 45 },
-    { name: 'Finance', value: 55 },
-    { name: 'Education', value: 30 },
-  ],
-  placementStats: {
-    totalPlaced: 180,
-    avgPackage: 4.5,
-  },
 });
 
 export default Analytics;

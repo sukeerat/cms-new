@@ -43,13 +43,13 @@ const StudentsList = ({
       width: "25%",
       render: (_, record) => (
         <div>
-          <Text strong className="text-blue-600">
+          <Text strong className="text-primary">
             {record.student?.name || "N/A"}
           </Text>
-          <Text className="text-gray-500 block text-sm">
+          <Text className="text-text-secondary block text-sm">
             Roll No: {record.student?.rollNumber || "N/A"}
           </Text>
-          <Text className="text-gray-500 block text-sm">
+          <Text className="text-text-secondary block text-sm">
             {record.student?.branchName || "N/A"}
           </Text>
           <div className="flex items-center mt-1">
@@ -72,12 +72,12 @@ const StudentsList = ({
       render: (_, record) => (
         <div>
           <div className="flex items-center mb-1">
-            <PhoneOutlined className="text-gray-400 mr-1" />
+            <PhoneOutlined className="text-text-tertiary mr-1" />
             <Text className="text-sm">{record.student?.contact || "N/A"}</Text>
           </div>
           <div className="flex items-center">
-            <MailOutlined className="text-gray-400 mr-1" />
-            <Text className="text-blue-500 text-sm">
+            <MailOutlined className="text-text-tertiary mr-1" />
+            <Text className="text-primary text-sm">
               {record.student?.email || "N/A"}
             </Text>
           </div>
@@ -94,7 +94,7 @@ const StudentsList = ({
         if (applications.length === 0) {
           return (
             <div className="text-center py-2">
-              <Text className="text-gray-400 text-sm">No applications</Text>
+              <Text className="text-text-tertiary text-sm">No applications</Text>
             </div>
           );
         }
@@ -134,7 +134,7 @@ const StudentsList = ({
                   {/* Company/Industry Info for regular internships */}
                   {!isSelfIdentified &&
                     app.internship?.industry?.companyName && (
-                      <Text className="text-gray-600 text-xs block">
+                      <Text className="text-text-secondary text-xs block">
                         {app.internship.industry.companyName}
                       </Text>
                     )}
@@ -173,11 +173,11 @@ const StudentsList = ({
 
                   {/* Additional Info */}
                   <div className="flex gap-3 mt-2 flex-wrap">
-                    <Text className="text-xs text-gray-400">
+                    <Text className="text-xs text-text-tertiary">
                       Applied: {dayjs(app.applicationDate).format("MMM DD")}
                     </Text>
                     {app.proposedFirstVisit && (
-                      <Text className="text-xs text-gray-400">
+                      <Text className="text-xs text-text-tertiary">
                         First Visit:{" "}
                         {dayjs(app.proposedFirstVisit).format("MMM DD")}
                       </Text>
@@ -187,7 +187,7 @@ const StudentsList = ({
               );
             })}
             {applications.length > 2 && (
-              <Text className="text-xs text-blue-500">
+              <Text className="text-xs text-primary">
                 +{applications.length - 2} more applications
               </Text>
             )}
@@ -232,7 +232,7 @@ const StudentsList = ({
                     {/* Show the latest visit date if available */}
                     {app.facultyVisitLogs &&
                       app.facultyVisitLogs.length > 0 && (
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-text-secondary mt-1">
                           Last:{" "}
                           {dayjs(
                             app.facultyVisitLogs[
@@ -244,7 +244,7 @@ const StudentsList = ({
 
                     {/* Show internship title for context */}
                     <div
-                      className="text-xs text-gray-400 truncate"
+                      className="text-xs text-text-tertiary truncate"
                       style={{ maxWidth: "120px" }}
                     >
                       {app.internship?.title || app.companyName || "N/A"}
@@ -253,7 +253,7 @@ const StudentsList = ({
                 );
               })
             ) : (
-              <Text className="text-xs text-gray-400">No Applications</Text>
+              <Text className="text-xs text-text-tertiary">No Applications</Text>
             )}
           </div>
         );
@@ -271,7 +271,7 @@ const StudentsList = ({
           </Tag>
           {record.assignmentReason && (
             <Tooltip title={record.assignmentReason}>
-              <InfoCircleOutlined className="text-gray-400 text-xs" />
+              <InfoCircleOutlined className="text-text-tertiary text-xs" />
             </Tooltip>
           )}
         </div>
@@ -439,7 +439,7 @@ const StudentsList = ({
   return (
     <div>
       <div className="mb-4">
-        <Text className="text-gray-600">
+        <Text className="text-text-secondary">
           Monitor your assigned students' internship progress and schedule
           industry visits.
         </Text>

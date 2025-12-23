@@ -98,33 +98,30 @@ const InternshipCompaniesCard = () => {
     dispatch(fetchInternshipStats());
   }, [dispatch]);
 
-  // Memoized company data extraction
+  // Memoized company data extraction - aligned with backend getInternshipStats() response
   const {
     companies,
     industryDistribution,
     totalCompanies,
     totalInterns,
-    statusBreakdown,
     ongoingCount,
     completedCount,
-    approvalRate
   } = useMemo(() => {
     const companiesData = stats?.byCompany || [];
     const industryData = stats?.byIndustry || [];
-    const statusData = stats?.byStatus || [];
 
-    const ongoing = statusData.find(s => s.status === 'APPROVED' || s.status === 'JOINED')?.count || 0;
-    const completed = statusData.find(s => s.status === 'COMPLETED')?.count || 0;
+    // Backend returns individual status counts: joined, selected, completed, etc.
+    const ongoing = (stats?.joined || 0) + (stats?.selected || 0);
+    const completed = stats?.completed || 0;
+    const total = stats?.total || companiesData.reduce((sum, c) => sum + (c.count || 0), 0);
 
     return {
       companies: companiesData,
       industryDistribution: industryData,
       totalCompanies: companiesData.length,
-      totalInterns: companiesData.reduce((sum, c) => sum + (c.count || 0), 0),
-      statusBreakdown: statusData,
-      ongoingCount: stats?.ongoingInternships || ongoing,
+      totalInterns: total,
+      ongoingCount: ongoing,
       completedCount: completed,
-      approvalRate: stats?.approvalRate || 100,
     };
   }, [stats]);
 

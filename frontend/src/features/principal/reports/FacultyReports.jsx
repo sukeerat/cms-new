@@ -76,17 +76,17 @@ const FacultyReports = () => {
         params.endDate = dateRange[1].format('YYYY-MM-DD');
       }
 
+      // Response is already unwrapped by service
       const response = await analyticsService.getFacultyReports(params);
-      const data = response.data || response;
 
-      setReports(data.reports || []);
-      setStats(data.stats || { totalVisits: 0, avgRating: 0, visitsThisMonth: 0 });
-      if (data.facultyList) {
-        setFacultyList(data.facultyList);
+      setReports(response?.reports || []);
+      setStats(response?.stats || { totalVisits: 0, avgRating: 0, visitsThisMonth: 0 });
+      if (response?.facultyList) {
+        setFacultyList(response.facultyList);
       }
       setPagination(prev => ({
         ...prev,
-        total: data.pagination?.total || data.reports?.length || 0,
+        total: response?.pagination?.total || response?.reports?.length || 0,
       }));
     } catch (error) {
       console.error('Failed to fetch faculty reports:', error);
@@ -174,7 +174,7 @@ const FacultyReports = () => {
       width: 150,
       render: (text) => (
         <div className="flex items-center gap-2">
-          <TeamOutlined className="text-primary-500" />
+          <TeamOutlined className="text-primary" />
           <span className="font-medium">{text}</span>
         </div>
       ),
@@ -187,7 +187,7 @@ const FacultyReports = () => {
         <div>
           <div className="font-medium">{record.studentName}</div>
           {record.studentRollNumber && (
-            <div className="text-xs text-surface-400">{record.studentRollNumber}</div>
+            <div className="text-xs text-text-tertiary">{record.studentRollNumber}</div>
           )}
         </div>
       ),
@@ -279,7 +279,7 @@ const FacultyReports = () => {
     return (
       <div className="flex flex-col justify-center items-center min-h-[400px] gap-4">
         <Spin size="large" />
-        <Text className="text-surface-500">Loading faculty reports...</Text>
+        <Text className="text-text-tertiary">Loading faculty reports...</Text>
       </div>
     );
   }
@@ -292,7 +292,7 @@ const FacultyReports = () => {
           <Title level={2} className="!mb-2">
             Faculty Visit Reports
           </Title>
-          <Text className="text-surface-500">
+          <Text className="text-text-tertiary">
             Monitor and review faculty visit reports and student interactions
           </Text>
         </div>
@@ -323,8 +323,8 @@ const FacultyReports = () => {
             <Statistic
               title="Total Visits"
               value={stats?.totalVisits || 0}
-              prefix={<CheckCircleOutlined className="text-primary-500" />}
-              className="text-blue-600 dark:text-blue-400"
+              prefix={<CheckCircleOutlined className="text-primary" />}
+              className="text-primary"
             />
           </Card>
         </Col>
@@ -334,9 +334,9 @@ const FacultyReports = () => {
               title="Average Rating"
               value={stats?.avgRating || 0}
               precision={1}
-              prefix={<StarOutlined className="text-amber-500" />}
+              prefix={<StarOutlined className="text-warning" />}
               suffix="/ 5"
-              className="text-yellow-600 dark:text-yellow-400"
+              className="text-warning"
             />
           </Card>
         </Col>
@@ -345,8 +345,8 @@ const FacultyReports = () => {
             <Statistic
               title="Visits This Month"
               value={stats?.visitsThisMonth || 0}
-              prefix={<CalendarOutlined className="text-emerald-500" />}
-              className="text-green-600 dark:text-green-400"
+              prefix={<CalendarOutlined className="text-success" />}
+              className="text-success"
             />
           </Card>
         </Col>

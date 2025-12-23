@@ -418,5 +418,3 @@ const PostInternship = () => {
 };
 
 export default PostInternship;
-
-export default PostInternship;

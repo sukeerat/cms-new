@@ -28,7 +28,7 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background bg-gradient-to-br from-primary-50/30 to-background p-4">
+    <div className="flex items-center justify-center min-h-screen bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10 p-4">
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">
@@ -45,7 +45,7 @@ const LoginForm = () => {
 
         {/* Login Card */}
         <Card
-          className="rounded-xl shadow-soft-lg border border-border overflow-hidden"
+          className="rounded-xl shadow-soft-lg border border-border overflow-hidden bg-surface"
         >
           <Form
             form={form}

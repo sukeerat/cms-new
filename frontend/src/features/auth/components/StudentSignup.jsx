@@ -60,7 +60,7 @@ const StudentSignup = () => {
 
   return (
     <div
-      className="flex items-center justify-center min-h-screen py-8 bg-background bg-gradient-to-br from-primary-50/30 to-background p-4"
+      className="flex items-center justify-center min-h-screen py-8 bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10 p-4"
     >
       <div className="w-full max-w-lg">
         {/* Header */}
@@ -77,7 +77,7 @@ const StudentSignup = () => {
         </div>
 
         {/* Form Card */}
-        <Card className="rounded-xl shadow-soft-lg border border-border overflow-hidden">
+        <Card className="rounded-xl shadow-soft-lg border border-border overflow-hidden bg-surface">
           <Form
             layout="vertical"
             onFinish={onFinish}

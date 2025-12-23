@@ -2,14 +2,14 @@
 import React, { useEffect, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Table, Typography, Card, Tag, Spin, Empty, Alert, Button } from "antd";
-import { PhoneOutlined, MailOutlined, ReloadOutlined } from "@ant-design/icons";
+import { PhoneOutlined, MailOutlined, ReloadOutlined, TeamOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
   fetchAssignedStudents,
   selectStudents,
 } from "../store/facultySlice";
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 export default function AssignedStudents() {
   const dispatch = useDispatch();
@@ -59,13 +59,13 @@ export default function AssignedStudents() {
       width: "28%",
       render: (_, r) => (
         <div>
-          <Text strong className="text-blue-600">
+          <Text strong className="text-primary">
             {r.student?.name || "N/A"}
           </Text>
-          <Text className="text-gray-500 block text-sm">
+          <Text className="text-text-secondary block text-sm">
             Roll No: {r.student?.rollNumber || "N/A"}
           </Text>
-          <Text className="text-gray-500 block text-sm">
+          <Text className="text-text-secondary block text-sm">
             {r.student?.branchName || "N/A"}
           </Text>
           <div className="flex items-center gap-2 mt-1">
@@ -82,12 +82,12 @@ export default function AssignedStudents() {
       render: (_, r) => (
         <div>
           <div className="flex items-center mb-1">
-            <PhoneOutlined className="mr-1 text-gray-400" />
+            <PhoneOutlined className="mr-1 text-text-tertiary" />
             <Text className="text-sm">{r.student?.contact || "N/A"}</Text>
           </div>
           <div className="flex items-center">
-            <MailOutlined className="mr-1 text-gray-400" />
-            <Text className="text-sm text-blue-500">
+            <MailOutlined className="mr-1 text-text-tertiary" />
+            <Text className="text-sm text-primary">
               {r.student?.email || "N/A"}
             </Text>
           </div>
@@ -100,7 +100,7 @@ export default function AssignedStudents() {
       render: (_, r) => {
         const apps = r.student?.internshipApplications || [];
         if (!apps.length)
-          return <Text className="text-gray-400 text-sm">No applications</Text>;
+          return <Text className="text-text-tertiary text-sm">No applications</Text>;
 
         return (
           <div className="space-y-2">
@@ -108,7 +108,7 @@ export default function AssignedStudents() {
               <Card
                 key={app.id}
                 size="small"
-                className="border border-gray-200"
+                className="border border-border"
               >
                 <Text strong className="block text-sm">
                   {app.internship?.title || "N/A"}
@@ -123,13 +123,13 @@ export default function AssignedStudents() {
                     </Tag>
                   )}
                 </div>
-                <Text className="text-xs text-gray-400">
+                <Text className="text-xs text-text-tertiary">
                   Applied {dayjs(app.applicationDate).format("MMM DD")}
                 </Text>
               </Card>
             ))}
             {apps.length > 2 && (
-              <Text className="text-xs text-blue-500">
+              <Text className="text-xs text-primary">
                 +{apps.length - 2} more
               </Text>
             )}

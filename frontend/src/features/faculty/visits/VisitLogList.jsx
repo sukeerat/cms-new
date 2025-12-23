@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Card, Table, Button, Tag, Space, Modal, message, Input, DatePicker, Descriptions, Drawer } from 'antd';
-import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Tag, Space, Modal, message, Input, DatePicker, Descriptions, Drawer, Typography } from 'antd';
+import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons';
 import { fetchVisitLogs, deleteVisitLog } from '../../../store/slices/facultySlice';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
+const { Title, Text, Paragraph } = Typography;
 
 const VisitLogList = () => {
   const dispatch = useDispatch();
@@ -68,7 +69,7 @@ const VisitLogList = () => {
       render: (text, record) => (
         <div>
           <div className="font-medium">{text}</div>
-          <div className="text-gray-500 text-xs">{record.student?.rollNumber}</div>
+          <div className="text-text-secondary text-xs">{record.student?.rollNumber}</div>
         </div>
       ),
     },

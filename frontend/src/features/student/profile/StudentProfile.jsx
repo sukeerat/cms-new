@@ -539,7 +539,7 @@ export default function StudentProfile() {
                 icon={<UserOutlined />}
                 className="rounded-2xl border-4 border-background shadow-soft ring-1 ring-border"
               />
-              <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-lg flex items-center justify-center border-2 border-white shadow-sm ${student.isActive ? 'bg-success' : 'bg-error'}`}>
+              <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-lg flex items-center justify-center border-2 border-surface shadow-sm ${student.isActive ? 'bg-success' : 'bg-error'}`}>
                 {student.isActive ? <CheckCircleOutlined className="text-white text-xs" /> : <StopOutlined className="text-white text-xs" />}
               </div>
             </div>
@@ -1204,7 +1204,7 @@ export default function StudentProfile() {
 
             <Col span={12}>
               <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-                <Input prefix={<UserOutlined className="text-gray-400" />} />
+                <Input prefix={<UserOutlined className="text-text-tertiary" />} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1213,7 +1213,7 @@ export default function StudentProfile() {
                   label="Email"
                   rules={[{ required: true, type: "email" }]}
                 >
-                  <Input prefix={<MailOutlined className="text-gray-400" />} />
+                  <Input prefix={<MailOutlined className="text-text-tertiary" />} />
                 </Form.Item>
               </Col>
 
@@ -1223,7 +1223,7 @@ export default function StudentProfile() {
                 label="Contact"
                 rules={[{ required: true }]}
               >
-                <Input prefix={<PhoneOutlined className="text-gray-400" />} />
+                <Input prefix={<PhoneOutlined className="text-text-tertiary" />} />
               </Form.Item>
             </Col>
             {/* <Col span={12}>
@@ -1281,7 +1281,7 @@ export default function StudentProfile() {
                 label="Parent Name"
                 rules={[{ required: true }]}
               >
-                <Input prefix={<TeamOutlined className="text-gray-400" />} />
+                <Input prefix={<TeamOutlined className="text-text-tertiary" />} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1290,7 +1290,7 @@ export default function StudentProfile() {
                 label="Parent Contact"
                 rules={[{ required: true }]}
               >
-                <Input prefix={<PhoneOutlined className="text-gray-400" />} />
+                <Input prefix={<PhoneOutlined className="text-text-tertiary" />} />
               </Form.Item>
             </Col>
             <Col span={12}>

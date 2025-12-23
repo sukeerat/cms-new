@@ -9,7 +9,10 @@ import {
   Query,
   UseGuards,
   Req,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { FacultyService } from './faculty.service';
 import { JwtAuthGuard } from '../../core/auth/guards/jwt-auth.guard';
@@ -85,7 +88,10 @@ export class FacultyController {
 
   @Post('visit-logs')
   @Roles(Role.TEACHER, Role.FACULTY_SUPERVISOR)
-  @ApiOperation({ summary: 'Create visit log' })
+  @ApiOperation({
+    summary: 'Create visit log (supports quick visit logging)',
+    description: 'Required fields: (applicationId OR studentId), visitType, visitLocation. All other fields are optional. Auto-sets visitDate to now and status to COMPLETED if not provided.',
+  })
   @ApiResponse({ status: 201, description: 'Visit log created successfully' })
   async createVisitLog(@Req() req, @Body() createVisitLogDto: any) {
     return this.facultyService.createVisitLog(req.user.userId, createVisitLogDto);
@@ -262,5 +268,25 @@ export class FacultyController {
   @ApiResponse({ status: 200, description: 'Joining letter deleted successfully' })
   async deleteJoiningLetter(@Param('id') id: string, @Req() req) {
     return this.facultyService.deleteJoiningLetter(id, req.user.userId);
+  }
+
+  @Post('joining-letters/:id/upload')
+  @Roles(Role.TEACHER, Role.FACULTY_SUPERVISOR)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload joining letter for a student' })
+  @ApiResponse({ status: 200, description: 'Joining letter uploaded successfully' })
+  async uploadJoiningLetter(
+    @Param('id') applicationId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req,
+  ) {
+    // Get the file URL from the uploaded file
+    const fileUrl = (file as any)?.path || (file as any)?.location || (file as any)?.url || '';
+
+    if (!fileUrl) {
+      throw new Error('File upload failed - no URL returned');
+    }
+
+    return this.facultyService.uploadJoiningLetter(applicationId, fileUrl, req.user.userId);
   }
 }

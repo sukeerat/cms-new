@@ -4,20 +4,35 @@ import { GrievanceController } from './grievance/grievance.controller';
 import { TechnicalQueryService } from './technical-query/technical-query.service';
 import { NoticeService } from './notice/notice.service';
 import { CalendarService } from './calendar/calendar.service';
+import { NotificationModule } from '../../infrastructure/notification/notification.module';
+// Help & Support
+import { SupportTicketService } from './help-support/support-ticket.service';
+import { SupportTicketController } from './help-support/support-ticket.controller';
+import { FAQService } from './help-support/faq.service';
+import { FAQController } from './help-support/faq.controller';
 
 @Module({
-  controllers: [GrievanceController],
+  imports: [NotificationModule],
+  controllers: [
+    GrievanceController,
+    SupportTicketController,
+    FAQController,
+  ],
   providers: [
     GrievanceService,
     TechnicalQueryService,
     NoticeService,
     CalendarService,
+    SupportTicketService,
+    FAQService,
   ],
   exports: [
     GrievanceService,
     TechnicalQueryService,
     NoticeService,
     CalendarService,
+    SupportTicketService,
+    FAQService,
   ],
 })
 export class SupportModule {}

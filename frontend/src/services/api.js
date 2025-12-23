@@ -109,9 +109,31 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/**
+ * Unwrap TransformInterceptor response structure from backend.
+ * Backend wraps all responses as: { data: T, statusCode, message, timestamp }
+ */
+const unwrapResponse = (data) => {
+  if (
+    data &&
+    typeof data === 'object' &&
+    'statusCode' in data &&
+    'message' in data &&
+    'timestamp' in data &&
+    'data' in data
+  ) {
+    return data.data;
+  }
+  return data;
+};
+
 // Response interceptor
 API.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Auto-unwrap TransformInterceptor wrapper
+    response.data = unwrapResponse(response.data);
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 

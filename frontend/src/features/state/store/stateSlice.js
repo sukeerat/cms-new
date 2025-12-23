@@ -122,6 +122,18 @@ const initialState = {
     loading: false,
     error: null,
   },
+  // State-wide companies overview
+  companiesOverview: {
+    list: [],
+    pagination: null,
+    summary: null,
+    selectedCompany: null,
+    selectedCompanyDetails: null,
+    loading: false,
+    detailsLoading: false,
+    error: null,
+    detailsError: null,
+  },
   lastFetched: {
     dashboard: null,
     institutions: null,
@@ -139,6 +151,8 @@ const initialState = {
     criticalAlerts: null,
     actionItems: null,
     complianceSummary: null,
+    companiesOverview: null,
+    companiesOverviewKey: null,
   },
 };
 
@@ -894,6 +908,58 @@ export const fetchComplianceSummary = createAsyncThunk(
   }
 );
 
+// ==================== STATE-WIDE COMPANIES OVERVIEW ====================
+
+// Fetch all companies across all institutions
+export const fetchAllCompanies = createAsyncThunk(
+  'state/fetchAllCompanies',
+  async (params = {}, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const lastFetched = state.state.lastFetched.companiesOverview;
+
+      // Normalize params for cache key
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 20,
+        search: params?.search ?? '',
+        industryType: params?.industryType ?? '',
+        sortBy: params?.sortBy ?? 'studentCount',
+        sortOrder: params?.sortOrder ?? 'desc',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.state.lastFetched.companiesOverviewKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
+        return { cached: true };
+      }
+
+      const response = await stateService.getAllCompanies(params);
+      return { ...response, _cacheKey: requestKey };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch companies');
+    }
+  }
+);
+
+// Fetch company details with all institutions and students
+export const fetchCompanyDetails = createAsyncThunk(
+  'state/fetchCompanyDetails',
+  async (companyId, { rejectWithValue }) => {
+    try {
+      const response = await stateService.getCompanyDetails(companyId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch company details');
+    }
+  }
+);
+
 const stateSlice = createSlice({
   name: 'state',
   initialState,
@@ -1000,6 +1066,13 @@ const stateSlice = createSlice({
       state.instituteStudents = { list: [], cursor: null, hasMore: true, total: 0, loading: false, loadingMore: false, error: null };
       state.instituteCompanies = { list: [], total: 0, summary: null, loading: false, error: null };
       state.instituteFacultyPrincipal = { principal: null, faculty: [], summary: null, loading: false, error: null };
+    },
+    setSelectedCompany: (state, action) => {
+      state.companiesOverview.selectedCompany = action.payload;
+    },
+    clearSelectedCompany: (state) => {
+      state.companiesOverview.selectedCompany = null;
+      state.companiesOverview.selectedCompanyDetails = null;
     },
   },
   extraReducers: (builder) => {
@@ -1655,6 +1728,38 @@ const stateSlice = createSlice({
       .addCase(fetchComplianceSummary.rejected, (state, action) => {
         state.complianceSummary.loading = false;
         state.complianceSummary.error = action.payload;
+      })
+
+      // ==================== STATE-WIDE COMPANIES OVERVIEW ====================
+      .addCase(fetchAllCompanies.pending, (state) => {
+        state.companiesOverview.loading = true;
+        state.companiesOverview.error = null;
+      })
+      .addCase(fetchAllCompanies.fulfilled, (state, action) => {
+        state.companiesOverview.loading = false;
+        if (!action.payload.cached) {
+          state.companiesOverview.list = action.payload.companies || [];
+          state.companiesOverview.pagination = action.payload.pagination || null;
+          state.companiesOverview.summary = action.payload.summary || null;
+          state.lastFetched.companiesOverview = Date.now();
+          state.lastFetched.companiesOverviewKey = action.payload._cacheKey;
+        }
+      })
+      .addCase(fetchAllCompanies.rejected, (state, action) => {
+        state.companiesOverview.loading = false;
+        state.companiesOverview.error = action.payload;
+      })
+      .addCase(fetchCompanyDetails.pending, (state) => {
+        state.companiesOverview.detailsLoading = true;
+        state.companiesOverview.detailsError = null;
+      })
+      .addCase(fetchCompanyDetails.fulfilled, (state, action) => {
+        state.companiesOverview.detailsLoading = false;
+        state.companiesOverview.selectedCompanyDetails = action.payload;
+      })
+      .addCase(fetchCompanyDetails.rejected, (state, action) => {
+        state.companiesOverview.detailsLoading = false;
+        state.companiesOverview.detailsError = action.payload || 'Failed to load company details';
       });
   },
 });
@@ -1678,6 +1783,9 @@ export const {
   // Institute detail view actions
   setSelectedInstitute,
   clearSelectedInstitute,
+  // Companies overview actions
+  setSelectedCompany,
+  clearSelectedCompany,
 } = stateSlice.actions;
 
 // ============= SELECTORS =============
@@ -1778,5 +1886,17 @@ export const selectActionItemsError = (state) => state.state.actionItems.error;
 export const selectComplianceSummary = (state) => state.state.complianceSummary.data;
 export const selectComplianceSummaryLoading = (state) => state.state.complianceSummary.loading;
 export const selectComplianceSummaryError = (state) => state.state.complianceSummary.error;
+
+// Companies Overview selectors
+export const selectCompaniesOverview = (state) => state.state.companiesOverview;
+export const selectAllCompanies = (state) => state.state.companiesOverview.list;
+export const selectCompaniesPagination = (state) => state.state.companiesOverview.pagination;
+export const selectCompaniesSummary = (state) => state.state.companiesOverview.summary;
+export const selectSelectedCompany = (state) => state.state.companiesOverview.selectedCompany;
+export const selectSelectedCompanyDetails = (state) => state.state.companiesOverview.selectedCompanyDetails;
+export const selectCompaniesLoading = (state) => state.state.companiesOverview.loading;
+export const selectCompanyDetailsLoading = (state) => state.state.companiesOverview.detailsLoading;
+export const selectCompaniesError = (state) => state.state.companiesOverview.error;
+export const selectCompanyDetailsError = (state) => state.state.companiesOverview.detailsError;
 
 export default stateSlice.reducer;

@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { Row, Col, Spin, Alert, Modal, Form, Input, Select, DatePicker, message } from 'antd';
+import { Row, Col, Spin, Alert, Modal, Form, Input, Select, DatePicker, message, FloatButton } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import { CameraOutlined } from '@ant-design/icons';
 
 import { useFacultyDashboard } from '../hooks/useFacultyDashboard';
 import {
@@ -14,6 +15,8 @@ import {
   MonthlyReportsCard,
   JoiningLettersCard,
 } from './components';
+import QuickVisitModal from '../visits/QuickVisitModal';
+import { facultyService } from '../../../services/faculty.service';
 
 dayjs.extend(isBetween);
 
@@ -51,6 +54,7 @@ const FacultyDashboard = () => {
   const [visitModalVisible, setVisitModalVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingVisit, setEditingVisit] = useState(null);
+  const [quickVisitModalVisible, setQuickVisitModalVisible] = useState(false);
 
   // Handle creating a new visit log
   const handleNewVisit = useCallback((student = null) => {
@@ -166,6 +170,18 @@ const FacultyDashboard = () => {
     navigate(`/students/${studentId}`);
   }, [navigate]);
 
+  // Handle quick visit submission
+  const handleQuickVisitSubmit = useCallback(async (formData) => {
+    try {
+      await facultyService.quickLogVisit(formData);
+      // Refresh dashboard to show new visit
+      await refresh();
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }, [refresh]);
+
   // Show error state
   if (error) {
     return (
@@ -204,24 +220,40 @@ const FacultyDashboard = () => {
 
           {/* Main Content Grid */}
           <Row gutter={[16, 16]}>
-            {/* Assigned Students List */}
-            <Col xs={24} lg={14}>
+            {/* Assigned Students List - Full Width */}
+            <Col xs={24}>
               <AssignedStudentsList
                 students={students}
                 loading={isLoading}
                 onViewStudent={handleViewStudent}
-                onScheduleVisit={handleNewVisit}
+                onScheduleVisit={async (visitData) => {
+                  await handleCreateVisitLog(visitData);
+                }}
                 onViewAll={() => navigate('/assigned-students')}
               />
             </Col>
+          </Row>
 
+          {/* Secondary Content Grid */}
+          <Row gutter={[16, 16]} className="mt-4">
             {/* Visit Logs */}
-            <Col xs={24} lg={10}>
+            <Col xs={24} lg={12}>
               <VisitLogsCard
                 visitLogs={visitLogs}
                 loading={isLoading}
                 onCreateNew={() => handleNewVisit()}
                 onViewAll={() => navigate('/visit-logs')}
+              />
+            </Col>
+
+            {/* Pending Approvals */}
+            <Col xs={24} lg={12}>
+              <PendingApprovalsCard
+                applications={pendingApprovals}
+                loading={isLoading}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onViewAll={() => navigate('/approvals')}
               />
             </Col>
           </Row>
@@ -245,17 +277,6 @@ const FacultyDashboard = () => {
               />
             </Col>
           </Row>
-
-          {/* Pending Approvals */}
-          <div className="mt-4">
-            <PendingApprovalsCard
-              applications={pendingApprovals}
-              loading={isLoading}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              onViewAll={() => navigate('/approvals')}
-            />
-          </div>
         </div>
       </Spin>
 
@@ -318,6 +339,30 @@ const FacultyDashboard = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Quick Visit Modal */}
+      <QuickVisitModal
+        visible={quickVisitModalVisible}
+        onClose={() => setQuickVisitModalVisible(false)}
+        onSubmit={handleQuickVisitSubmit}
+        students={students}
+        loading={isLoading}
+      />
+
+      {/* Floating Quick Log Button */}
+      <FloatButton
+        icon={<CameraOutlined />}
+        type="primary"
+        tooltip="Quick Log Visit"
+        onClick={() => setQuickVisitModalVisible(true)}
+        style={{
+          right: 24,
+          bottom: 24,
+          width: 60,
+          height: 60,
+        }}
+        badge={{ count: 'Quick Log', color: '#52c41a' }}
+      />
     </>
   );
 };

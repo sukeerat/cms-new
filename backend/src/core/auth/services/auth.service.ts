@@ -27,6 +27,15 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: {
+        Institution: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -49,8 +58,13 @@ export class AuthService {
     // Update login tracking
     await this.updateLoginTracking(user.id);
 
-    const { password: _, ...result } = user;
-    return result;
+    // Flatten institution data for easier frontend access
+    const { password: _, Institution, ...result } = user;
+    return {
+      ...result,
+      institutionName: Institution?.name || null,
+      institutionCode: Institution?.code || null,
+    };
   }
 
   /**

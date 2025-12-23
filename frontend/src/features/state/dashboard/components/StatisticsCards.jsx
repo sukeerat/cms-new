@@ -107,7 +107,7 @@ const DetailedStatCard = ({
         </div>
         <div className="p-3 bg-background-tertiary">
           {alertMessage ? (
-            <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400">
+            <div className="flex items-center gap-2 text-xs text-warning">
               <WarningOutlined />
               <span>{alertMessage}</span>
             </div>
@@ -115,8 +115,8 @@ const DetailedStatCard = ({
             <div className="grid grid-cols-2 gap-2 text-xs">
               {details?.slice(0, 2).map((detail, idx) => (
                 <div key={idx} className="flex justify-between items-center">
-                  <span className="text-slate-500 dark:text-slate-400">{detail.label}:</span>
-                  <span className={`font-semibold ${detail.highlight ? 'text-orange-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                  <span className="text-text-tertiary">{detail.label}:</span>
+                  <span className={`font-semibold ${detail.highlight ? 'text-warning' : 'text-text-secondary'}`}>
                     {detail.value}
                   </span>
                 </div>
@@ -129,7 +129,7 @@ const DetailedStatCard = ({
       <Modal
         title={
           <div className="flex items-center gap-2">
-            {React.cloneElement(icon, { style: { fontSize: '20px', color: '#3b82f6' } })}
+            {React.cloneElement(icon, { style: { fontSize: '20px', color: 'rgb(var(--color-primary))' } })}
             <span>{title} - Detailed View</span>
           </div>
         }
@@ -152,7 +152,7 @@ const DetailedStatCard = ({
                     }
                     value={detail.value}
                     valueStyle={{
-                      color: detail.highlight ? '#ea580c' : undefined,
+                      color: detail.highlight ? 'rgb(var(--color-warning))' : undefined,
                       fontSize: '20px'
                     }}
                   />

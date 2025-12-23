@@ -40,15 +40,15 @@ export class PrincipalService {
     return this.cache.getOrSet(
       cacheKey,
       async () => {
-        // Only count self-identified internships (not placement-based)
+        // Only count self-identified internships (auto-approved on submission)
         const [
           totalStudents,
           activeStudents,
           totalStaff,
           activeStaff,
           totalSelfIdentifiedInternships,
-          approvedSelfIdentifiedInternships,
-          pendingApprovals,
+          ongoingInternships,
+          completedInternships,
           totalBatches,
           pendingMonthlyReports,
           pendingGrievances,
@@ -59,23 +59,25 @@ export class PrincipalService {
           this.prisma.user.count({
             where: { institutionId, role: { not: Role.STUDENT }, active: true }
           }),
-          // Count self-identified internships only
+          // Count all self-identified internships
           this.prisma.internshipApplication.count({
             where: { student: { institutionId }, isSelfIdentified: true }
           }),
+          // Count ongoing self-identified internships (auto-approved, in progress)
           this.prisma.internshipApplication.count({
             where: {
               student: { institutionId },
               isSelfIdentified: true,
               status: ApplicationStatus.APPROVED,
+              internshipStatus: { in: ['ONGOING', 'IN_PROGRESS'] },
             }
           }),
-          // Pending approvals - self-identified with APPLIED status (should be 0 with auto-approval)
+          // Count completed self-identified internships
           this.prisma.internshipApplication.count({
             where: {
               student: { institutionId },
               isSelfIdentified: true,
-              status: ApplicationStatus.APPLIED,
+              status: ApplicationStatus.COMPLETED,
             }
           }),
           this.prisma.batch.count({ where: { institutionId, isActive: true } }),
@@ -93,9 +95,9 @@ export class PrincipalService {
           }),
         ]);
 
-        // Approval rate for self-identified internships
-        const approvalRate = totalSelfIdentifiedInternships > 0
-          ? Number(((approvedSelfIdentifiedInternships / totalSelfIdentifiedInternships) * 100).toFixed(2))
+        // Completion rate for self-identified internships (auto-approved on submission)
+        const completionRate = totalSelfIdentifiedInternships > 0
+          ? Number(((completedInternships / totalSelfIdentifiedInternships) * 100).toFixed(2))
           : 0;
 
         return {
@@ -112,14 +114,15 @@ export class PrincipalService {
             total: totalStaff,
             active: activeStaff,
           },
-          // Self-identified internships only (no placement-based)
+          // Self-identified internships only (auto-approved, no placement-based)
           internships: {
             totalApplications: totalSelfIdentifiedInternships,
-            approvedApplications: approvedSelfIdentifiedInternships,
-            approvalRate,
+            ongoingInternships,
+            completedInternships,
+            completionRate,
           },
           pending: {
-            selfIdentifiedApprovals: pendingApprovals,
+            // Self-identified internships are auto-approved, so no pending approvals
             monthlyReports: pendingMonthlyReports,
             grievances: pendingGrievances,
           },
@@ -232,6 +235,34 @@ export class PrincipalService {
   }
 
   /**
+   * Get institution branches/departments
+   */
+  async getBranches(principalId: string) {
+    const principal = await this.prisma.user.findUnique({
+      where: { id: principalId },
+      select: { institutionId: true },
+    });
+
+    if (!principal?.institutionId) {
+      throw new NotFoundException('Institution not found');
+    }
+
+    const branches = await this.prisma.branch.findMany({
+      where: { institutionId: principal.institutionId, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+        code: true,
+        duration: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return branches;
+  }
+
+  /**
    * Update institution details
    */
   async updateInstitution(principalId: string, updateData: Prisma.InstitutionUpdateInput) {
@@ -330,6 +361,7 @@ export class PrincipalService {
             select: {
               id: true,
               status: true,
+              internshipStatus: true,
               joiningDate: true,
               completionDate: true,
               hasJoined: true,
@@ -340,6 +372,17 @@ export class PrincipalService {
               isSelfIdentified: true,
               companyName: true,
               companyAddress: true,
+              companyContact: true,
+              companyEmail: true,
+              jobProfile: true,
+              stipend: true,
+              internshipDuration: true,
+              startDate: true,
+              endDate: true,
+              facultyMentorName: true,
+              facultyMentorEmail: true,
+              facultyMentorContact: true,
+              facultyMentorDesignation: true,
               internship: {
                 select: {
                   id: true,
@@ -523,15 +566,34 @@ export class PrincipalService {
           } : (application as any).isSelfIdentified ? {
             name: (application as any).companyName,
             address: (application as any).companyAddress,
+            contact: (application as any).companyContact,
+            email: (application as any).companyEmail,
             isSelfIdentified: true,
           } : null,
           // Internship details
           workLocation: application.internship?.workLocation,
-          stipendAmount: application.internship?.stipendAmount,
-          duration: application.internship?.duration,
-          startDate: application.internship?.startDate,
-          endDate: application.internship?.endDate,
+          stipendAmount: (application as any).isSelfIdentified
+            ? (application as any).stipend
+            : application.internship?.stipendAmount,
+          duration: (application as any).isSelfIdentified
+            ? (application as any).internshipDuration
+            : application.internship?.duration,
+          startDate: (application as any).isSelfIdentified
+            ? (application as any).startDate
+            : application.internship?.startDate,
+          endDate: (application as any).isSelfIdentified
+            ? (application as any).endDate
+            : application.internship?.endDate,
+          jobProfile: (application as any).jobProfile,
           isSelfIdentified: (application as any).isSelfIdentified,
+          internshipStatus: (application as any).internshipStatus,
+          // Faculty mentor details (for self-identified internships)
+          facultyMentor: (application as any).isSelfIdentified ? {
+            name: (application as any).facultyMentorName,
+            email: (application as any).facultyMentorEmail,
+            contact: (application as any).facultyMentorContact,
+            designation: (application as any).facultyMentorDesignation,
+          } : null,
         } : null,
         // Monthly reports with details
         monthlyReports: reports.map((report: any) => ({
@@ -610,6 +672,7 @@ export class PrincipalService {
     branchId?: string;
     isActive?: boolean;
     hasMentor?: string; // 'true', 'false', or undefined for all
+    hasInternship?: string; // 'true' to filter only students with self-identified internships
   }) {
     const principal = await this.prisma.user.findUnique({
       where: { id: principalId },
@@ -622,7 +685,7 @@ export class PrincipalService {
     // Parse page and limit as numbers (query params come as strings)
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
-    const { search, batchId, branchId, isActive, hasMentor } = query;
+    const { search, batchId, branchId, isActive, hasMentor, hasInternship } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.StudentWhereInput = {
@@ -660,6 +723,16 @@ export class PrincipalService {
       };
     }
 
+    // Filter by self-identified internship
+    if (hasInternship === 'true') {
+      where.internshipApplications = {
+        some: { isSelfIdentified: true },
+      };
+    }
+
+    // Determine if we need to include full internship data
+    const includeInternships = hasInternship === 'true';
+
     const [students, total] = await Promise.all([
       this.prisma.student.findMany({
         where,
@@ -675,6 +748,46 @@ export class PrincipalService {
               active: true,
             },
           },
+          // Include self-identified internship applications when requested
+          ...(includeInternships && {
+            internshipApplications: {
+              where: { isSelfIdentified: true },
+              orderBy: { createdAt: 'desc' as const },
+              take: 1,
+              select: {
+                id: true,
+                status: true,
+                internshipStatus: true,
+                isSelfIdentified: true,
+                companyName: true,
+                companyAddress: true,
+                companyContact: true,
+                companyEmail: true,
+                jobProfile: true,
+                stipend: true,
+                internshipDuration: true,
+                startDate: true,
+                endDate: true,
+                joiningLetterUrl: true,
+                joiningLetterUploadedAt: true,
+                facultyMentorName: true,
+                facultyMentorEmail: true,
+                facultyMentorContact: true,
+                facultyMentorDesignation: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+            mentorAssignments: {
+              where: { isActive: true },
+              take: 1,
+              include: {
+                mentor: {
+                  select: { id: true, name: true, email: true, designation: true, phoneNo: true },
+                },
+              },
+            },
+          }),
           _count: {
             select: {
               internshipApplications: true,
@@ -687,8 +800,18 @@ export class PrincipalService {
       this.prisma.student.count({ where }),
     ]);
 
+    // Transform response to include selfIdentifiedInternship for easier frontend access
+    const transformedStudents = students.map((student: any) => {
+      const mentor = student.mentorAssignments?.[0]?.mentor || null;
+      return {
+        ...student,
+        selfIdentifiedInternship: student.internshipApplications?.[0] || null,
+        mentor, // Add mentor at student level for easier access
+      };
+    });
+
     return {
-      data: students,
+      data: transformedStudents,
       total,
       page,
       limit,
@@ -1985,8 +2108,9 @@ export class PrincipalService {
       ? Math.round((completedInternships / totalApplications) * 100)
       : 0;
 
-    const placementRate = totalStudents > 0
-      ? Math.round((completedInternships / totalStudents) * 100)
+    // Active rate: percentage of students with ongoing internships
+    const activeRate = totalStudents > 0
+      ? Math.round((activeInternships / totalStudents) * 100)
       : 0;
 
     // Format students by batch
@@ -2008,7 +2132,7 @@ export class PrincipalService {
       totalStudents,
       activeInternships,
       completionRate,
-      placementRate,
+      activeRate,
       studentsByBatch,
       internshipStatus,
       monthlyProgress,
@@ -2099,6 +2223,7 @@ export class PrincipalService {
       applied: 0,
       underReview: 0,
       selected: 0,
+      approved: 0,
       joined: 0,
       completed: 0,
       rejected: 0,
@@ -2113,6 +2238,7 @@ export class PrincipalService {
         case 'APPLIED': counts.applied = count; break;
         case 'UNDER_REVIEW': counts.underReview = count; break;
         case 'SELECTED': counts.selected = count; break;
+        case 'APPROVED': counts.approved = count; break;
         case 'JOINED': counts.joined = count; break;
         case 'COMPLETED': counts.completed = count; break;
         case 'REJECTED': counts.rejected = count; break;
@@ -2156,7 +2282,7 @@ export class PrincipalService {
     return {
       total,
       ...counts,
-      activeRate: total > 0 ? Math.round(((counts.selected + counts.joined) / total) * 100) : 0,
+      activeRate: total > 0 ? Math.round(((counts.approved + counts.selected + counts.joined) / total) * 100) : 0,
       completionRate: total > 0 ? Math.round((counts.completed / total) * 100) : 0,
       byCompany,
       byIndustry,
@@ -2644,11 +2770,27 @@ export class PrincipalService {
             branch: { select: { id: true, name: true } },
             internshipApplications: {
               where: {
-                status: { in: ['JOINED', 'COMPLETED', 'SELECTED'] },
+                OR: [
+                  { status: { in: ['JOINED', 'COMPLETED', 'SELECTED', 'APPROVED'] } },
+                  { isSelfIdentified: true },
+                ],
               },
               orderBy: { createdAt: 'desc' },
               take: 1,
-              include: {
+              select: {
+                id: true,
+                status: true,
+                internshipStatus: true,
+                isSelfIdentified: true,
+                companyName: true,
+                companyAddress: true,
+                companyContact: true,
+                companyEmail: true,
+                jobProfile: true,
+                stipend: true,
+                internshipDuration: true,
+                startDate: true,
+                endDate: true,
                 internship: {
                   select: {
                     id: true,
@@ -2768,17 +2910,28 @@ export class PrincipalService {
     // Transform students data
     const students = mentorAssignments.map((a) => {
       const app = a.student.internshipApplications[0];
+      const isSelfIdentified = (app as any)?.isSelfIdentified;
       return {
         id: a.student.id,
+        applicationId: app?.id || null,
         name: a.student.name,
         rollNumber: a.student.rollNumber,
         batch: a.student.batch?.name || 'N/A',
         department: a.student.branch?.name || 'N/A',
         internshipTitle: app?.internship?.title || null,
-        companyName: app?.internship?.industry?.companyName || null,
-        internshipStatus: app?.status === 'JOINED' ? 'In Progress' :
-          app?.status === 'COMPLETED' ? 'Completed' :
-          app?.status === 'SELECTED' ? 'Pending' : 'Not Started',
+        companyName: isSelfIdentified
+          ? (app as any)?.companyName
+          : app?.internship?.industry?.companyName || null,
+        jobProfile: (app as any)?.jobProfile || null,
+        stipend: (app as any)?.stipend || null,
+        internshipDuration: (app as any)?.internshipDuration || null,
+        startDate: (app as any)?.startDate || null,
+        endDate: (app as any)?.endDate || null,
+        isSelfIdentified: isSelfIdentified || false,
+        internshipStatus: (app as any)?.internshipStatus ||
+          (app?.status === 'JOINED' ? 'ONGOING' :
+          app?.status === 'COMPLETED' ? 'COMPLETED' :
+          app?.status === 'SELECTED' ? 'PENDING' : 'NOT_STARTED'),
         totalVisits: app?._count?.facultyVisitLogs || 0,
         lastVisitDate: app?.facultyVisitLogs?.[0]?.visitDate || null,
       };

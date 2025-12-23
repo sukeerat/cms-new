@@ -150,8 +150,8 @@ const ResetPassword = () => {
   // Loading state while verifying token
   if (verifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background">
-        <Card className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border text-center p-8">
+      <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10">
+        <Card className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border text-center p-8 bg-surface">
           <Spin size="large" className="mb-6" />
           <Title level={4} className="text-text-primary mb-2">
             Verifying reset link...
@@ -167,9 +167,9 @@ const ResetPassword = () => {
   // Success state
   if (resetSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10 p-4">
         <Card 
-          className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border overflow-hidden"
+          className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border overflow-hidden bg-surface"
         >
           <Result
             status="success"
@@ -209,9 +209,9 @@ const ResetPassword = () => {
   // Invalid token state
   if (!tokenValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10 p-4">
         <Card 
-          className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border overflow-hidden"
+          className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border overflow-hidden bg-surface"
         >
           <Result
             status="error"
@@ -259,9 +259,9 @@ const ResetPassword = () => {
 
   // Reset password form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10 p-4">
       <Card 
-        className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border"
+        className="w-full max-w-md shadow-soft-lg rounded-2xl border border-border bg-surface"
       >
         {/* Header */}
         <div className="text-center mb-8">

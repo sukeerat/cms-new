@@ -250,7 +250,7 @@ const StateDashboard = () => {
           <Card
             title={
               <div className="flex items-center gap-2">
-                <WarningOutlined className="text-red-500" />
+                <WarningOutlined className="text-error" />
                 <span>Critical Alerts</span>
                 {criticalAlerts?.totalAlerts > 0 && (
                   <Badge count={criticalAlerts.totalAlerts} className="ml-2" />
@@ -311,7 +311,7 @@ const StateDashboard = () => {
                 )}
                 {!criticalAlerts.totalAlerts && (
                   <div className="text-center py-8">
-                    <CheckCircleOutlined className="text-4xl text-green-500 mb-2" />
+                    <CheckCircleOutlined className="text-4xl text-success mb-2" />
                     <Text className="block text-text-secondary">No critical alerts</Text>
                   </div>
                 )}
@@ -329,7 +329,7 @@ const StateDashboard = () => {
           <Card
             title={
               <div className="flex items-center gap-2">
-                <CheckCircleOutlined className="text-green-500" />
+                <CheckCircleOutlined className="text-success" />
                 <span>Compliance Summary</span>
               </div>
             }
@@ -345,7 +345,7 @@ const StateDashboard = () => {
                   </div>
                   <Progress
                     percent={complianceSummary.stateWide.mentorCoverageRate || 0}
-                    strokeColor={complianceSummary.stateWide.mentorCoverageRate >= 80 ? '#52c41a' : complianceSummary.stateWide.mentorCoverageRate >= 50 ? '#faad14' : '#ff4d4f'}
+                    strokeColor={complianceSummary.stateWide.mentorCoverageRate >= 80 ? 'rgb(var(--color-success))' : complianceSummary.stateWide.mentorCoverageRate >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))'}
                     showInfo={false}
                   />
                 </div>
@@ -356,7 +356,7 @@ const StateDashboard = () => {
                   </div>
                   <Progress
                     percent={complianceSummary.stateWide.visitComplianceRate || 0}
-                    strokeColor={complianceSummary.stateWide.visitComplianceRate >= 80 ? '#52c41a' : complianceSummary.stateWide.visitComplianceRate >= 50 ? '#faad14' : '#ff4d4f'}
+                    strokeColor={complianceSummary.stateWide.visitComplianceRate >= 80 ? 'rgb(var(--color-success))' : complianceSummary.stateWide.visitComplianceRate >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))'}
                     showInfo={false}
                   />
                 </div>
@@ -367,7 +367,7 @@ const StateDashboard = () => {
                   </div>
                   <Progress
                     percent={complianceSummary.stateWide.reportComplianceRate || 0}
-                    strokeColor={complianceSummary.stateWide.reportComplianceRate >= 80 ? '#52c41a' : complianceSummary.stateWide.reportComplianceRate >= 50 ? '#faad14' : '#ff4d4f'}
+                    strokeColor={complianceSummary.stateWide.reportComplianceRate >= 80 ? 'rgb(var(--color-success))' : complianceSummary.stateWide.reportComplianceRate >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))'}
                     showInfo={false}
                   />
                 </div>
@@ -378,7 +378,7 @@ const StateDashboard = () => {
                   </div>
                   <Progress
                     percent={complianceSummary.stateWide.overallComplianceScore || 0}
-                    strokeColor={complianceSummary.stateWide.overallComplianceScore >= 80 ? '#52c41a' : complianceSummary.stateWide.overallComplianceScore >= 50 ? '#faad14' : '#ff4d4f'}
+                    strokeColor={complianceSummary.stateWide.overallComplianceScore >= 80 ? 'rgb(var(--color-success))' : complianceSummary.stateWide.overallComplianceScore >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))'}
                   />
                 </div>
               </div>
@@ -397,7 +397,7 @@ const StateDashboard = () => {
           <Card
             title={
               <div className="flex items-center gap-2">
-                <ClockCircleOutlined className="text-blue-500" />
+                <ClockCircleOutlined className="text-primary" />
                 <span>Action Items</span>
                 <Badge count={actionItems.items.length} className="ml-2" />
               </div>
@@ -543,7 +543,7 @@ const StateDashboard = () => {
             </Col>
             <Col xs={12} sm={8} md={4}>
               <div className="text-center">
-                <div className="text-2xl font-bold text-info">
+                <div className="text-2xl font-bold text-primary">
                   {monthlyAnalytics.metrics.facultyVisits || 0}
                 </div>
                 <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Faculty Visits</div>
@@ -551,7 +551,7 @@ const StateDashboard = () => {
             </Col>
             <Col xs={12} sm={8} md={4}>
               <div className="text-center">
-                <div className="text-2xl font-bold text-pink-500">
+                <div className="text-2xl font-bold text-secondary">
                   {monthlyAnalytics.metrics.approvalRate || monthlyAnalytics.metrics.placementRate || 0}%
                 </div>
                 <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold mt-1">Approval Rate</div>

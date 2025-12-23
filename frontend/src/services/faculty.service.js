@@ -73,6 +73,16 @@ export const facultyService = {
     return response.data;
   },
 
+  // Quick Visit Log - Fast visit creation with GPS and photos
+  async quickLogVisit(formData) {
+    const response = await API.post('/faculty/visit-logs/quick', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // Monthly Reports
   async getMonthlyReports(params = {}) {
     const queryParams = new URLSearchParams();
@@ -172,6 +182,18 @@ export const facultyService = {
     return response.data;
   },
 
+  async uploadJoiningLetter(applicationId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await API.post(`/faculty/joining-letters/${applicationId}/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // Monthly Report Actions
   async approveMonthlyReport(reportId, remarks) {
     const response = await API.put(`/faculty/monthly-reports/${reportId}/approve`, { remarks });
@@ -185,6 +207,28 @@ export const facultyService = {
 
   async deleteMonthlyReport(reportId) {
     const response = await API.delete(`/faculty/monthly-reports/${reportId}`);
+    return response.data;
+  },
+
+  // Upload monthly report for a student (multipart/form-data)
+  async uploadMonthlyReport(formData) {
+    const response = await API.post('/faculty/monthly-reports/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Submit feedback for a student
+  async submitFeedback(data) {
+    const response = await API.post('/faculty/feedback/monthly', data);
+    return response.data;
+  },
+
+  // Create assignment for a student
+  async createAssignment(data) {
+    const response = await API.post('/faculty/assignments', data);
     return response.data;
   },
 

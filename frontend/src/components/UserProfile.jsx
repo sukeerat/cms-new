@@ -9,6 +9,7 @@ import {
   Tag,
   Space,
   Tooltip,
+  Spin,
 } from 'antd';
 import {
   UserOutlined,
@@ -20,6 +21,7 @@ import {
   SafetyOutlined,
   ClockCircleOutlined,
   EditOutlined,
+  BookOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -27,32 +29,45 @@ const { Title, Text } = Typography;
 
 const UserProfile = ({ visible, onClose }) => {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
   const { darkMode } = useTheme();
 
   useEffect(() => {
-    // Get user info from token
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser(payload);
-      } catch (error) {
-        console.error('Failed to parse token:', error);
-      }
-    }
+    if (!visible) return;
 
-    // Also try to get more details from loginResponse
+    setLoading(true);
+
+    // Use loginResponse data directly - it already has all user info from login
     const loginData = localStorage.getItem('loginResponse');
     if (loginData) {
       try {
         const parsed = JSON.parse(loginData);
         if (parsed?.user) {
-          setUser(prev => ({ ...prev, ...parsed.user }));
+          setUser(parsed.user);
+          setLoading(false);
+          return;
         }
       } catch (error) {
         console.error('Failed to parse login data:', error);
       }
     }
+
+    // Fallback: try to decode JWT token if loginResponse not available
+    const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUser({
+          email: payload.email,
+          role: payload.role || payload.roles?.[0],
+          id: payload.sub || payload.userId,
+        });
+      } catch (error) {
+        console.error('Failed to parse token:', error);
+      }
+    }
+
+    setLoading(false);
   }, [visible]);
 
   const formatDate = (dateString) => {
@@ -104,7 +119,7 @@ const UserProfile = ({ visible, onClose }) => {
         <div className="flex justify-between items-center">
           <Text type="secondary" className="text-xs">
             <ClockCircleOutlined className="mr-1" />
-            Last login: {user?.lastLoginAt ? formatDate(user.lastLoginAt) : 'Just now'}
+            Last login: {user?.previousLoginAt ? formatDate(user.previousLoginAt) : user?.lastLoginAt ? formatDate(user.lastLoginAt) : 'Just now'}
           </Text>
           <Button onClick={onClose} className="rounded-lg">Close</Button>
         </div>
@@ -113,7 +128,12 @@ const UserProfile = ({ visible, onClose }) => {
       centered
       className="rounded-xl overflow-hidden"
     >
-      {user ? (
+      {loading ? (
+        <div className="py-12 text-center">
+          <Spin size="default" />
+          <Text type="secondary" className="block mt-4">Loading profile...</Text>
+        </div>
+      ) : user ? (
         <div className="py-4">
           {/* Profile Header */}
           <div
@@ -167,7 +187,7 @@ const UserProfile = ({ visible, onClose }) => {
               <Text className="text-text-primary">{user.email || 'N/A'}</Text>
             </Descriptions.Item>
 
-            {user.phone && (
+            {(user.phone || user.contact || user.phoneNo) && (
               <Descriptions.Item
                 label={
                   <Space className="text-text-secondary">
@@ -176,7 +196,7 @@ const UserProfile = ({ visible, onClose }) => {
                   </Space>
                 }
               >
-                <Text className="text-text-primary">{user.phone}</Text>
+                <Text className="text-text-primary">{user.phone || user.contact || user.phoneNo}</Text>
               </Descriptions.Item>
             )}
 
@@ -193,7 +213,20 @@ const UserProfile = ({ visible, onClose }) => {
               </Descriptions.Item>
             )}
 
-            {user.institutionName && (
+            {(user.branchName || user.branch?.name || user.department) && (
+              <Descriptions.Item
+                label={
+                  <Space className="text-text-secondary">
+                    <BookOutlined />
+                    Department
+                  </Space>
+                }
+              >
+                <Text className="text-text-primary">{user.branchName || user.branch?.name || user.department}</Text>
+              </Descriptions.Item>
+            )}
+
+            {(user.institutionName || user.institution?.name) && (
               <Descriptions.Item
                 label={
                   <Space className="text-text-secondary">
@@ -202,7 +235,7 @@ const UserProfile = ({ visible, onClose }) => {
                   </Space>
                 }
               >
-                <Text className="text-text-primary">{user.institutionName}</Text>
+                <Text className="text-text-primary">{user.institutionName || user.institution?.name}</Text>
               </Descriptions.Item>
             )}
 
@@ -216,6 +249,19 @@ const UserProfile = ({ visible, onClose }) => {
                 }
               >
                 <Text className="text-text-primary">{user.designation}</Text>
+              </Descriptions.Item>
+            )}
+
+            {user.batch?.name && (
+              <Descriptions.Item
+                label={
+                  <Space className="text-text-secondary">
+                    <CalendarOutlined />
+                    Batch
+                  </Space>
+                }
+              >
+                <Text className="text-text-primary">{user.batch.name}</Text>
               </Descriptions.Item>
             )}
 
@@ -246,17 +292,28 @@ const UserProfile = ({ visible, onClose }) => {
             )}
           </Descriptions>
 
-          {/* Account Status */}
-          <div className="mt-6 p-3 rounded-xl border border-success-border bg-success-50 dark:bg-success-900/10">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
-              <Text className="text-success-600 font-medium">Account Active</Text>
+          {/* Account Status & Login Info */}
+          <div className="mt-6 space-y-3">
+            <div className="p-3 rounded-xl border border-success-border bg-success-50 dark:bg-success-900/10">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full animate-pulse ${user.active ? 'bg-success' : 'bg-error'}`} />
+                <Text className={`font-medium ${user.active ? 'text-success-600' : 'text-error-600'}`}>
+                  {user.active ? 'Account Active' : 'Account Inactive'}
+                </Text>
+              </div>
             </div>
+
+            {user.loginCount && (
+              <div className="flex justify-between items-center p-3 rounded-xl bg-background-tertiary/30 border border-border/30">
+                <Text className="text-text-secondary text-sm">Total Logins</Text>
+                <Tag color="blue" className="m-0">{user.loginCount}</Tag>
+              </div>
+            )}
           </div>
         </div>
       ) : (
         <div className="py-8 text-center">
-          <Text type="secondary">Loading profile...</Text>
+          <Text type="secondary">Unable to load profile</Text>
         </div>
       )}
     </Modal>

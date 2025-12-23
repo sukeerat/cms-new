@@ -52,14 +52,10 @@ const StatisticsGrid = ({ stats }) => {
       title: 'Approvals Pending',
       value: stats?.pendingApprovals || 0,
       icon: <CheckCircleOutlined />,
-      colorClass: 'text-info', // Using info color for approvals
-      bgClass: 'bg-info-light', // Assuming global class or we can use bg-blue-50/10 if needed. Let's use Tailwind class directly
+      colorClass: 'text-info',
+      bgClass: 'bg-info/10',
     },
   ];
-
-  // Fix for the last card to use tailwind directly to be safe
-  cardConfigs[3].bgClass = 'bg-blue-500/10';
-  cardConfigs[3].colorClass = 'text-blue-500';
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

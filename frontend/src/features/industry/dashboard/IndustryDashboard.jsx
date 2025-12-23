@@ -93,8 +93,8 @@ const IndustryDashboard = () => {
       title: "Applications",
       value: dashboardData?.stats?.totalApplications || 0,
       icon: ContactsOutlined,
-      colorClass: "text-blue-500",
-      bgClass: "bg-blue-500/10",
+      colorClass: "text-info",
+      bgClass: "bg-info/10",
     },
     {
       title: "Selected Students",
@@ -156,7 +156,7 @@ const IndustryDashboard = () => {
             <div className="mt-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-background-tertiary border border-border">
                 <div className={`w-2 h-2 rounded-full ${profile?.isApproved ? 'bg-success animate-pulse' : 'bg-warning animate-pulse'}`} />
-                <Text className={`font-bold uppercase tracking-widest text-[10px] ${profile?.isApproved ? 'text-success-600' : 'text-warning-600'}`}>
+                <Text className={`font-bold uppercase tracking-widest text-[10px] ${profile?.isApproved ? 'text-success' : 'text-warning'}`}>
                   {profile?.isApproved ? 'Profile Approved' : 'Under Review'}
                 </Text>
               </div>

@@ -34,6 +34,14 @@ const initialState = {
     loading: false,
     error: null,
   },
+  joiningLetters: {
+    list: [],
+    total: 0,
+    page: 1,
+    totalPages: 1,
+    loading: false,
+    error: null,
+  },
   profile: {
     data: null,
     loading: false,
@@ -61,6 +69,8 @@ const initialState = {
     visitLogsKey: null,
     monthlyReports: null,
     monthlyReportsKey: null,
+    joiningLetters: null,
+    joiningLettersKey: null,
     profile: null,
     applications: null,
     applicationsKey: null,
@@ -408,6 +418,126 @@ export const fetchFeedbackHistory = createAsyncThunk(
   }
 );
 
+// ==================== Joining Letters ====================
+
+export const fetchJoiningLetters = createAsyncThunk(
+  'faculty/fetchJoiningLetters',
+  async (params = {}, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const lastFetched = state.faculty.lastFetched.joiningLetters;
+
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        status: params?.status ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.faculty.lastFetched.joiningLettersKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
+        return { cached: true };
+      }
+
+      const response = await facultyService.getJoiningLetters(params);
+      return { ...response, _cacheKey: requestKey };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch joining letters');
+    }
+  }
+);
+
+export const verifyJoiningLetter = createAsyncThunk(
+  'faculty/verifyJoiningLetter',
+  async ({ letterId, remarks }, { rejectWithValue }) => {
+    try {
+      const response = await facultyService.verifyJoiningLetter(letterId, { remarks });
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to verify joining letter');
+    }
+  }
+);
+
+export const rejectJoiningLetter = createAsyncThunk(
+  'faculty/rejectJoiningLetter',
+  async ({ letterId, reason }, { rejectWithValue }) => {
+    try {
+      const response = await facultyService.rejectJoiningLetter(letterId, reason);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to reject joining letter');
+    }
+  }
+);
+
+export const deleteJoiningLetter = createAsyncThunk(
+  'faculty/deleteJoiningLetter',
+  async (letterId, { rejectWithValue }) => {
+    try {
+      const response = await facultyService.deleteJoiningLetter(letterId);
+      return { id: letterId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete joining letter');
+    }
+  }
+);
+
+export const uploadJoiningLetter = createAsyncThunk(
+  'faculty/uploadJoiningLetter',
+  async ({ applicationId, file }, { rejectWithValue }) => {
+    try {
+      const response = await facultyService.uploadJoiningLetter(applicationId, file);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to upload joining letter');
+    }
+  }
+);
+
+// ==================== Monthly Report Actions ====================
+
+export const approveMonthlyReport = createAsyncThunk(
+  'faculty/approveMonthlyReport',
+  async ({ reportId, remarks }, { rejectWithValue }) => {
+    try {
+      const response = await facultyService.approveMonthlyReport(reportId, remarks);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to approve report');
+    }
+  }
+);
+
+export const rejectMonthlyReport = createAsyncThunk(
+  'faculty/rejectMonthlyReport',
+  async ({ reportId, reason }, { rejectWithValue }) => {
+    try {
+      const response = await facultyService.rejectMonthlyReport(reportId, reason);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to reject report');
+    }
+  }
+);
+
+export const deleteMonthlyReport = createAsyncThunk(
+  'faculty/deleteMonthlyReport',
+  async (reportId, { rejectWithValue }) => {
+    try {
+      const response = await facultyService.deleteMonthlyReport(reportId);
+      return { id: reportId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete report');
+    }
+  }
+);
+
 // Backward compatibility aliases
 export const fetchGrievances = fetchFeedbackHistory;
 export const resolveGrievance = submitFeedback;
@@ -421,7 +551,9 @@ const facultySlice = createSlice({
       state.students.error = null;
       state.visitLogs.error = null;
       state.monthlyReports.error = null;
+      state.joiningLetters.error = null;
       state.applications.error = null;
+      state.feedbackHistory.error = null;
     },
     invalidateCache: (state) => {
       state.lastFetched = {
@@ -432,6 +564,8 @@ const facultySlice = createSlice({
         visitLogsKey: null,
         monthlyReports: null,
         monthlyReportsKey: null,
+        joiningLetters: null,
+        joiningLettersKey: null,
         profile: null,
         applications: null,
         applicationsKey: null,
@@ -698,6 +832,133 @@ const facultySlice = createSlice({
       .addCase(submitFeedback.rejected, (state, action) => {
         state.feedbackHistory.loading = false;
         state.feedbackHistory.error = action.payload;
+      })
+
+      // ==================== Joining Letters ====================
+      .addCase(fetchJoiningLetters.pending, (state) => {
+        state.joiningLetters.loading = true;
+        state.joiningLetters.error = null;
+      })
+      .addCase(fetchJoiningLetters.fulfilled, (state, action) => {
+        state.joiningLetters.loading = false;
+        if (!action.payload.cached) {
+          state.joiningLetters.list = action.payload.letters || [];
+          state.joiningLetters.total = action.payload.total || 0;
+          state.joiningLetters.page = action.payload.page || 1;
+          state.joiningLetters.totalPages = action.payload.totalPages || 1;
+          state.lastFetched.joiningLetters = Date.now();
+          state.lastFetched.joiningLettersKey = action.payload._cacheKey ?? null;
+        }
+      })
+      .addCase(fetchJoiningLetters.rejected, (state, action) => {
+        state.joiningLetters.loading = false;
+        state.joiningLetters.error = action.payload;
+      })
+      .addCase(verifyJoiningLetter.pending, (state) => {
+        state.joiningLetters.loading = true;
+      })
+      .addCase(verifyJoiningLetter.fulfilled, (state, action) => {
+        state.joiningLetters.loading = false;
+        const index = state.joiningLetters.list.findIndex(l => l.id === action.payload.data?.id);
+        if (index !== -1) {
+          state.joiningLetters.list[index] = action.payload.data;
+        }
+        state.lastFetched.joiningLetters = null;
+      })
+      .addCase(verifyJoiningLetter.rejected, (state, action) => {
+        state.joiningLetters.loading = false;
+        state.joiningLetters.error = action.payload;
+      })
+      .addCase(rejectJoiningLetter.pending, (state) => {
+        state.joiningLetters.loading = true;
+      })
+      .addCase(rejectJoiningLetter.fulfilled, (state, action) => {
+        state.joiningLetters.loading = false;
+        const index = state.joiningLetters.list.findIndex(l => l.id === action.payload.data?.id);
+        if (index !== -1) {
+          state.joiningLetters.list[index] = action.payload.data;
+        }
+        state.lastFetched.joiningLetters = null;
+      })
+      .addCase(rejectJoiningLetter.rejected, (state, action) => {
+        state.joiningLetters.loading = false;
+        state.joiningLetters.error = action.payload;
+      })
+      .addCase(deleteJoiningLetter.pending, (state) => {
+        state.joiningLetters.loading = true;
+      })
+      .addCase(deleteJoiningLetter.fulfilled, (state, action) => {
+        state.joiningLetters.loading = false;
+        state.joiningLetters.list = state.joiningLetters.list.filter(l => l.id !== action.payload.id);
+        state.joiningLetters.total -= 1;
+      })
+      .addCase(deleteJoiningLetter.rejected, (state, action) => {
+        state.joiningLetters.loading = false;
+        state.joiningLetters.error = action.payload;
+      })
+      .addCase(uploadJoiningLetter.pending, (state) => {
+        state.joiningLetters.loading = true;
+      })
+      .addCase(uploadJoiningLetter.fulfilled, (state, action) => {
+        state.joiningLetters.loading = false;
+        // Add or update the letter in the list
+        const newLetter = action.payload.data;
+        const index = state.joiningLetters.list.findIndex(l => l.id === newLetter.id);
+        if (index !== -1) {
+          state.joiningLetters.list[index] = newLetter;
+        } else {
+          state.joiningLetters.list = [newLetter, ...state.joiningLetters.list];
+          state.joiningLetters.total += 1;
+        }
+        state.lastFetched.joiningLetters = null;
+      })
+      .addCase(uploadJoiningLetter.rejected, (state, action) => {
+        state.joiningLetters.loading = false;
+        state.joiningLetters.error = action.payload;
+      })
+
+      // ==================== Monthly Report Actions ====================
+      .addCase(approveMonthlyReport.pending, (state) => {
+        state.monthlyReports.loading = true;
+      })
+      .addCase(approveMonthlyReport.fulfilled, (state, action) => {
+        state.monthlyReports.loading = false;
+        const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.data?.id);
+        if (index !== -1) {
+          state.monthlyReports.list[index] = action.payload.data;
+        }
+        state.lastFetched.monthlyReports = null;
+      })
+      .addCase(approveMonthlyReport.rejected, (state, action) => {
+        state.monthlyReports.loading = false;
+        state.monthlyReports.error = action.payload;
+      })
+      .addCase(rejectMonthlyReport.pending, (state) => {
+        state.monthlyReports.loading = true;
+      })
+      .addCase(rejectMonthlyReport.fulfilled, (state, action) => {
+        state.monthlyReports.loading = false;
+        const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.data?.id);
+        if (index !== -1) {
+          state.monthlyReports.list[index] = action.payload.data;
+        }
+        state.lastFetched.monthlyReports = null;
+      })
+      .addCase(rejectMonthlyReport.rejected, (state, action) => {
+        state.monthlyReports.loading = false;
+        state.monthlyReports.error = action.payload;
+      })
+      .addCase(deleteMonthlyReport.pending, (state) => {
+        state.monthlyReports.loading = true;
+      })
+      .addCase(deleteMonthlyReport.fulfilled, (state, action) => {
+        state.monthlyReports.loading = false;
+        state.monthlyReports.list = state.monthlyReports.list.filter(r => r.id !== action.payload.id);
+        state.monthlyReports.total -= 1;
+      })
+      .addCase(deleteMonthlyReport.rejected, (state, action) => {
+        state.monthlyReports.loading = false;
+        state.monthlyReports.error = action.payload;
       });
   },
 });
@@ -709,6 +970,7 @@ export const selectDashboard = (state) => state.faculty.dashboard;
 export const selectStudents = (state) => state.faculty.students;
 export const selectVisitLogs = (state) => state.faculty.visitLogs;
 export const selectMonthlyReports = (state) => state.faculty.monthlyReports;
+export const selectJoiningLetters = (state) => state.faculty.joiningLetters;
 export const selectProfile = (state) => state.faculty.profile;
 export const selectApplications = (state) => state.faculty.applications;
 export const selectFeedbackHistory = (state) => state.faculty.feedbackHistory;

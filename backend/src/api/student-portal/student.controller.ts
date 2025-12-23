@@ -164,10 +164,12 @@ export class StudentController {
     @Req() req,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('applicationId') applicationId?: string,
   ) {
-    return this.studentService.getMonthlyReports(req.user.userId, { 
-      page: page ? parseInt(page, 10) : undefined, 
-      limit: limit ? parseInt(limit, 10) : undefined 
+    return this.studentService.getMonthlyReports(req.user.userId, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      applicationId,
     });
   }
 

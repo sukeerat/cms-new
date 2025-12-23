@@ -41,8 +41,8 @@ const LayoutHeader = ({
         sticky top-0 z-40 flex items-center justify-between
         h-16 px-4 md:px-6
         border-b transition-all duration-300
-        bg-white/80 dark:bg-slate-900/80
-        border-slate-200 dark:border-slate-800
+        bg-surface/80
+        border-border
         backdrop-blur-md
         shadow-sm
       `}
@@ -95,7 +95,7 @@ const LayoutHeader = ({
         </div>
 
         {/* Divider */}
-        <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
+        <div className="h-8 w-px bg-border mx-1" />
 
         {/* User Profile Button */}
         <Tooltip title="View profile">

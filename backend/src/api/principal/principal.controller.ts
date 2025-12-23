@@ -70,6 +70,12 @@ export class PrincipalController {
     return this.principalService.getInstitution(req.user.userId);
   }
 
+  @Get('branches')
+  @ApiOperation({ summary: 'Get institution branches/departments' })
+  async getBranches(@Request() req) {
+    return this.principalService.getBranches(req.user.userId);
+  }
+
   @Put('institution')
   @ApiOperation({ summary: 'Update institution details' })
   async updateInstitution(@Request() req, @Body() updateData: any) {

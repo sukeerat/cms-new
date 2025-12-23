@@ -38,7 +38,15 @@ const ActiveInternshipCard = ({
     );
   }
 
-  const company = internship.internship?.industry || internship.industry || {};
+  // Handle self-identified vs regular internships
+  const isSelfIdentified = internship.isSelfIdentified || !internship.internshipId;
+
+  // For self-identified: companyName is directly on application
+  // For regular: companyName is in internship.industry
+  const company = isSelfIdentified
+    ? { companyName: internship.companyName, city: internship.companyAddress?.split(',')[0] }
+    : (internship.internship?.industry || internship.industry || {});
+
   const startDate = internship.joiningDate || internship.startDate || internship.internship?.startDate;
   const endDate = internship.endDate || internship.internship?.endDate;
   const duration = internship.internshipDuration || internship.internship?.duration;
@@ -70,8 +78,12 @@ const ActiveInternshipCard = ({
         </div>
       }
       extra={
-        <Tag color={internship.status === 'SELECTED' ? 'green' : 'blue'}>
-          {internship.status}
+        <Tag color={
+          internship.status === 'SELECTED' || internship.status === 'APPROVED' ? 'green' :
+          internship.status === 'JOINED' ? 'purple' :
+          internship.status === 'COMPLETED' ? 'cyan' : 'blue'
+        }>
+          {internship.isSelfIdentified && internship.status === 'APPROVED' ? 'Self-Identified' : internship.status}
         </Tag>
       }
     >
@@ -107,8 +119,28 @@ const ActiveInternshipCard = ({
           </div>
         </div>
 
-        {/* Industry Mentor */}
-        {internship.industryMentor && (
+        {/* Faculty Mentor (for self-identified internships) */}
+        {isSelfIdentified && (internship.mentor || internship.facultyMentorName) && (
+          <div className="p-3 bg-primary-50/50 rounded-lg">
+            <Text className="text-xs text-text-secondary block mb-2">Faculty Mentor</Text>
+            <div className="flex items-center gap-2">
+              <Avatar size="small" icon={<UserOutlined />} className="bg-primary" />
+              <div>
+                <Text strong className="text-sm">
+                  {internship.mentor?.name || internship.facultyMentorName}
+                </Text>
+                {(internship.mentor?.email || internship.facultyMentorEmail) && (
+                  <Text className="text-xs text-text-secondary block">
+                    {internship.mentor?.email || internship.facultyMentorEmail}
+                  </Text>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Industry Mentor (for regular internships) */}
+        {!isSelfIdentified && internship.industryMentor && (
           <div className="p-3 bg-background-tertiary rounded-lg">
             <Text className="text-xs text-text-secondary block mb-2">Industry Mentor</Text>
             <div className="flex items-center gap-2">

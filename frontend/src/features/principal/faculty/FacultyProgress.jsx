@@ -78,14 +78,14 @@ const FacultyProgress = () => {
   const fetchFacultyList = async () => {
     try {
       setLoading(true);
+      // Response is already unwrapped: { faculty: [...] }
       const response = await analyticsService.getFacultyProgressList();
-      const data = response.data || response;
-      setFacultyList(data.faculty || []);
+      setFacultyList(response?.faculty || []);
 
       // Auto-select first faculty if available
-      if (data.faculty?.length > 0 && !selectedFaculty) {
-        setSelectedFaculty(data.faculty[0]);
-        fetchFacultyDetails(data.faculty[0].id);
+      if (response?.faculty?.length > 0 && !selectedFaculty) {
+        setSelectedFaculty(response.faculty[0]);
+        fetchFacultyDetails(response.faculty[0].id);
       }
     } catch (error) {
       console.error('Failed to fetch faculty list:', error);
@@ -99,9 +99,9 @@ const FacultyProgress = () => {
   const fetchFacultyDetails = async (facultyId) => {
     try {
       setDetailsLoading(true);
+      // Response is already unwrapped
       const response = await analyticsService.getFacultyProgressDetails(facultyId);
-      const data = response.data || response;
-      setFacultyDetails(data);
+      setFacultyDetails(response);
     } catch (error) {
       console.error('Failed to fetch faculty details:', error);
       toast.error('Failed to load faculty details');
@@ -169,12 +169,14 @@ const FacultyProgress = () => {
   // Handle edit internship
   const handleEditInternship = (student) => {
     setEditStudent(student);
+    // Normalize status to uppercase
+    const status = student.internshipStatus?.toUpperCase?.() || student.internshipStatus || 'ONGOING';
     editForm.setFieldsValue({
       companyName: student.companyName || '',
       jobProfile: student.jobProfile || '',
       stipend: student.stipend ? parseInt(student.stipend) : null,
       internshipDuration: student.internshipDuration || '',
-      internshipStatus: student.internshipStatus || 'In Progress',
+      internshipStatus: status,
     });
     setEditVisible(true);
   };
@@ -264,12 +266,23 @@ const FacultyProgress = () => {
       key: 'status',
       render: (status) => {
         const colors = {
-          'In Progress': 'processing',
-          'Completed': 'success',
-          'Pending': 'warning',
-          'Not Started': 'default',
+          'ONGOING': 'processing',
+          'IN_PROGRESS': 'processing',
+          'COMPLETED': 'success',
+          'PENDING': 'warning',
+          'APPROVED': 'success',
+          'NOT_STARTED': 'default',
         };
-        return <Tag color={colors[status] || 'default'} className="rounded-full">{status || 'N/A'}</Tag>;
+        const labels = {
+          'ONGOING': 'Ongoing',
+          'IN_PROGRESS': 'In Progress',
+          'COMPLETED': 'Completed',
+          'PENDING': 'Pending',
+          'APPROVED': 'Approved',
+          'NOT_STARTED': 'Not Started',
+        };
+        const statusKey = status?.toUpperCase?.() || status;
+        return <Tag color={colors[statusKey] || 'default'} className="rounded-full">{labels[statusKey] || status || 'N/A'}</Tag>;
       },
     },
     {
@@ -868,9 +881,10 @@ const FacultyProgress = () => {
             <Col xs={24} md={8}>
               <Form.Item name="internshipStatus" label="Status">
                 <Select placeholder="Select status">
-                  <Select.Option value="In Progress">In Progress</Select.Option>
-                  <Select.Option value="Completed">Completed</Select.Option>
-                  <Select.Option value="Pending">Pending</Select.Option>
+                  <Select.Option value="ONGOING">Ongoing</Select.Option>
+                  <Select.Option value="IN_PROGRESS">In Progress</Select.Option>
+                  <Select.Option value="COMPLETED">Completed</Select.Option>
+                  <Select.Option value="APPROVED">Approved</Select.Option>
                 </Select>
               </Form.Item>
             </Col>

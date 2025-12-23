@@ -99,7 +99,7 @@ const InstitutionList = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Institutions</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Institutions</h1>
         <Button type="primary" onClick={() => navigate('/institutions/new')}>Add Institution</Button>
       </div>
 

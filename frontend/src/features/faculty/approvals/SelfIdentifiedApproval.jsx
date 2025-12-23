@@ -1,5 +1,5 @@
-// src/pages/faculty/SelfIdentifiedApprovalPage.jsx
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Card,
@@ -11,15 +11,10 @@ import {
   Form,
   Input,
   DatePicker,
-  Row,
-  Col,
   Descriptions,
-  Divider,
   Typography,
-  message,
   Badge,
   Tabs,
-  Alert,
   Popconfirm,
   Select,
 } from "antd";
@@ -35,26 +30,18 @@ import {
   CalendarOutlined,
   DollarOutlined,
   ClockCircleOutlined,
-  DownloadOutlined,
+  ArrowLeftOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import API from "../../../services/api";
+import facultyService from "../../../services/faculty.service";
 import { toast } from "react-hot-toast";
-import {
-  fetchInstituteAsync,
-  selectInstitute,
-  selectInstituteLoading,
-} from "../../../store/slices/instituteSlice";
 
 const { Title, Text, Paragraph } = Typography;
-const { TextArea } = Input;
 const { Option } = Select;
 
-export default function SelfIdentifiedApprovalPage() {
-  const dispatch = useDispatch();
-  const institute = useSelector(selectInstitute);
-  const instituteLoading = useSelector(selectInstituteLoading);
-  
+const SelfIdentifiedApproval = () => {
+  const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -63,38 +50,18 @@ export default function SelfIdentifiedApprovalPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState("pending");
-  const [userId, setUserId] = useState(null);
 
-  // Get user ID from localStorage
+  // Fetch self-identified applications on mount
   useEffect(() => {
-    const loginData = localStorage.getItem("loginResponse");
-    if (loginData) {
-      try {
-        const parsedData = JSON.parse(loginData);
-        if (parsedData.user) {
-          setUserId(parsedData.user.id);
-        }
-        // console.log("Parsed login data:", parsedData.user.id);
-      } catch (e) {
-        console.error("Error parsing login data:", e);
-      }
-    }
+    fetchSelfIdentifiedApplications();
   }, []);
-
-  // Fetch self-identified applications
-  useEffect(() => {
-    if (userId) {
-      fetchSelfIdentifiedApplications();
-    }
-  }, [userId]);
 
   const fetchSelfIdentifiedApplications = async () => {
     try {
       setLoading(true);
-      const response = await API.get(`/internship-applications/self-identified/mentor/${userId}`);
-      if (response.data.success) {
-        setApplications(response.data.data || []);
-      }
+      // Use faculty service with correct endpoint: GET /faculty/approvals/self-identified
+      const response = await facultyService.getSelfIdentifiedApprovals({});
+      setApplications(response.approvals || response.data || []);
     } catch (error) {
       console.error("Error fetching self-identified applications:", error);
       toast.error("Failed to load applications");
@@ -121,12 +88,14 @@ export default function SelfIdentifiedApprovalPage() {
   const handleReject = async (record) => {
     setActionLoading(true);
     try {
-      await API.patch(`/internship-applications/${record.id}/joining-status`, {
-        hasJoined: false,
+      // Use faculty service with correct endpoint: PUT /faculty/approvals/self-identified/:id
+      await facultyService.updateSelfIdentifiedApproval(record.id, {
+        status: 'REJECTED',
+        reviewRemarks: 'Application rejected by faculty',
       });
-      
+
       toast.success("Internship application rejected");
-      
+
       // Refresh the applications list
       await fetchSelfIdentifiedApplications();
     } catch (error) {
@@ -140,24 +109,45 @@ export default function SelfIdentifiedApprovalPage() {
   const handleSubmitApproval = async (values) => {
     setActionLoading(true);
     try {
-      await API.patch(
-        `/internship-applications/${selectedApplication.id}/joining-status`,
-        {
-          hasJoined: values.hasJoined,
-          joiningDate: values.joiningDate ? values.joiningDate.toISOString() : new Date().toISOString(),
-        }
-      );
+      if (values.hasJoined) {
+        // Approve the application using faculty service: PUT /faculty/approvals/self-identified/:id
+        await facultyService.updateSelfIdentifiedApproval(selectedApplication.id, {
+          status: 'APPROVED',
+          reviewRemarks: `Approved. Joining date: ${values.joiningDate ? values.joiningDate.format('YYYY-MM-DD') : 'Not specified'}`,
+        });
 
-      toast.success("Internship application approved successfully");
+        // If there's a joining date, also update the internship
+        if (values.joiningDate) {
+          try {
+            await facultyService.updateInternship(selectedApplication.id, {
+              hasJoined: true,
+              joiningDate: values.joiningDate.toISOString(),
+            });
+          } catch (e) {
+            // Non-critical - log but don't fail
+            console.warn("Could not update joining status:", e);
+          }
+        }
+
+        toast.success("Internship application approved successfully");
+      } else {
+        // Reject the application
+        await facultyService.updateSelfIdentifiedApproval(selectedApplication.id, {
+          status: 'REJECTED',
+          reviewRemarks: 'Rejected by faculty',
+        });
+        toast.success("Internship application rejected");
+      }
+
       setApprovalModalVisible(false);
       form.resetFields();
       setSelectedApplication(null);
-      
+
       // Refresh the applications list
       await fetchSelfIdentifiedApplications();
     } catch (error) {
-      console.error("Error approving application:", error);
-      toast.error(error?.response?.data?.message || "Failed to approve application");
+      console.error("Error processing application:", error);
+      toast.error(error?.response?.data?.message || "Failed to process application");
     } finally {
       setActionLoading(false);
     }
@@ -183,9 +173,9 @@ export default function SelfIdentifiedApprovalPage() {
       width: "20%",
       render: (_, record) => (
         <div>
-          <div className="font-semibold text-blue-600">{record.student?.name}</div>
-          <div className="text-xs text-gray-500">{record.student?.rollNumber}</div>
-          <div className="text-xs text-gray-500">{record.student?.branchName}</div>
+          <div className="font-semibold text-primary">{record.student?.name}</div>
+          <div className="text-xs text-text-secondary">{record.student?.rollNumber}</div>
+          <div className="text-xs text-text-secondary">{record.student?.branchName}</div>
         </div>
       ),
     },
@@ -196,16 +186,16 @@ export default function SelfIdentifiedApprovalPage() {
       render: (_, record) => (
         <div>
           <div className="font-medium flex items-center">
-            <BankOutlined className="mr-1 text-green-600" />
+            <BankOutlined className="mr-1 text-success" />
             {record.companyName || "N/A"}
           </div>
           {record.jobProfile && (
-            <div className="text-xs text-gray-600 mt-1">
+            <div className="text-xs text-text-secondary mt-1">
               Role: {record.jobProfile}
             </div>
           )}
           {record.companyAddress && (
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-text-tertiary mt-1">
               {record.companyAddress}
             </div>
           )}
@@ -220,13 +210,13 @@ export default function SelfIdentifiedApprovalPage() {
         <div>
           <div className="text-sm font-medium">{record.hrName || "N/A"}</div>
           {record.hrContact && (
-            <div className="text-xs text-gray-600 flex items-center mt-1">
+            <div className="text-xs text-text-secondary flex items-center mt-1">
               <PhoneOutlined className="mr-1" />
               {record.hrContact}
             </div>
           )}
           {record.hrEmail && (
-            <div className="text-xs text-blue-500 flex items-center mt-1">
+            <div className="text-xs text-primary flex items-center mt-1">
               <MailOutlined className="mr-1" />
               {record.hrEmail}
             </div>
@@ -242,18 +232,18 @@ export default function SelfIdentifiedApprovalPage() {
         <div>
           {record.internshipDuration && (
             <div className="text-sm flex items-center mb-1">
-              <ClockCircleOutlined className="mr-1 text-blue-500" />
+              <ClockCircleOutlined className="mr-1 text-primary" />
               {record.internshipDuration}
             </div>
           )}
           {record.stipend && (
-            <div className="text-sm flex items-center text-green-600">
+            <div className="text-sm flex items-center text-success">
               <DollarOutlined className="mr-1" />
               ₹{record.stipend}
             </div>
           )}
           {record.startDate && (
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-text-secondary mt-1">
               Start: {dayjs(record.startDate).format("MMM DD, YYYY")}
             </div>
           )}
@@ -426,20 +416,33 @@ export default function SelfIdentifiedApprovalPage() {
     <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="flex items-center">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Button
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate('/dashboard')}
+              className="rounded-lg"
+            />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm">
               <CheckCircleOutlined className="text-lg" />
             </div>
             <div>
               <Title level={2} className="mb-0 text-text-primary text-2xl">
-                Internship Approvals
+                Self-Identified Internship Approvals
               </Title>
-              <Paragraph className="text-text-secondary text-sm mb-0">
+              <Text className="text-text-secondary text-sm">
                 Review and approve self-identified internship applications from students
-              </Paragraph>
+              </Text>
             </div>
           </div>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={fetchSelfIdentifiedApplications}
+            loading={loading}
+            className="rounded-lg"
+          >
+            Refresh
+          </Button>
         </div>
 
         {/* Statistics Cards */}
@@ -690,7 +693,7 @@ export default function SelfIdentifiedApprovalPage() {
         >
           {selectedApplication && (
             <div className="space-y-4">
-              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mt-2">
+              <div className="bg-info-bg/50 p-4 rounded-xl border border-info-border mt-2">
                 <Text className="text-text-secondary text-sm">You are approving the internship for:</Text>
                 <div className="mt-2">
                   <Text strong className="text-text-primary block">{selectedApplication.student?.name}</Text>
@@ -750,5 +753,6 @@ export default function SelfIdentifiedApprovalPage() {
       </div>
     </div>
   );
-}
-}
+};
+
+export default SelfIdentifiedApproval;

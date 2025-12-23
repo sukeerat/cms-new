@@ -68,6 +68,16 @@ export class FacultyService {
     return this.cache.getOrSet(
       cacheKey,
       async () => {
+        // First, get all student IDs assigned to this faculty
+        const assignedStudentIds = await this.prisma.mentorAssignment.findMany({
+          where: {
+            mentorId: facultyId,
+            isActive: true,
+          },
+          select: { studentId: true },
+        });
+        const studentIds = assignedStudentIds.map((a) => a.studentId);
+
         // Only count self-identified internships (not placement-based)
         const [
           assignedStudents,
@@ -76,34 +86,40 @@ export class FacultyService {
           pendingVisits,
           totalVisits,
         ] = await Promise.all([
-          this.prisma.mentorAssignment.count({
-            where: {
-              mentorId: facultyId,
-              isActive: true,
-            },
-          }),
-          // Count active self-identified internships only
+          // Count assigned students
+          Promise.resolve(studentIds.length),
+          // Count active self-identified internships for assigned students
           this.prisma.internshipApplication.count({
             where: {
-              mentorId: facultyId,
-              isSelfIdentified: true,
+              studentId: { in: studentIds },
+              OR: [
+                { isSelfIdentified: true },
+                { internshipId: null },
+              ],
               status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] },
             },
           }),
+          // Count pending monthly reports for assigned students
           this.prisma.monthlyReport.count({
             where: {
               application: {
-                mentorId: facultyId,
-                isSelfIdentified: true, // Only self-identified internships
+                studentId: { in: studentIds },
+                OR: [
+                  { isSelfIdentified: true },
+                  { internshipId: null },
+                ],
               },
               status: MonthlyReportStatus.SUBMITTED,
             },
           }),
-          // Pending self-identified internship approvals (should be 0 with auto-approval)
+          // Count pending applications (if any) for assigned students
           this.prisma.internshipApplication.count({
             where: {
-              mentorId: facultyId,
-              isSelfIdentified: true,
+              studentId: { in: studentIds },
+              OR: [
+                { isSelfIdentified: true },
+                { internshipId: null },
+              ],
               status: ApplicationStatus.APPLIED,
             },
           }),
@@ -212,7 +228,10 @@ export class FacultyService {
               branch: true,
               internshipApplications: {
                 where: {
-                  mentorId: facultyId,
+                  OR: [
+                    { isSelfIdentified: true },
+                    { internshipId: null }, // No linked internship = self-identified
+                  ],
                 },
                 include: {
                   internship: {
@@ -220,7 +239,16 @@ export class FacultyService {
                       industry: true,
                     },
                   },
+                  monthlyReports: {
+                    orderBy: { createdAt: 'desc' as const },
+                    take: 5,
+                  },
+                  facultyVisitLogs: {
+                    orderBy: { visitDate: 'desc' as const },
+                    take: 5,
+                  },
                 },
+                orderBy: { createdAt: 'desc' as const },
               },
               _count: {
                 select: {
@@ -252,7 +280,12 @@ export class FacultyService {
       where: { id: studentId },
       include: {
         internshipApplications: {
-          where: { isSelfIdentified: true }, // Only self-identified internships
+          where: {
+            OR: [
+              { isSelfIdentified: true },
+              { internshipId: null }, // No linked internship = self-identified
+            ],
+          },
           include: {
             internship: {
               include: {
@@ -383,18 +416,57 @@ export class FacultyService {
   }
 
   /**
-   * Create visit log
+   * Create visit log (supports quick visit logging)
+   * Required fields: applicationId OR studentId, visitType, visitLocation
+   * All other fields are optional
    */
   async createVisitLog(facultyId: string, createVisitLogDto: any) {
-    const { applicationId, ...visitData } = createVisitLogDto;
+    const {
+      applicationId,
+      studentId,
+      visitDate,
+      visitType,
+      visitLocation,
+      latitude,
+      longitude,
+      visitPhotos,
+      status,
+      ...visitData
+    } = createVisitLogDto;
 
-    // Verify application exists and faculty is the mentor
-    const application = await this.prisma.internshipApplication.findFirst({
-      where: {
-        id: applicationId,
-        mentorId: facultyId,
-      },
-    });
+    // Validate required fields
+    if (!visitType) {
+      throw new BadRequestException('visitType is required');
+    }
+
+    if (!visitLocation) {
+      throw new BadRequestException('visitLocation is required');
+    }
+
+    // Find application - support both applicationId and studentId
+    let application;
+
+    if (applicationId) {
+      // Direct application ID provided
+      application = await this.prisma.internshipApplication.findFirst({
+        where: {
+          id: applicationId,
+          mentorId: facultyId,
+        },
+      });
+    } else if (studentId) {
+      // Find active application by student ID
+      application = await this.prisma.internshipApplication.findFirst({
+        where: {
+          studentId,
+          mentorId: facultyId,
+          status: { in: ['JOINED', 'APPROVED'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } else {
+      throw new BadRequestException('Either applicationId or studentId is required');
+    }
 
     if (!application) {
       throw new NotFoundException('Application not found or you are not the assigned mentor');
@@ -402,17 +474,32 @@ export class FacultyService {
 
     // Count existing visits for this application
     const visitCount = await this.prisma.facultyVisitLog.count({
-      where: { applicationId },
+      where: { applicationId: application.id },
     });
 
+    // Prepare visit data with defaults for quick logging
+    const visitLogData: any = {
+      applicationId: application.id,
+      facultyId,
+      internshipId: application.internshipId,
+      visitNumber: visitCount + 1,
+      visitType,
+      visitLocation,
+      // Auto-set visitDate to current date/time if not provided
+      visitDate: visitDate ? new Date(visitDate) : new Date(),
+      // Auto-set status to COMPLETED for quick logs if not provided
+      status: status || 'COMPLETED',
+      // Include GPS coordinates if provided
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude }),
+      // Include photo URLs if provided
+      ...(visitPhotos && visitPhotos.length > 0 && { visitPhotos }),
+      // Include any additional optional fields provided
+      ...visitData,
+    };
+
     const visitLog = await this.prisma.facultyVisitLog.create({
-      data: {
-        applicationId,
-        facultyId,
-        internshipId: application.internshipId,
-        visitNumber: visitCount + 1,
-        ...visitData,
-      },
+      data: visitLogData,
       include: {
         application: {
           include: {
@@ -427,7 +514,7 @@ export class FacultyService {
       },
     });
 
-    await this.cache.invalidateByTags(['visits', `application:${applicationId}`]);
+    await this.cache.invalidateByTags(['visits', `application:${application.id}`, `faculty:${facultyId}`]);
 
     return visitLog;
   }
@@ -1202,6 +1289,73 @@ export class FacultyService {
     return {
       success: true,
       message: 'Joining letter deleted successfully',
+      data: updated,
+    };
+  }
+
+  /**
+   * Upload joining letter for a student
+   */
+  async uploadJoiningLetter(applicationId: string, joiningLetterUrl: string, facultyId: string) {
+    // Verify application exists and faculty is the mentor
+    const application = await this.prisma.internshipApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            rollNumber: true,
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Verify faculty is the mentor
+    if (application.mentorId && application.mentorId !== facultyId) {
+      throw new BadRequestException('You are not authorized to upload a joining letter for this application');
+    }
+
+    // Update the application with joining letter URL and clear previous review data
+    const updated = await this.prisma.internshipApplication.update({
+      where: { id: applicationId },
+      data: {
+        joiningLetterUrl,
+        joiningLetterUploadedAt: new Date(),
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewRemarks: null,
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            rollNumber: true,
+          },
+        },
+        internship: {
+          include: {
+            industry: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    await this.cache.invalidateByTags(['applications', `application:${applicationId}`]);
+
+    return {
+      success: true,
+      message: 'Joining letter uploaded successfully',
       data: updated,
     };
   }

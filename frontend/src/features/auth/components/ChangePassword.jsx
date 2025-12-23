@@ -125,7 +125,7 @@ function ChangePassword() {
 
   return (
     <div
-      className="flex items-center justify-center min-h-screen bg-background bg-gradient-to-br from-primary-50/30 to-background"
+      className="flex items-center justify-center min-h-screen bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10"
     >
       <div className="w-full max-w-xl px-4 mt-5">
         {/* Header */}
@@ -142,7 +142,7 @@ function ChangePassword() {
         </div>
 
         {/* Form Card */}
-        <Card className="rounded-xl shadow-soft-lg border border-border">
+        <Card className="rounded-xl shadow-soft-lg border border-border bg-surface">
           <Alert
             message={<span className="font-semibold">Security Notice</span>}
             description="You are using a default password. Please create a strong, unique password to secure your account."
@@ -172,7 +172,7 @@ function ChangePassword() {
             >
               <Input.Password
                 placeholder="Enter your current password"
-                prefix={<LockOutlined className="text-primary mr-2" />}
+                prefix={<LockOutlined className="text-text-tertiary mr-2" />}
                 className="rounded-lg h-12"
               />
             </Form.Item>
@@ -187,7 +187,7 @@ function ChangePassword() {
               >
                 <Input.Password
                   placeholder="Enter new password"
-                  prefix={<LockOutlined className="text-primary mr-2" />}
+                  prefix={<LockOutlined className="text-text-tertiary mr-2" />}
                   className="rounded-lg h-12"
                 />
               </Form.Item>
@@ -203,7 +203,7 @@ function ChangePassword() {
               >
                 <Input.Password
                   placeholder="Confirm password"
-                  prefix={<CheckCircleOutlined className="text-primary mr-2" />}
+                  prefix={<CheckCircleOutlined className="text-text-tertiary mr-2" />}
                   className="rounded-lg h-12"
                 />
               </Form.Item>

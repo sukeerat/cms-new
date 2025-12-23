@@ -28,7 +28,7 @@ export const useBrowseInternships = (pageSize = 9) => {
     try {
       const [internshipsResponse, applicationsResponse] = await Promise.all([
         API.get('/internships/eligible'),
-        API.get('/internship-applications/my-applications')
+        API.get('/student/applications')
       ]);
 
       if (internshipsResponse) {

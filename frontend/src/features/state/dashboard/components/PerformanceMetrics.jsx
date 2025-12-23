@@ -101,29 +101,29 @@ const PerformanceMetrics = ({ stats }) => {
     {
       label: 'Internship Coverage',
       value: internshipRate,
-      color: '#ec4899',
-      icon: <BookOutlined className="text-pink-500" />,
+      color: 'rgb(var(--color-secondary))',
+      icon: <BookOutlined className="text-secondary" />,
       description: 'Percentage of students with active self-identified internships',
     },
     {
       label: 'Mentor Assignment',
       value: assignmentRate,
-      color: '#8b5cf6',
-      icon: <UserSwitchOutlined className="text-purple-500" />,
+      color: 'rgb(var(--color-primary))',
+      icon: <UserSwitchOutlined className="text-primary" />,
       description: 'Percentage of interns with assigned mentors',
     },
     {
       label: 'Faculty Visit Compliance',
       value: visitRate,
-      color: '#06b6d4',
-      icon: <CalendarOutlined className="text-cyan-500" />,
+      color: 'rgb(var(--color-info))',
+      icon: <CalendarOutlined className="text-info" />,
       description: 'Faculty visits completed this month vs expected',
     },
     {
       label: 'Report Submission',
       value: reportRate,
-      color: '#f97316',
-      icon: <FileTextOutlined className="text-orange-500" />,
+      color: 'rgb(var(--color-warning))',
+      icon: <FileTextOutlined className="text-warning" />,
       description: 'Monthly reports submitted this month vs expected',
     },
   ];
@@ -188,16 +188,16 @@ const PerformanceMetrics = ({ stats }) => {
           <Radar
             name="Current"
             dataKey="current"
-            stroke="#3b82f6"
-            fill="#3b82f6"
+            stroke="rgb(var(--color-primary))"
+            fill="rgb(var(--color-primary))"
             fillOpacity={0.4}
             strokeWidth={2}
           />
           <Radar
             name="Target"
             dataKey="target"
-            stroke="#52c41a"
-            fill="#52c41a"
+            stroke="rgb(var(--color-success))"
+            fill="rgb(var(--color-success))"
             fillOpacity={0.2}
             strokeWidth={2}
             strokeDasharray="5 5"
@@ -247,7 +247,7 @@ const PerformanceMetrics = ({ stats }) => {
               value={overallScore}
               suffix="%"
               valueStyle={{
-                color: overallScore >= 75 ? '#52c41a' : overallScore >= 50 ? '#faad14' : '#f5222d',
+                color: overallScore >= 75 ? 'rgb(var(--color-success))' : overallScore >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))',
                 fontSize: '20px'
               }}
             />
@@ -264,7 +264,7 @@ const PerformanceMetrics = ({ stats }) => {
               title={<span className="text-xs">Pending Actions</span>}
               value={(assignments?.unassigned || 0) + (monthlyReports?.missingThisMonth || 0)}
               valueStyle={{
-                color: '#f5222d',
+                color: 'rgb(var(--color-error))',
                 fontSize: '20px'
               }}
             />

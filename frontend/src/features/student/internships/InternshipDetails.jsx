@@ -87,7 +87,7 @@ const InternshipDetails = () => {
       // Fetch both internship details and user's applications
       const [internshipResponse, applicationsResponse] = await Promise.all([
         API.get(`/internships/${id}`),
-        API.get("/internship-applications/my-applications"),
+        API.get("/student/applications"),
       ]);
 
       if (internshipResponse) {
@@ -131,7 +131,7 @@ const InternshipDetails = () => {
       }
 
       const response = await API.post(
-        "/internship-applications",
+        `/student/internships/${id}/apply`,
         formData,
         {
           headers: {

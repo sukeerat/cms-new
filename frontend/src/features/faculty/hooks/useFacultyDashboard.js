@@ -7,6 +7,7 @@ import {
   fetchProfile,
   fetchApplications,
   fetchMonthlyReports,
+  fetchJoiningLetters,
   createVisitLog,
   updateVisitLog,
   deleteVisitLog,
@@ -20,6 +21,7 @@ import {
   selectProfile,
   selectApplications,
   selectMonthlyReports,
+  selectJoiningLetters,
 } from '../store/facultySlice';
 
 /**
@@ -36,14 +38,16 @@ export const useFacultyDashboard = () => {
   const profile = useSelector(selectProfile);
   const applications = useSelector(selectApplications);
   const monthlyReports = useSelector(selectMonthlyReports);
+  const joiningLetters = useSelector(selectJoiningLetters);
 
   // Derived loading state
   const isLoading = useMemo(() => (
     dashboard.loading ||
     students.loading ||
     visitLogs.loading ||
-    monthlyReports.loading
-  ), [dashboard.loading, students.loading, visitLogs.loading, monthlyReports.loading]);
+    monthlyReports.loading ||
+    joiningLetters.loading
+  ), [dashboard.loading, students.loading, visitLogs.loading, monthlyReports.loading, joiningLetters.loading]);
 
   // Fetch all dashboard data
   const fetchDashboardData = useCallback((forceRefresh = false) => {
@@ -53,6 +57,7 @@ export const useFacultyDashboard = () => {
     dispatch(fetchProfile());
     dispatch(fetchApplications({ forceRefresh }));
     dispatch(fetchMonthlyReports({ forceRefresh }));
+    dispatch(fetchJoiningLetters({ forceRefresh }));
   }, [dispatch]);
 
   // Initial fetch on mount
@@ -126,24 +131,41 @@ export const useFacultyDashboard = () => {
     fetchDashboardData(true);
   }, [fetchDashboardData]);
 
+  // Get pending joining letters
+  const pendingJoiningLetters = useMemo(() => {
+    return joiningLetters.list.filter(l => !l.reviewedAt);
+  }, [joiningLetters.list]);
+
+  // Get pending monthly reports
+  const pendingMonthlyReports = useMemo(() => {
+    return monthlyReports.list.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED');
+  }, [monthlyReports.list]);
+
   return {
     // State
     isLoading,
     dashboard: {
       ...dashboard.stats,
       monthlyReports: monthlyReports.list,
-      joiningLetters: [], // Will be populated from backend when available
+      joiningLetters: joiningLetters.list,
     },
     students: students.list,
     visitLogs: visitLogs.list,
     monthlyReports: monthlyReports.list,
+    joiningLetters: joiningLetters.list,
     mentor: profile.data,
     grievances: [], // Deprecated - use feedbackHistory instead
     applications: applications.list,
 
     // Computed
-    stats,
+    stats: {
+      ...stats,
+      pendingJoiningLetters: pendingJoiningLetters.length,
+      pendingMonthlyReports: pendingMonthlyReports.length,
+    },
     pendingApprovals,
+    pendingJoiningLetters,
+    pendingMonthlyReports,
     upcomingVisits,
     recentActivities: dashboard.recentActivities || [],
 
@@ -159,7 +181,7 @@ export const useFacultyDashboard = () => {
     handleReviewReport,
 
     // Errors
-    error: dashboard.error || students.error || visitLogs.error || monthlyReports.error,
+    error: dashboard.error || students.error || visitLogs.error || monthlyReports.error || joiningLetters.error,
   };
 };
 

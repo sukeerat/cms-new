@@ -28,7 +28,12 @@
       "Bash(grep:*)",
       "Bash(npx eslint:*)",
       "Bash(node --check:*)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma format:*)",
+      "Bash(npx prisma:*)",
+      "Bash(cd:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

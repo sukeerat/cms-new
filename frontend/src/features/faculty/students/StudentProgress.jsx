@@ -26,6 +26,7 @@ import {
   Upload,
   Popconfirm,
   Space,
+  Badge,
 } from "antd";
 import {
   UserOutlined,
@@ -53,11 +54,12 @@ import {
   EnvironmentOutlined,
   DeleteOutlined,
   UploadOutlined,
+  IdcardOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import API from "../../../services/api";
+import facultyService from "../../../services/faculty.service";
 import { toast } from "react-hot-toast";
 import {
   fetchAssignedStudents,
@@ -65,7 +67,7 @@ import {
 } from "../store/facultySlice";
 import { getDocumentUrl, getImageUrl } from "../../../utils/imageUtils";
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
 
@@ -339,9 +341,11 @@ const StudentProgressPage = () => {
         dueDate: vals.dueDate?.toISOString(),
       };
       if (modalType === "feedback") {
-        await API.post("/mentor/feedback", body);
+        // Use faculty service for feedback submission
+        await facultyService.submitFeedback(body);
       } else {
-        await API.post("/assignments", body);
+        // Use faculty service for assignment creation
+        await facultyService.createAssignment(body);
       }
       setModalOpen(false);
       // Optimistically update or refetch
@@ -412,11 +416,8 @@ const StudentProgressPage = () => {
       formData.append("month", selectedReportMonth.toString());
       formData.append("year", selectedReportYear.toString());
 
-      await API.post("/monthly-reports/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      // Use faculty service for uploading monthly reports
+      await facultyService.uploadMonthlyReport(formData);
 
       toast.success("Monthly report uploaded successfully!");
       setIsReportUploadModalVisible(false);
@@ -439,9 +440,8 @@ const StudentProgressPage = () => {
     }
 
     try {
-      await API.delete(`/monthly-reports/${reportId}`, {
-        data: { studentId: selected.student.id },
-      });
+      // Use faculty service for deleting monthly reports
+      await facultyService.deleteMonthlyReport(reportId);
 
       toast.success("Monthly report deleted successfully!");
       forceRefresh(); // Refresh student data
@@ -474,7 +474,8 @@ const StudentProgressPage = () => {
 
     setSavingInternship(true);
     try {
-      await API.put(`/faculty/internships/${editInternshipModal.internship.id}`, {
+      // Use faculty service for updating internships
+      await facultyService.updateInternship(editInternshipModal.internship.id, {
         ...values,
         joiningDate: values.joiningDate?.toISOString(),
       });
@@ -499,7 +500,8 @@ const StudentProgressPage = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          await API.delete(`/faculty/internships/${appId}`);
+          // Use faculty service for deleting internships
+          await facultyService.deleteInternship(appId);
           toast.success("Internship application deleted successfully!");
           forceRefresh();
         } catch (error) {
@@ -573,6 +575,7 @@ const StudentProgressPage = () => {
   }
 
   return (
+    <>
     <div className="p-4 md:p-6 bg-background-secondary min-h-screen overflow-hidden flex flex-col">
       <div className="max-w-[1600px] mx-auto w-full space-y-6 flex flex-col flex-1">
         {/* Header */}
@@ -733,7 +736,7 @@ const StudentProgressPage = () => {
                         icon={<UserOutlined />}
                         className="rounded-2xl border-4 border-background shadow-soft ring-1 ring-border"
                       />
-                      <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-lg bg-success flex items-center justify-center border-2 border-white shadow-sm">
+                      <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-lg bg-success flex items-center justify-center border-2 border-surface shadow-sm">
                         <CheckCircleOutlined className="text-white text-xs" />
                       </div>
                     </div>
@@ -953,170 +956,6 @@ const StudentProgressPage = () => {
         </Row>
       </div>
     </div>
-  );
-}
-                        <Empty description="No completion feedback available" />
-                      )}
-                    </TabPane> */}
-
-                    {/* ─── Monthly Reports ───────────────────────────────── */}
-                    <TabPane
-                      key="monthly-reports"
-                      tab={
-                        <span>
-                          <FileOutlined /> Monthly Reports (
-                          {metrics.monthlyReports?.length || 0})
-                        </span>
-                      }
-                    >
-                      <div className="mb-4 flex justify-end">
-                        <Button
-                          type="primary"
-                          icon={<PlusOutlined />}
-                          onClick={handleOpenReportUpload}
-                          disabled={!selected?.student?.id}
-                        >
-                          Upload Monthly Report
-                        </Button>
-                      </div>
-                      
-                      {metrics.monthlyReports?.length ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-3">
-                          {metrics.monthlyReports.map((rep) => (
-                            <Card
-                              key={rep.id}
-                              size="small"
-                              className="border-l-4 border-indigo-500 bg-indigo-50 shadow-sm hover:shadow-md transition-shadow"
-                            >
-                              <div className="flex justify-between items-center mb-3">
-                                <div>
-                                  <Text strong className="text-sm">
-                                    {formatDate(
-                                      rep.submittedAt || rep.createdAt
-                                    )}
-                                  </Text>
-                                  <div className="text-xs text-gray-500">
-                                    {rep.month && rep.year ? `${MONTH_NAMES[rep.month - 1]} ${rep.year}` : ""}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Tag color="blue" className="text-xs">
-                                    {rep.status || "SUBMITTED"}
-                                  </Tag>
-                                  <Popconfirm
-                                    title="Delete this report?"
-                                    description="Are you sure you want to delete this monthly report?"
-                                    onConfirm={() => handleDeleteReport(rep.id)}
-                                    okText="Yes"
-                                    cancelText="No"
-                                  >
-                                    <Button
-                                      type="text"
-                                      danger
-                                      size="small"
-                                      icon={<DeleteOutlined />}
-                                      title="Delete report"
-                                    />
-                                  </Popconfirm>
-                                </div>
-                              </div>
-
-                              {rep.summary && (
-                                <div className="mb-3">
-                                  <Text strong className="text-xs block mb-1">
-                                    Summary
-                                  </Text>
-                                  <Text className="text-sm text-gray-700 line-clamp-3">
-                                    {rep.summary}
-                                  </Text>
-                                </div>
-                              )}
-
-                              {rep.attachments?.length ? (
-                                <div className="mt-2">
-                                  <Text strong className="text-xs block mb-1">
-                                    Attachments
-                                  </Text>
-                                  <div className="flex flex-col gap-1">
-                                    {rep.attachments.map((att) => {
-                                      const fileUrl = getDocumentUrl(att.fileUrl);
-                                      return (
-                                        <a
-                                          key={att.id || att.url}
-                                          href={att.url || fileUrl}
-                                          target="_blank" // Changed to target="_blank"
-                                            rel="noreferrer"
-                                          className="text-sm text-indigo-700"
-                                        >
-                                          {att.name || att.fileName || "Download"}
-                                        </a>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ) : rep.reportFileUrl ? (
-                                <div className="mt-2">
-                                  <a
-                                    href={getDocumentUrl(rep.reportFileUrl)} // Changed to use getDocumentUrl
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-sm text-indigo-700"
-                                  >
-                                    Download Report
-                                  </a>
-                                </div>
-                              ) : null}
-                            </Card>
-                          ))}
-                        </div>
-                      ) : (
-                        <Empty
-                          description="No monthly reports available"
-                          image={
-                            <FileOutlined className="text-4xl text-gray-300" />
-                          }
-                        >
-                          <Text className="text-gray-500 text-sm">
-                            Monthly reports will appear here once submitted by
-                            the student or industry
-                          </Text>
-                        </Empty>
-                      )}
-                    </TabPane>
-                  </Tabs>
-                </Card>
-              </div>
-            ) : (
-              <Card className="min-h-[75vh] shadow-xl rounded-3xl bg-white/90 backdrop-blur-lg border-0 flex items-center justify-center">
-                <div className="text-center max-w-md mx-auto">
-                  <div className="relative mb-8">
-                    <div className="w-24 h-24 bg-gradient-to-r from-gray-200 to-gray-300 rounded-3xl flex items-center justify-center mb-4 mx-auto">
-                      <UserOutlined className="!text-gray-600 text-4xl" />
-                    </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <SearchOutlined className="!text-indigo-500 text-sm" />
-                    </div>
-                  </div>
-                  <Title level={4} className="text-gray-600 mb-4">
-                    Select an Student
-                  </Title>
-                  <Text className="text-gray-500 text-base block mb-6">
-                    Choose an Student from the directory on the left to view
-                    detailed information, manage applications, and track
-                    progress.
-                  </Text>
-                  <Card className="!bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl p-4">
-                    <Text className="!text-indigo-700 text-sm">
-                      💡 Tip: Use the search and filters to quickly find
-                      specific internships
-                    </Text>
-                  </Card>
-                </div>
-              </Card>
-            )}
-          </Col>
-        </Row>
-      </div>
 
       <Modal
         title={
@@ -1341,7 +1180,7 @@ const StudentProgressPage = () => {
                       "Internship"}
                   </strong>
                   <br />
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-text-secondary">
                     {editInternshipModal.internship.internship?.industry?.companyName ||
                       "Self-Identified"}
                   </span>

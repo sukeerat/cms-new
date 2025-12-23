@@ -48,11 +48,15 @@ import ReportBuilderDashboard from '../../features/state/reports/ReportBuilderDa
 import AuditLogs from '../../features/state/audit/AuditLogs';
 import BulkUserCreate from '../../features/state/users/BulkUserCreate';
 import CredentialsReset from '../../features/state/users/CredentialsReset';
+import CompaniesOverview from '../../features/state/companies/CompaniesOverview';
 
 // Shared
 import GrievanceList from '../../features/shared/grievances/GrievanceList';
 import NotificationCenter from '../../features/shared/notifications/NotificationCenter';
 import SubmitGrievance from '../../features/student/grievances/SubmitGrievance';
+
+// Help & Support
+import { HelpCenter, MyQueries, SupportDashboard } from '../../features/help-support';
 
 // Principal
 import PrincipalDashboard from '../../features/principal/dashboard/PrincipalDashboard';
@@ -74,6 +78,10 @@ import FacultyDashboard from '../../features/faculty/dashboard/FacultyDashboard'
 import VisitLogList from '../../features/faculty/visits/VisitLogList';
 import VisitLogForm from '../../features/faculty/visits/VisitLogForm';
 import AssignedStudentsList from '../../features/faculty/students/AssignedStudentsList';
+import SelfIdentifiedApproval from '../../features/faculty/approvals/SelfIdentifiedApproval';
+import MonthlyReportsPage from '../../features/faculty/reports/MonthlyReportsPage';
+import JoiningLettersPage from '../../features/faculty/joining-letters/JoiningLettersPage';
+import FacultyGrievances from '../../features/faculty/grievances/FacultyGrievances';
 
 // Student
 import StudentDashboard from '../../features/student/dashboard/StudentDashboard';
@@ -192,6 +200,14 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="companies-overview"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
+              <CompaniesOverview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="principals"
           element={
             <ProtectedRoute allowedRoles={[ROLES.STATE]}>
@@ -251,7 +267,7 @@ const AppRoutes = () => {
           path="grievances"
           element={
             <ProtectedRoute allowedRoles={[ROLES.STATE, ROLES.PRINCIPAL]}>
-              <GrievanceList />
+              <Grievances />
             </ProtectedRoute>
           }
         />
@@ -410,14 +426,6 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="grievances"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <Grievances />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="internships"
           element={
             <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
@@ -456,6 +464,38 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={ROLES.FACULTY}>
               <AssignedStudentsList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="approvals"
+          element={
+            <ProtectedRoute allowedRoles={ROLES.FACULTY}>
+              <SelfIdentifiedApproval />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="monthly-reports"
+          element={
+            <ProtectedRoute allowedRoles={ROLES.FACULTY}>
+              <MonthlyReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="joining-letters"
+          element={
+            <ProtectedRoute allowedRoles={ROLES.FACULTY}>
+              <JoiningLettersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="faculty-grievances"
+          element={
+            <ProtectedRoute allowedRoles={ROLES.FACULTY}>
+              <FacultyGrievances />
             </ProtectedRoute>
           }
         />
@@ -555,6 +595,18 @@ const AppRoutes = () => {
         {/* Shared Routes */}
         <Route path="notifications" element={<NotificationCenter />} />
         <Route path="change-password" element={<ChangePassword />} />
+
+        {/* Help & Support Routes - Available to all authenticated users */}
+        <Route path="help" element={<HelpCenter />} />
+        <Route path="my-queries" element={<MyQueries />} />
+        <Route
+          path="support-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
+              <SupportDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* Unauthorized Page */}

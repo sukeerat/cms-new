@@ -67,7 +67,7 @@ const AssignedStudentsList = () => {
           <Avatar icon={<UserOutlined />} src={record.profileImage} />
           <div>
             <div className="font-medium">{record.name}</div>
-            <div className="text-gray-500 text-xs">{record.rollNumber}</div>
+            <div className="text-text-secondary text-xs">{record.rollNumber}</div>
           </div>
         </Space>
       ),
@@ -187,7 +187,7 @@ const AssignedStudentsList = () => {
             <div className="text-center mb-6">
               <Avatar size={100} icon={<UserOutlined />} src={selectedStudent.profileImage} />
               <h2 className="text-xl font-semibold mt-3">{selectedStudent.name}</h2>
-              <p className="text-gray-500">{selectedStudent.rollNumber}</p>
+              <p className="text-text-secondary">{selectedStudent.rollNumber}</p>
             </div>
 
             <Divider plain>Personal Information</Divider>

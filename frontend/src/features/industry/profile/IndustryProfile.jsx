@@ -283,7 +283,7 @@ const IndustryProfile = () => {
           )}
           {/* Hero Section */}
           <div className="relative overflow-hidden rounded-3xl mb-8 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary-600 via-secondary-600 to-primary-700"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary-700"></div>
             <div className="absolute inset-0 bg-black/10"></div>
             <div className="relative p-8 md:p-12 text-white">
               <div className="flex flex-col md:flex-row items-center justify-between gap-8">

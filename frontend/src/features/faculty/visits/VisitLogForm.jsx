@@ -333,7 +333,7 @@ const VisitLogForm = () => {
                 Upload Files
               </Button>
             </Upload>
-            <div className="text-gray-500 text-xs mt-2">
+            <div className="text-text-tertiary text-xs mt-2">
               Supported formats: PDF, DOC, DOCX, JPG, PNG (Max 10MB per file, up to 5 files)
             </div>
           </Form.Item>

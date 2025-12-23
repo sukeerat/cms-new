@@ -129,23 +129,23 @@ const StudentProgress = () => {
       Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
       const response = await analyticsService.getStudentProgress(params);
-      const data = response.data || response;
+      // Response is already unwrapped: { students: [...], pagination: {...}, mentors: [...] }
 
-      setStudents(data.students || []);
+      setStudents(response?.students || []);
       setPagination({
-        current: data.pagination?.page || page,
-        pageSize: data.pagination?.limit || pageSize,
-        total: data.pagination?.total || 0,
+        current: response?.pagination?.page || page,
+        pageSize: response?.pagination?.limit || pageSize,
+        total: response?.pagination?.total || 0,
       });
 
       // Set mentors list from API response
-      if (data.mentors && Array.isArray(data.mentors)) {
-        setMentors(data.mentors);
+      if (response?.mentors && Array.isArray(response.mentors)) {
+        setMentors(response.mentors);
       }
 
-      const studentList = data.students || [];
+      const studentList = response?.students || [];
       const statusCounts = {
-        total: data.pagination?.total || studentList.length,
+        total: response?.pagination?.total || studentList.length,
         inProgress: studentList.filter(s => s.internshipStatus === 'In Progress').length,
         completed: studentList.filter(s => s.internshipStatus === 'Completed').length,
         delayed: studentList.filter(s => s.internshipStatus === 'Delayed').length,
@@ -173,8 +173,9 @@ const StudentProgress = () => {
 
       Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
+      // Response is already unwrapped by service
       const response = await analyticsService.getPendingReportsByMonth(params);
-      setPendingReportsData(response.data || response);
+      setPendingReportsData(response);
     } catch (error) {
       console.error('Failed to fetch pending reports:', error);
       toast.error('Failed to load pending reports');
@@ -279,20 +280,28 @@ const StudentProgress = () => {
   const handleEditInternship = (student) => {
     setEditStudent(student);
     const app = student.application || {};
+    const company = app.company || {};
+    const facultyMentor = app.facultyMentor || {};
+
     editForm.setFieldsValue({
-      companyName: app.companyName || '',
-      companyAddress: app.companyAddress || '',
-      companyContact: app.companyContact || '',
-      companyEmail: app.companyEmail || '',
+      // Company fields - check both direct and nested access
+      companyName: company.name || app.companyName || app.internshipTitle || '',
+      companyAddress: company.address || app.companyAddress || '',
+      companyContact: company.contact || app.companyContact || '',
+      companyEmail: company.email || app.companyEmail || '',
       jobProfile: app.jobProfile || '',
-      stipend: app.stipend ? parseInt(app.stipend) : null,
-      internshipDuration: app.internshipDuration || '',
+      // Stipend - backend returns stipendAmount
+      stipend: app.stipendAmount || app.stipend ? parseInt(app.stipendAmount || app.stipend) : null,
+      // Duration - backend returns duration
+      internshipDuration: app.duration || app.internshipDuration || '',
       startDate: app.startDate ? dayjs(app.startDate) : null,
       endDate: app.endDate ? dayjs(app.endDate) : null,
-      facultyMentorName: app.facultyMentorName || '',
-      facultyMentorEmail: app.facultyMentorEmail || '',
-      facultyMentorDesignation: app.facultyMentorDesignation || '',
-      status: app.status || 'APPROVED',
+      // Faculty mentor - check both nested and direct access
+      facultyMentorName: facultyMentor.name || app.facultyMentorName || '',
+      facultyMentorEmail: facultyMentor.email || app.facultyMentorEmail || '',
+      facultyMentorDesignation: facultyMentor.designation || app.facultyMentorDesignation || '',
+      facultyMentorContact: facultyMentor.contact || app.facultyMentorContact || '',
+      status: app.status || app.internshipStatus || 'APPROVED',
     });
     setEditVisible(true);
   };
@@ -592,26 +601,26 @@ const StudentProgress = () => {
                   <Text strong className="text-xs uppercase tracking-widest text-text-tertiary">Self-Identified Internship</Text>
                   <Tag color="purple" className="rounded-full text-[10px] uppercase font-bold m-0">Student Sourced</Tag>
                 </div>
-                <Text className="text-lg text-text-primary font-semibold">{record.application.companyName || record.application.internshipTitle || 'N/A'}</Text>
+                <Text className="text-lg text-text-primary font-semibold">{record.application.company?.name || record.application.companyName || record.application.internshipTitle || 'N/A'}</Text>
                 {record.application.jobProfile && (
                   <Text className="text-sm text-text-secondary block">{record.application.jobProfile}</Text>
                 )}
                 <div className="flex items-center gap-4 mt-2 text-text-secondary text-sm flex-wrap">
-                  {record.application.joiningDate && (
+                  {(record.application.joiningDate || record.application.startDate) && (
                     <div className="flex items-center gap-1">
                       <CalendarOutlined className="text-xs" />
                       <span>Started {dayjs(record.application.joiningDate || record.application.startDate).format("DD MMM YYYY")}</span>
                     </div>
                   )}
-                  {record.application.internshipDuration && (
+                  {(record.application.duration || record.application.internshipDuration) && (
                     <div className="flex items-center gap-1">
                       <ClockCircleOutlined className="text-xs" />
-                      <span>{record.application.internshipDuration}</span>
+                      <span>{record.application.duration || record.application.internshipDuration}</span>
                     </div>
                   )}
-                  {record.application.stipend && (
+                  {(record.application.stipendAmount || record.application.stipend) && (
                     <Tag color="green" className="rounded-full m-0 text-xs">
-                      Stipend: {record.application.stipend}/month
+                      Stipend: {record.application.stipendAmount || record.application.stipend}/month
                     </Tag>
                   )}
                 </div>
@@ -686,33 +695,33 @@ const StudentProgress = () => {
                 className="bg-background-tertiary/30 rounded-lg p-3"
               >
                 <Descriptions.Item label={<span className="text-text-tertiary"><BankOutlined className="mr-1" />Company</span>}>
-                  <Text strong className="text-text-primary">{record.application.companyName || record.application.company?.name || 'N/A'}</Text>
+                  <Text strong className="text-text-primary">{record.application.company?.name || record.application.companyName || 'N/A'}</Text>
                 </Descriptions.Item>
                 {record.application.jobProfile && (
                   <Descriptions.Item label={<span className="text-text-tertiary">Job Profile</span>}>
                     <Tag color="purple" className="rounded-md">{record.application.jobProfile}</Tag>
                   </Descriptions.Item>
                 )}
-                {record.application.stipend && (
+                {(record.application.stipendAmount || record.application.stipend) && (
                   <Descriptions.Item label={<span className="text-text-tertiary">Stipend</span>}>
-                    <Tag color="green" className="rounded-md">{record.application.stipend}/month</Tag>
+                    <Tag color="green" className="rounded-md">{record.application.stipendAmount || record.application.stipend}/month</Tag>
                   </Descriptions.Item>
                 )}
-                {record.application.companyEmail && (
+                {(record.application.company?.email || record.application.companyEmail) && (
                   <Descriptions.Item label={<span className="text-text-tertiary"><MailOutlined className="mr-1" />Email</span>}>
-                    <a href={`mailto:${record.application.companyEmail}`} className="text-primary hover:underline">
-                      {record.application.companyEmail}
+                    <a href={`mailto:${record.application.company?.email || record.application.companyEmail}`} className="text-primary hover:underline">
+                      {record.application.company?.email || record.application.companyEmail}
                     </a>
                   </Descriptions.Item>
                 )}
-                {record.application.companyContact && (
+                {(record.application.company?.contact || record.application.companyContact) && (
                   <Descriptions.Item label={<span className="text-text-tertiary"><PhoneOutlined className="mr-1" />Phone</span>}>
-                    <Text className="text-text-primary">{record.application.companyContact}</Text>
+                    <Text className="text-text-primary">{record.application.company?.contact || record.application.companyContact}</Text>
                   </Descriptions.Item>
                 )}
-                {record.application.companyAddress && (
+                {(record.application.company?.address || record.application.companyAddress) && (
                   <Descriptions.Item label={<span className="text-text-tertiary"><EnvironmentOutlined className="mr-1" />Address</span>} span={2}>
-                    <Text className="text-text-primary">{record.application.companyAddress}</Text>
+                    <Text className="text-text-primary">{record.application.company?.address || record.application.companyAddress}</Text>
                   </Descriptions.Item>
                 )}
                 {record.application.startDate && (
@@ -725,7 +734,7 @@ const StudentProgress = () => {
               </Descriptions>
 
               {/* Faculty Mentor Details for Self-Identified */}
-              {record.application.facultyMentorName && (
+              {(record.application.facultyMentor?.name || record.application.facultyMentorName) && (
                 <div className="mt-4 pt-4 border-t border-border/50">
                   <div className="flex items-center gap-2 mb-3">
                     <TeamOutlined className="text-text-tertiary" />
@@ -737,23 +746,23 @@ const StudentProgress = () => {
                     className="bg-background-tertiary/30 rounded-lg p-3"
                   >
                     <Descriptions.Item label="Name">
-                      <Text strong className="text-text-primary">{record.application.facultyMentorName}</Text>
+                      <Text strong className="text-text-primary">{record.application.facultyMentor?.name || record.application.facultyMentorName}</Text>
                     </Descriptions.Item>
-                    {record.application.facultyMentorDesignation && (
+                    {(record.application.facultyMentor?.designation || record.application.facultyMentorDesignation) && (
                       <Descriptions.Item label="Designation">
-                        <Text className="text-text-primary">{record.application.facultyMentorDesignation}</Text>
+                        <Text className="text-text-primary">{record.application.facultyMentor?.designation || record.application.facultyMentorDesignation}</Text>
                       </Descriptions.Item>
                     )}
-                    {record.application.facultyMentorEmail && (
+                    {(record.application.facultyMentor?.email || record.application.facultyMentorEmail) && (
                       <Descriptions.Item label="Email">
-                        <a href={`mailto:${record.application.facultyMentorEmail}`} className="text-primary hover:underline">
-                          {record.application.facultyMentorEmail}
+                        <a href={`mailto:${record.application.facultyMentor?.email || record.application.facultyMentorEmail}`} className="text-primary hover:underline">
+                          {record.application.facultyMentor?.email || record.application.facultyMentorEmail}
                         </a>
                       </Descriptions.Item>
                     )}
-                    {record.application.facultyMentorContact && (
+                    {(record.application.facultyMentor?.contact || record.application.facultyMentorContact) && (
                       <Descriptions.Item label="Contact">
-                        <Text className="text-text-primary">{record.application.facultyMentorContact}</Text>
+                        <Text className="text-text-primary">{record.application.facultyMentor?.contact || record.application.facultyMentorContact}</Text>
                       </Descriptions.Item>
                     )}
                   </Descriptions>
@@ -1409,19 +1418,26 @@ const StudentProgress = () => {
 
           <Divider className="my-4">Faculty Mentor</Divider>
           <Row gutter={16}>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={12}>
               <Form.Item name="facultyMentorName" label="Mentor Name">
                 <Input placeholder="Enter mentor name" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={12}>
+              <Form.Item name="facultyMentorDesignation" label="Designation">
+                <Input placeholder="Enter designation" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
               <Form.Item name="facultyMentorEmail" label="Mentor Email">
                 <Input placeholder="Enter mentor email" type="email" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="facultyMentorDesignation" label="Designation">
-                <Input placeholder="Enter designation" />
+            <Col xs={24} md={12}>
+              <Form.Item name="facultyMentorContact" label="Mentor Contact">
+                <Input placeholder="Enter mentor contact number" />
               </Form.Item>
             </Col>
           </Row>

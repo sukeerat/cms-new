@@ -163,7 +163,7 @@ function Login() {
 
   return (
     <div
-      className="flex items-center justify-center min-h-screen bg-background bg-gradient-to-br from-primary-50/30 to-background"
+      className="flex items-center justify-center min-h-screen bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10"
     >
       <div className="w-full max-w-lg px-4 mt-5">
         {/* Header */}
@@ -177,7 +177,7 @@ function Login() {
         </div>
 
         {/* Form Card */}
-        <Card className="rounded-xl shadow-soft-lg border border-border">
+        <Card className="rounded-xl shadow-soft-lg border border-border bg-surface">
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
@@ -207,7 +207,7 @@ function Login() {
                       <Input
                         placeholder="Enter your student email address"
                         prefix={
-                          <MailOutlined className="text-primary" />
+                          <MailOutlined className="text-text-tertiary" />
                         }
                       />
                     </Form.Item>
@@ -228,7 +228,7 @@ function Login() {
                       <Input.Password
                         placeholder="Enter your password"
                         prefix={
-                          <LockOutlined className="text-primary" />
+                          <LockOutlined className="text-text-tertiary" />
                         }
                       />
                     </Form.Item>
@@ -288,7 +288,7 @@ function Login() {
                         placeholder="Enter your Registration Number"
                         prefix={
                           <IdcardOutlined
-                            className="text-primary"
+                            className="text-text-tertiary"
                           />
                         }
                       />
@@ -310,7 +310,7 @@ function Login() {
                       <Input.Password
                         placeholder="Enter your password"
                         prefix={
-                          <LockOutlined className="text-primary" />
+                          <LockOutlined className="text-text-tertiary" />
                         }
                       />
                     </Form.Item>

@@ -131,6 +131,34 @@ export class StateController {
     });
   }
 
+  // ==================== STATE-WIDE COMPANIES OVERVIEW ====================
+
+  @Get('companies')
+  @ApiOperation({ summary: 'Get all companies across all institutions with student breakdown' })
+  async getAllCompanies(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('industryType') industryType?: string,
+    @Query('sortBy') sortBy?: 'studentCount' | 'institutionCount' | 'companyName',
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    return this.stateService.getAllCompanies({
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+      search,
+      industryType,
+      sortBy,
+      sortOrder,
+    });
+  }
+
+  @Get('companies/:id')
+  @ApiOperation({ summary: 'Get company details with all institutions and students' })
+  async getCompanyDetails(@Param('id') id: string) {
+    return this.stateService.getCompanyDetails(id);
+  }
+
   @Get('institutions/:id/faculty-principal')
   @ApiOperation({ summary: 'Get institution faculty and principal with stats' })
   async getInstitutionFacultyAndPrincipal(@Param('id') id: string) {

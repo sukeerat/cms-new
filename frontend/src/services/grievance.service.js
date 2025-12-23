@@ -33,6 +33,26 @@ export const grievanceService = {
   },
 
   /**
+   * Get grievances by student ID
+   * @param {string} studentId - Student ID
+   * @returns {Promise} - List of student's grievances
+   */
+  async getByStudentId(studentId) {
+    const response = await API.get(`/grievances/student/${studentId}`);
+    return response.data;
+  },
+
+  /**
+   * Get grievances assigned to faculty member
+   * @param {string} userId - Faculty user ID
+   * @returns {Promise} - List of assigned grievances
+   */
+  async getByFaculty(userId) {
+    const response = await API.get(`/grievances/faculty/${userId}`);
+    return response.data;
+  },
+
+  /**
    * Get a single grievance by ID
    * @param {string} id - Grievance ID
    * @returns {Promise} - Grievance details
@@ -43,8 +63,18 @@ export const grievanceService = {
   },
 
   /**
+   * Get escalation chain for a grievance
+   * @param {string} id - Grievance ID
+   * @returns {Promise} - Escalation chain details
+   */
+  async getEscalationChain(id) {
+    const response = await API.get(`/grievances/${id}/escalation-chain`);
+    return response.data;
+  },
+
+  /**
    * Submit a new grievance
-   * @param {Object} data - Grievance data (category, subject, description, priority, etc.)
+   * @param {Object} data - Grievance data (category, title, description, severity, etc.)
    * @returns {Promise} - Created grievance
    */
   async submit(data) {
@@ -56,32 +86,42 @@ export const grievanceService = {
    * Respond to a grievance
    * @param {string} id - Grievance ID
    * @param {string} response - Response text
+   * @param {string} newStatus - Optional new status
    * @param {string[]} attachments - Optional attachments
    * @returns {Promise} - Updated grievance
    */
-  async respond(id, response, attachments = []) {
-    const res = await API.post(`/grievances/${id}/respond`, { response, attachments });
+  async respond(id, responseText, newStatus = null, attachments = []) {
+    const data = { response: responseText, attachments };
+    if (newStatus) data.newStatus = newStatus;
+    const res = await API.post(`/grievances/${id}/respond`, data);
     return res.data;
   },
 
   /**
-   * Escalate a grievance
+   * Escalate a grievance to the next level
    * @param {string} id - Grievance ID
+   * @param {string} reason - Reason for escalation
+   * @param {string} escalateToId - Optional user ID to escalate to
    * @returns {Promise} - Updated grievance
    */
-  async escalate(id) {
-    const response = await API.post(`/grievances/${id}/escalate`);
+  async escalate(id, reason, escalateToId = null) {
+    const data = { reason };
+    if (escalateToId) data.escalateToId = escalateToId;
+    const response = await API.post(`/grievances/${id}/escalate`, data);
     return response.data;
   },
 
   /**
    * Update grievance status
    * @param {string} id - Grievance ID
-   * @param {string} status - New status (SUBMITTED, IN_REVIEW, ESCALATED, RESOLVED, CLOSED)
+   * @param {string} status - New status
+   * @param {string} remarks - Optional remarks
    * @returns {Promise} - Updated grievance
    */
-  async updateStatus(id, status) {
-    const response = await API.patch(`/grievances/${id}/status`, { status });
+  async updateStatus(id, status, remarks = null) {
+    const data = { status };
+    if (remarks) data.remarks = remarks;
+    const response = await API.patch(`/grievances/${id}/status`, data);
     return response.data;
   },
 
@@ -89,10 +129,13 @@ export const grievanceService = {
    * Assign grievance to a user
    * @param {string} id - Grievance ID
    * @param {string} assigneeId - User ID to assign to
+   * @param {string} remarks - Optional remarks
    * @returns {Promise} - Updated grievance
    */
-  async assign(id, assigneeId) {
-    const response = await API.patch(`/grievances/${id}/assign`, { assigneeId });
+  async assign(id, assigneeId, remarks = null) {
+    const data = { assigneeId };
+    if (remarks) data.remarks = remarks;
+    const response = await API.patch(`/grievances/${id}/assign`, data);
     return response.data;
   },
 
@@ -108,12 +151,35 @@ export const grievanceService = {
   },
 
   /**
+   * Get assignable users for grievance assignment
+   * @param {string} institutionId - Institution ID
+   * @returns {Promise} - List of assignable users
+   */
+  async getAssignableUsers(institutionId) {
+    const response = await API.get(`/grievances/assignable-users/list?institutionId=${institutionId}`);
+    return response.data;
+  },
+
+  /**
    * Close a grievance
    * @param {string} id - Grievance ID
+   * @param {string} remarks - Optional remarks
    * @returns {Promise} - Updated grievance
    */
-  async close(id) {
-    const response = await API.patch(`/grievances/${id}/close`);
+  async close(id, remarks = null) {
+    const data = remarks ? { remarks } : {};
+    const response = await API.patch(`/grievances/${id}/close`, data);
+    return response.data;
+  },
+
+  /**
+   * Reject a grievance
+   * @param {string} id - Grievance ID
+   * @param {string} reason - Rejection reason
+   * @returns {Promise} - Updated grievance
+   */
+  async reject(id, reason) {
+    const response = await API.patch(`/grievances/${id}/reject`, { reason });
     return response.data;
   },
 };

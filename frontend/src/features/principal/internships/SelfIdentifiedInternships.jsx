@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Card,
@@ -74,6 +74,7 @@ const SelfIdentifiedInternships = () => {
   const dispatch = useDispatch();
   const internshipStats = useSelector(selectInternshipStats);
   const [form] = Form.useForm();
+  const hasFetched = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [internships, setInternships] = useState([]);
@@ -99,53 +100,75 @@ const SelfIdentifiedInternships = () => {
   const fetchInternships = useCallback(async () => {
     try {
       setLoading(true);
-      // Using student progress endpoint which includes internship data
+      // Fetch all students with internships (use large limit for client-side filtering/pagination)
       const response = await principalService.getStudents({
-        page: pagination.current,
-        limit: pagination.pageSize,
-        hasInternship: true,
+        page: 1,
+        limit: 500, // Fetch all for client-side filtering and pagination
+        hasInternship: 'true',
       });
 
-      const data = response.data || response;
-      const students = data.data || data.students || [];
+      // Response is already unwrapped by service, structure: { data: [...], total, page, limit }
+      const students = response?.data || [];
 
       // Transform student data to internship format
+      // Filter for students who have self-identified internships in their internshipApplications array
       const internshipData = students
-        .filter(s => s.internshipApplication || s.selfIdentifiedInternship)
+        .filter(s => {
+          // Check both legacy selfIdentifiedInternship and new internshipApplications array
+          if (s.selfIdentifiedInternship) return true;
+          if (s.internshipApplications && Array.isArray(s.internshipApplications)) {
+            return s.internshipApplications.some(app => app.isSelfIdentified);
+          }
+          return false;
+        })
         .map(student => {
-          const internship = student.internshipApplication || student.selfIdentifiedInternship || {};
+          // Get internship from either legacy format or from internshipApplications array
+          let internship = student.selfIdentifiedInternship;
+          if (!internship && student.internshipApplications) {
+            internship = student.internshipApplications.find(app => app.isSelfIdentified) || student.internshipApplications[0];
+          }
+
+          // Get mentor from mentorAssignments if available
+          // Backend returns: mentorAssignments[].mentor (not .faculty)
+          const mentorAssignment = student.mentorAssignments?.[0];
+          const mentor = mentorAssignment?.mentor || student.mentor;
+
           return {
-            id: internship.id || student.id,
+            id: internship?.id || student.id,
             studentId: student.id,
             studentName: student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim(),
             studentRollNumber: student.rollNumber || student.registrationNumber,
-            studentEmail: student.email,
-            studentPhone: student.phone,
+            studentEmail: student.email || student.user?.email,
+            studentPhone: student.phone || student.user?.phoneNo,
             studentBatch: student.batch?.name || student.batchName,
-            studentDepartment: student.department?.name || student.departmentName,
-            companyName: internship.companyName || 'N/A',
-            companyAddress: internship.companyAddress,
-            companyContact: internship.companyContact,
-            companyEmail: internship.companyEmail,
-            jobProfile: internship.jobProfile || internship.role,
-            stipend: internship.stipend,
-            startDate: internship.startDate,
-            endDate: internship.endDate,
-            duration: internship.internshipDuration,
-            status: internship.status || 'APPROVED',
-            mentorName: internship.facultyMentorName || student.mentor?.name,
-            mentorEmail: internship.facultyMentorEmail || student.mentor?.email,
-            mentorDesignation: internship.facultyMentorDesignation,
-            joiningLetterUrl: internship.joiningLetterUrl,
-            submittedAt: internship.createdAt || student.createdAt,
-            isSelfIdentified: internship.isSelfIdentified ?? true,
+            studentDepartment: student.branch?.name || student.department?.name || student.departmentName,
+            companyName: internship?.companyName || internship?.industry?.companyName || 'N/A',
+            companyAddress: internship?.companyAddress || internship?.industry?.address,
+            companyContact: internship?.companyContact || internship?.industry?.contactNumber,
+            companyEmail: internship?.companyEmail || internship?.industry?.email,
+            jobProfile: internship?.jobProfile || internship?.role || internship?.position,
+            stipend: internship?.stipend,
+            startDate: internship?.startDate,
+            endDate: internship?.endDate,
+            duration: internship?.internshipDuration || internship?.duration,
+            status: internship?.status || internship?.internshipStatus || 'APPROVED',
+            internshipStatus: internship?.internshipStatus,
+            mentorName: internship?.facultyMentorName || mentor?.name,
+            mentorEmail: internship?.facultyMentorEmail || mentor?.email,
+            mentorContact: internship?.facultyMentorContact || mentor?.phoneNo,
+            mentorDesignation: internship?.facultyMentorDesignation || mentor?.designation,
+            joiningLetterUrl: internship?.joiningLetterUrl,
+            joiningLetterUploadedAt: internship?.joiningLetterUploadedAt,
+            submittedAt: internship?.createdAt || internship?.appliedDate,
+            updatedAt: internship?.updatedAt,
+            isSelfIdentified: internship?.isSelfIdentified ?? true,
           };
         });
 
       setInternships(internshipData);
       setPagination(prev => ({
         ...prev,
-        total: data.total || data.pagination?.total || internshipData.length,
+        total: response?.total || internshipData.length,
       }));
     } catch (error) {
       console.error('Failed to fetch internships:', error);
@@ -155,9 +178,13 @@ const SelfIdentifiedInternships = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.current, pagination.pageSize]);
+  }, []); // No dependencies - fetch all data once
 
+  // Initial fetch - only runs once
   useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
     fetchInternships();
     dispatch(fetchInternshipStats());
   }, [fetchInternships, dispatch]);
@@ -167,8 +194,11 @@ const SelfIdentifiedInternships = () => {
     let filtered = [...internships];
 
     // Tab filter
-    if (activeTab !== 'all') {
-      filtered = filtered.filter(i => i.status === activeTab.toUpperCase());
+    if (activeTab === 'approved') {
+      // "Active" tab shows approved, joined, and selected internships
+      filtered = filtered.filter(i => ['APPROVED', 'JOINED', 'SELECTED'].includes(i.status));
+    } else if (activeTab === 'completed') {
+      filtered = filtered.filter(i => i.status === 'COMPLETED');
     }
 
     // Status filter
@@ -199,26 +229,37 @@ const SelfIdentifiedInternships = () => {
     return filtered;
   }, [internships, activeTab, filters, searchText]);
 
-  // Status helpers
+  // Status helpers - Self-identified internships are auto-approved
   const getStatusConfig = (status) => {
     const configs = {
       APPROVED: { color: 'success', icon: <CheckCircleOutlined />, text: 'Active' },
       JOINED: { color: 'processing', icon: <RiseOutlined />, text: 'Ongoing' },
       COMPLETED: { color: 'default', icon: <CheckCircleOutlined />, text: 'Completed' },
-      APPLIED: { color: 'warning', icon: <ClockCircleOutlined />, text: 'Pending' },
+      APPLIED: { color: 'warning', icon: <ClockCircleOutlined />, text: 'Processing' }, // Legacy - auto-approved now
     };
     return configs[status] || { color: 'default', icon: <ClockCircleOutlined />, text: status };
   };
 
-  // Calculate stats
+  // Calculate stats - use API stats for totals, fallback to local calculation
   const stats = useMemo(() => {
-    const total = internships.length;
-    const ongoing = internships.filter(i => ['APPROVED', 'JOINED'].includes(i.status)).length;
+    // Use API stats if available (more accurate for totals across all pages)
+    if (internshipStats?.total) {
+      return {
+        total: internshipStats.total || 0,
+        ongoing: (internshipStats.approved || 0) + (internshipStats.joined || 0) + (internshipStats.selected || 0),
+        completed: internshipStats.completed || 0,
+        uniqueCompanies: internshipStats.byCompany?.length || 0,
+      };
+    }
+
+    // Fallback to local calculation from current page data
+    const total = pagination.total || internships.length;
+    const ongoing = internships.filter(i => ['APPROVED', 'JOINED', 'SELECTED'].includes(i.status)).length;
     const completed = internships.filter(i => i.status === 'COMPLETED').length;
     const uniqueCompanies = new Set(internships.map(i => i.companyName)).size;
 
     return { total, ongoing, completed, uniqueCompanies };
-  }, [internships]);
+  }, [internships, internshipStats, pagination.total]);
 
   const handleViewDetails = (internship) => {
     setSelectedInternship(internship);
@@ -344,8 +385,8 @@ const SelfIdentifiedInternships = () => {
       width: 200,
       render: (_, record) => (
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
-            <BankOutlined className="text-purple-500" />
+          <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+            <BankOutlined className="text-secondary" />
           </div>
           <div className="min-w-0">
             <Tooltip title={record.companyName}>
@@ -566,7 +607,7 @@ const SelfIdentifiedInternships = () => {
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Ongoing</Text>}
               value={stats.ongoing}
               prefix={<RiseOutlined className="text-success mr-2" />}
-              valueStyle={{ color: '#52c41a', fontWeight: 'bold' }}
+              valueStyle={{ color: 'rgb(var(--color-success))', fontWeight: 'bold' }}
             />
           </Card>
         </Col>
@@ -575,8 +616,8 @@ const SelfIdentifiedInternships = () => {
             <Statistic
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Completed</Text>}
               value={stats.completed}
-              prefix={<CheckCircleOutlined className="text-blue-500 mr-2" />}
-              valueStyle={{ color: '#1890ff', fontWeight: 'bold' }}
+              prefix={<CheckCircleOutlined className="text-info mr-2" />}
+              valueStyle={{ color: 'rgb(var(--color-info))', fontWeight: 'bold' }}
             />
           </Card>
         </Col>
@@ -585,8 +626,8 @@ const SelfIdentifiedInternships = () => {
             <Statistic
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Companies</Text>}
               value={stats.uniqueCompanies}
-              prefix={<BankOutlined className="text-purple-500 mr-2" />}
-              valueStyle={{ color: '#9333ea', fontWeight: 'bold' }}
+              prefix={<BankOutlined className="text-secondary mr-2" />}
+              valueStyle={{ color: 'rgb(var(--color-secondary-500))', fontWeight: 'bold' }}
             />
           </Card>
         </Col>
@@ -937,11 +978,9 @@ const SelfIdentifiedInternships = () => {
             <Col xs={24} md={8}>
               <Form.Item name="status" label="Status">
                 <Select placeholder="Select status">
-                  <Select.Option value="APPLIED">Applied</Select.Option>
                   <Select.Option value="APPROVED">Active</Select.Option>
-                  <Select.Option value="JOINED">Joined</Select.Option>
+                  <Select.Option value="JOINED">Ongoing</Select.Option>
                   <Select.Option value="COMPLETED">Completed</Select.Option>
-                  <Select.Option value="REJECTED">Rejected</Select.Option>
                 </Select>
               </Form.Item>
             </Col>

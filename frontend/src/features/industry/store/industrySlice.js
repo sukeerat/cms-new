@@ -265,7 +265,42 @@ export const updateProfile = createAsyncThunk(
 const industrySlice = createSlice({
   name: 'industry',
   initialState,
-  reducers: {},
+  reducers: {
+    // Optimistic update reducers for applications
+    optimisticallyUpdateApplicationStatus: (state, action) => {
+      const { id, status } = action.payload;
+      const index = state.applications.list.findIndex(a => a.id === id);
+      if (index !== -1) {
+        state.applications.list[index] = {
+          ...state.applications.list[index],
+          status,
+          _isOptimistic: true,
+        };
+      }
+    },
+    rollbackApplicationOperation: (state, action) => {
+      if (action.payload?.list) {
+        state.applications.list = action.payload.list;
+      }
+    },
+    // Optimistic update reducers for posting status
+    optimisticallyTogglePostingStatus: (state, action) => {
+      const { id, isActive } = action.payload;
+      const index = state.postings.list.findIndex(p => p.id === id);
+      if (index !== -1) {
+        state.postings.list[index] = {
+          ...state.postings.list[index],
+          isActive,
+          _isOptimistic: true,
+        };
+      }
+    },
+    rollbackPostingStatus: (state, action) => {
+      if (action.payload?.list) {
+        state.postings.list = action.payload.list;
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       // Dashboard
@@ -352,7 +387,11 @@ const industrySlice = createSlice({
         state.postings.loading = false;
         const index = state.postings.list.findIndex(p => p.id === action.payload.id);
         if (index !== -1) {
-          state.postings.list[index] = { ...state.postings.list[index], isActive: action.payload.isActive };
+          state.postings.list[index] = {
+            ...state.postings.list[index],
+            isActive: action.payload.isActive,
+            _isOptimistic: false
+          };
         }
       })
       .addCase(togglePostingStatus.rejected, (state, action) => {
@@ -469,5 +508,12 @@ const industrySlice = createSlice({
       });
   },
 });
+
+export const {
+  optimisticallyUpdateApplicationStatus,
+  rollbackApplicationOperation,
+  optimisticallyTogglePostingStatus,
+  rollbackPostingStatus,
+} = industrySlice.actions;
 
 export default industrySlice.reducer;

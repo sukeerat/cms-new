@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Card, Table, Button, Tag, Space, Modal, Input, message, Avatar, Drawer, Descriptions, Divider } from 'antd';
+import { Card, Table, Button, Tag, Space, Modal, Input, message, Avatar, Drawer, Descriptions, Divider, Typography, Alert } from 'antd';
 import { CheckOutlined, CloseOutlined, UserOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
-import { fetchMyApplications, shortlistApplication, selectApplication, rejectApplication } from '../../../store/slices/industrySlice';
+import { fetchMyApplications, shortlistApplication, selectApplication, rejectApplication, optimisticallyUpdateApplicationStatus, rollbackApplicationOperation } from '../store/industrySlice';
+import { generateTxnId, snapshotManager, optimisticToast } from '../../../store/optimisticMiddleware';
+
+const { Text, Paragraph } = Typography;
 
 const ApplicationsList = () => {
   const dispatch = useDispatch();
-  const { applications, loading } = useSelector((state) => state.industry);
+  const applications = useSelector((state) => state.industry.applications.list);
+  const loading = useSelector((state) => state.industry.applications.loading);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [selectedApp, setSelectedApp] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -18,11 +22,31 @@ const ApplicationsList = () => {
   }, [dispatch]);
 
   const handleShortlist = async (applicationId) => {
+    const txnId = generateTxnId();
+
+    // Save snapshot of current state
+    const currentApplicationsList = applications || [];
+    snapshotManager.save(txnId, 'industry', { applications: { list: currentApplicationsList } });
+
+    // Show loading toast
+    optimisticToast.loading(txnId, 'Shortlisting application...');
+
+    // Optimistically update the status
+    dispatch(optimisticallyUpdateApplicationStatus({ id: applicationId, status: 'SHORTLISTED' }));
+
     try {
       await dispatch(shortlistApplication(applicationId)).unwrap();
-      message.success('Application shortlisted successfully');
+      optimisticToast.success(txnId, 'Application shortlisted successfully');
+      snapshotManager.delete(txnId);
     } catch (error) {
-      message.error(error?.message || 'Failed to shortlist application');
+      optimisticToast.error(txnId, error?.message || 'Failed to shortlist application');
+
+      // Rollback on error
+      const snapshot = snapshotManager.get(txnId);
+      if (snapshot) {
+        dispatch(rollbackApplicationOperation(snapshot.state.applications));
+        snapshotManager.delete(txnId);
+      }
     }
   };
 
@@ -33,11 +57,31 @@ const ApplicationsList = () => {
       okText: 'Yes, Select',
       okType: 'primary',
       onOk: async () => {
+        const txnId = generateTxnId();
+
+        // Save snapshot of current state
+        const currentApplicationsList = applications || [];
+        snapshotManager.save(txnId, 'industry', { applications: { list: currentApplicationsList } });
+
+        // Show loading toast
+        optimisticToast.loading(txnId, 'Selecting candidate...');
+
+        // Optimistically update the status
+        dispatch(optimisticallyUpdateApplicationStatus({ id: applicationId, status: 'SELECTED' }));
+
         try {
-          await dispatch(selectApplication(applicationId)).unwrap();
-          message.success('Candidate selected successfully');
+          await dispatch(selectApplication({ id: applicationId })).unwrap();
+          optimisticToast.success(txnId, 'Candidate selected successfully');
+          snapshotManager.delete(txnId);
         } catch (error) {
-          message.error(error?.message || 'Failed to select candidate');
+          optimisticToast.error(txnId, error?.message || 'Failed to select candidate');
+
+          // Rollback on error
+          const snapshot = snapshotManager.get(txnId);
+          if (snapshot) {
+            dispatch(rollbackApplicationOperation(snapshot.state.applications));
+            snapshotManager.delete(txnId);
+          }
         }
       },
     });
@@ -49,17 +93,37 @@ const ApplicationsList = () => {
       return;
     }
 
+    const txnId = generateTxnId();
+
+    // Save snapshot of current state
+    const currentApplicationsList = applications || [];
+    snapshotManager.save(txnId, 'industry', { applications: { list: currentApplicationsList } });
+
+    // Show loading toast
+    optimisticToast.loading(txnId, 'Rejecting application...');
+
+    // Optimistically update the status
+    dispatch(optimisticallyUpdateApplicationStatus({ id: selectedApp.id, status: 'REJECTED' }));
+
     try {
       await dispatch(rejectApplication({
-        applicationId: selectedApp.id,
+        id: selectedApp.id,
         reason: rejectReason,
       })).unwrap();
-      message.success('Application rejected successfully');
+      optimisticToast.success(txnId, 'Application rejected successfully');
+      snapshotManager.delete(txnId);
       setRejectModalVisible(false);
       setRejectReason('');
       setSelectedApp(null);
     } catch (error) {
-      message.error(error?.message || 'Failed to reject application');
+      optimisticToast.error(txnId, error?.message || 'Failed to reject application');
+
+      // Rollback on error
+      const snapshot = snapshotManager.get(txnId);
+      if (snapshot) {
+        dispatch(rollbackApplicationOperation(snapshot.state.applications));
+        snapshotManager.delete(txnId);
+      }
     }
   };
 

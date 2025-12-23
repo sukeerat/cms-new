@@ -36,14 +36,26 @@ import {
 import dayjs from "dayjs";
 import facultyService from "../../../services/faculty.service";
 import { toast } from "react-hot-toast";
+import {
+  fetchApplications,
+  approveApplication,
+  rejectApplication,
+  optimisticApproveApplication,
+  optimisticRejectApplication,
+  rollbackApplicationUpdate,
+  selectApplications
+} from "../store/facultySlice";
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 const SelfIdentifiedApproval = () => {
   const navigate = useNavigate();
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const dispatch = useDispatch();
+
+  // Get applications from Redux store
+  const { list: applications, loading, error } = useSelector(selectApplications);
+
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState(null);
@@ -53,21 +65,11 @@ const SelfIdentifiedApproval = () => {
 
   // Fetch self-identified applications on mount
   useEffect(() => {
-    fetchSelfIdentifiedApplications();
-  }, []);
+    dispatch(fetchApplications({}));
+  }, [dispatch]);
 
-  const fetchSelfIdentifiedApplications = async () => {
-    try {
-      setLoading(true);
-      // Use faculty service with correct endpoint: GET /faculty/approvals/self-identified
-      const response = await facultyService.getSelfIdentifiedApprovals({});
-      setApplications(response.approvals || response.data || []);
-    } catch (error) {
-      console.error("Error fetching self-identified applications:", error);
-      toast.error("Failed to load applications");
-    } finally {
-      setLoading(false);
-    }
+  const fetchSelfIdentifiedApplications = () => {
+    dispatch(fetchApplications({ forceRefresh: true }));
   };
 
   const handleViewDetails = (record) => {
@@ -86,40 +88,66 @@ const SelfIdentifiedApproval = () => {
   };
 
   const handleReject = async (record) => {
+    // Store the original application for potential rollback
+    const originalApplication = { ...record };
+
+    // Optimistically remove from list (instant UI update)
+    dispatch(optimisticRejectApplication({ applicationId: record.id }));
+
+    // Show optimistic success message
+    toast.success("Internship application rejected");
+
     setActionLoading(true);
     try {
-      // Use faculty service with correct endpoint: PUT /faculty/approvals/self-identified/:id
-      await facultyService.updateSelfIdentifiedApproval(record.id, {
-        status: 'REJECTED',
-        reviewRemarks: 'Application rejected by faculty',
-      });
-
-      toast.success("Internship application rejected");
-
-      // Refresh the applications list
-      await fetchSelfIdentifiedApplications();
+      // Call API in background
+      await dispatch(rejectApplication({
+        applicationId: record.id,
+        reason: 'Application rejected by faculty'
+      })).unwrap();
     } catch (error) {
       console.error("Error rejecting application:", error);
-      toast.error(error?.response?.data?.message || "Failed to reject application");
+
+      // Rollback on error: restore the application to the list
+      dispatch(rollbackApplicationUpdate({ application: originalApplication }));
+
+      toast.error(error?.message || "Failed to reject application - reverting changes");
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleSubmitApproval = async (values) => {
+    // Store the original application for potential rollback
+    const originalApplication = { ...selectedApplication };
+
+    // Close modal immediately for better UX
+    setApprovalModalVisible(false);
+    form.resetFields();
+    const appToProcess = selectedApplication;
+    setSelectedApplication(null);
+
     setActionLoading(true);
-    try {
-      if (values.hasJoined) {
-        // Approve the application using faculty service: PUT /faculty/approvals/self-identified/:id
-        await facultyService.updateSelfIdentifiedApproval(selectedApplication.id, {
-          status: 'APPROVED',
-          reviewRemarks: `Approved. Joining date: ${values.joiningDate ? values.joiningDate.format('YYYY-MM-DD') : 'Not specified'}`,
-        });
+
+    if (values.hasJoined) {
+      // Optimistically remove from list (instant UI update)
+      dispatch(optimisticApproveApplication({ applicationId: appToProcess.id }));
+
+      // Show optimistic success message
+      toast.success("Internship application approved successfully");
+
+      try {
+        // Call API in background
+        await dispatch(approveApplication({
+          applicationId: appToProcess.id,
+          data: {
+            reviewRemarks: `Approved. Joining date: ${values.joiningDate ? values.joiningDate.format('YYYY-MM-DD') : 'Not specified'}`,
+          }
+        })).unwrap();
 
         // If there's a joining date, also update the internship
         if (values.joiningDate) {
           try {
-            await facultyService.updateInternship(selectedApplication.id, {
+            await facultyService.updateInternship(appToProcess.id, {
               hasJoined: true,
               joiningDate: values.joiningDate.toISOString(),
             });
@@ -128,28 +156,39 @@ const SelfIdentifiedApproval = () => {
             console.warn("Could not update joining status:", e);
           }
         }
+      } catch (error) {
+        console.error("Error approving application:", error);
 
-        toast.success("Internship application approved successfully");
-      } else {
-        // Reject the application
-        await facultyService.updateSelfIdentifiedApproval(selectedApplication.id, {
-          status: 'REJECTED',
-          reviewRemarks: 'Rejected by faculty',
-        });
-        toast.success("Internship application rejected");
+        // Rollback on error: restore the application to the list
+        dispatch(rollbackApplicationUpdate({ application: originalApplication }));
+
+        toast.error(error?.message || "Failed to approve application - reverting changes");
+      } finally {
+        setActionLoading(false);
       }
+    } else {
+      // Optimistically remove from list (instant UI update)
+      dispatch(optimisticRejectApplication({ applicationId: appToProcess.id }));
 
-      setApprovalModalVisible(false);
-      form.resetFields();
-      setSelectedApplication(null);
+      // Show optimistic success message
+      toast.success("Internship application rejected");
 
-      // Refresh the applications list
-      await fetchSelfIdentifiedApplications();
-    } catch (error) {
-      console.error("Error processing application:", error);
-      toast.error(error?.response?.data?.message || "Failed to process application");
-    } finally {
-      setActionLoading(false);
+      try {
+        // Call API in background
+        await dispatch(rejectApplication({
+          applicationId: appToProcess.id,
+          reason: 'Rejected by faculty'
+        })).unwrap();
+      } catch (error) {
+        console.error("Error rejecting application:", error);
+
+        // Rollback on error: restore the application to the list
+        dispatch(rollbackApplicationUpdate({ application: originalApplication }));
+
+        toast.error(error?.message || "Failed to reject application - reverting changes");
+      } finally {
+        setActionLoading(false);
+      }
     }
   };
 

@@ -182,7 +182,7 @@ const HelpCenter = () => {
   return (
     <div style={{ padding: 24 }}>
       {/* Header */}
-      <Card style={{ marginBottom: 24, textAlign: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <Card style={{ marginBottom: 24, textAlign: 'center', background: 'linear-gradient(135deg, rgb(var(--color-primary)) 0%, rgb(var(--color-primary-900)) 100%)' }}>
         <CustomerServiceOutlined style={{ fontSize: 48, color: '#fff', marginBottom: 16 }} />
         <Title level={2} style={{ color: '#fff', marginBottom: 8 }}>Help & Support Center</Title>
         <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>

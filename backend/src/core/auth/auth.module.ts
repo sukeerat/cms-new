@@ -9,6 +9,7 @@ import { TokenBlacklistService } from './services/token-blacklist.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { PrismaService } from '../database/prisma.service';
 import { LruCacheService } from '../cache/lru-cache.service';
@@ -39,6 +40,7 @@ import { LruCacheService } from '../cache/lru-cache.service';
     JwtStrategy,
     GoogleStrategy,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     RolesGuard,
   ],
   exports: [
@@ -46,6 +48,7 @@ import { LruCacheService } from '../cache/lru-cache.service';
     TokenService,
     TokenBlacklistService,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     RolesGuard,
   ],
 })

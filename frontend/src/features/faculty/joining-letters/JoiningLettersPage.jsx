@@ -47,7 +47,10 @@ import {
   uploadJoiningLetter,
   fetchAssignedStudents,
   selectJoiningLetters,
+  optimisticallyUpdateJoiningLetter,
+  rollbackJoiningLetterOperation,
 } from '../store/facultySlice';
+import { generateTxnId, snapshotManager, optimisticToast } from '../../../store/optimisticMiddleware';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -71,7 +74,6 @@ const JoiningLettersPage = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [reviewModal, setReviewModal] = useState({ visible: false, letter: null, action: null });
   const [remarks, setRemarks] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
   const [detailDrawer, setDetailDrawer] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState(null);
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -96,17 +98,44 @@ const JoiningLettersPage = () => {
 
   const handleVerify = async () => {
     if (!reviewModal.letter) return;
-    setActionLoading(true);
+
+    const txnId = generateTxnId();
+    const currentLetterId = reviewModal.letter.id;
+
+    // Save snapshot of current state
+    const currentLettersList = letters || [];
+    snapshotManager.save(txnId, 'faculty', { joiningLetters: { list: currentLettersList } });
+
+    // Show loading toast
+    optimisticToast.loading(txnId, 'Verifying joining letter...');
+
+    // Close modal and clear form
+    setReviewModal({ visible: false, letter: null, action: null });
+    setRemarks('');
+
+    // Optimistically update the letter status
+    dispatch(optimisticallyUpdateJoiningLetter({
+      id: currentLetterId,
+      updates: {
+        reviewedAt: new Date().toISOString(),
+        reviewRemarks: remarks || 'Verified',
+      }
+    }));
+
     try {
-      await dispatch(verifyJoiningLetter({ letterId: reviewModal.letter.id, remarks })).unwrap();
-      message.success('Joining letter verified successfully');
-      setReviewModal({ visible: false, letter: null, action: null });
-      setRemarks('');
+      await dispatch(verifyJoiningLetter({ letterId: currentLetterId, remarks })).unwrap();
+      optimisticToast.success(txnId, 'Joining letter verified successfully');
+      snapshotManager.delete(txnId);
       handleRefresh();
     } catch (error) {
-      message.error(error || 'Failed to verify joining letter');
-    } finally {
-      setActionLoading(false);
+      optimisticToast.error(txnId, error || 'Failed to verify joining letter');
+
+      // Rollback on error
+      const snapshot = snapshotManager.get(txnId);
+      if (snapshot) {
+        dispatch(rollbackJoiningLetterOperation(snapshot.state.joiningLetters));
+        snapshotManager.delete(txnId);
+      }
     }
   };
 
@@ -115,17 +144,45 @@ const JoiningLettersPage = () => {
       message.warning('Please provide a reason for rejection');
       return;
     }
-    setActionLoading(true);
+
+    const txnId = generateTxnId();
+    const currentLetterId = reviewModal.letter.id;
+    const rejectionReason = remarks;
+
+    // Save snapshot of current state
+    const currentLettersList = letters || [];
+    snapshotManager.save(txnId, 'faculty', { joiningLetters: { list: currentLettersList } });
+
+    // Show loading toast
+    optimisticToast.loading(txnId, 'Rejecting joining letter...');
+
+    // Close modal and clear form
+    setReviewModal({ visible: false, letter: null, action: null });
+    setRemarks('');
+
+    // Optimistically update the letter status
+    dispatch(optimisticallyUpdateJoiningLetter({
+      id: currentLetterId,
+      updates: {
+        reviewedAt: new Date().toISOString(),
+        reviewRemarks: `rejected: ${rejectionReason}`,
+      }
+    }));
+
     try {
-      await dispatch(rejectJoiningLetter({ letterId: reviewModal.letter.id, reason: remarks })).unwrap();
-      message.success('Joining letter rejected');
-      setReviewModal({ visible: false, letter: null, action: null });
-      setRemarks('');
+      await dispatch(rejectJoiningLetter({ letterId: currentLetterId, reason: rejectionReason })).unwrap();
+      optimisticToast.success(txnId, 'Joining letter rejected successfully');
+      snapshotManager.delete(txnId);
       handleRefresh();
     } catch (error) {
-      message.error(error || 'Failed to reject joining letter');
-    } finally {
-      setActionLoading(false);
+      optimisticToast.error(txnId, error || 'Failed to reject joining letter');
+
+      // Rollback on error
+      const snapshot = snapshotManager.get(txnId);
+      if (snapshot) {
+        dispatch(rollbackJoiningLetterOperation(snapshot.state.joiningLetters));
+        snapshotManager.delete(txnId);
+      }
     }
   };
 
@@ -568,11 +625,11 @@ const JoiningLettersPage = () => {
             Cancel
           </Button>,
           reviewModal.action === 'verify' ? (
-            <Button key="verify" type="primary" loading={actionLoading} onClick={handleVerify} className="rounded-lg bg-success border-success">
+            <Button key="verify" type="primary" onClick={handleVerify} className="rounded-lg bg-success border-success">
               Verify
             </Button>
           ) : (
-            <Button key="reject" type="primary" danger loading={actionLoading} onClick={handleReject} className="rounded-lg">
+            <Button key="reject" type="primary" danger onClick={handleReject} className="rounded-lg">
               Reject
             </Button>
           ),

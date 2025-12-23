@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Space, Tag, Card, Input, Select, Modal, Form, DatePicker, InputNumber } from 'antd';
+import { Button, Space, Tag, Card, Input, Select, Modal, Form, DatePicker, InputNumber, Switch } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchMyPostings } from '../store/industrySlice';
+import { fetchMyPostings, togglePostingStatus, optimisticallyTogglePostingStatus, rollbackPostingStatus } from '../store/industrySlice';
 import DataTable from '../../../components/tables/DataTable';
 import { EyeOutlined, EditOutlined, PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons';
 import toast from 'react-hot-toast';
 import industryService from '../../../services/industry.service';
+import { snapshotManager, optimisticToast, generateTxnId } from '../../../store/optimisticMiddleware';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -86,6 +87,39 @@ const InternshipPostingList = () => {
     setFilters({ ...filters, page, limit: pageSize });
   };
 
+  const handleToggleStatus = async (id, currentStatus) => {
+    const txnId = generateTxnId();
+    const newStatus = !currentStatus;
+
+    // Save snapshot for rollback
+    snapshotManager.save(txnId, 'industry', { postings: { list } });
+
+    // Show loading toast
+    optimisticToast.loading(txnId, `${newStatus ? 'Activating' : 'Deactivating'} posting...`);
+
+    // Optimistic update - instant UI feedback
+    dispatch(optimisticallyTogglePostingStatus({ id, isActive: newStatus }));
+
+    try {
+      // Call server in background
+      await dispatch(togglePostingStatus({ id, isActive: newStatus })).unwrap();
+
+      // Success - update toast
+      optimisticToast.success(txnId, `Posting ${newStatus ? 'activated' : 'deactivated'} successfully`);
+      snapshotManager.delete(txnId);
+    } catch (error) {
+      // Error - rollback optimistic update
+      const snapshot = snapshotManager.get(txnId);
+      if (snapshot) {
+        dispatch(rollbackPostingStatus(snapshot.state.postings));
+      }
+
+      // Show error toast
+      optimisticToast.error(txnId, error || 'Failed to update posting status');
+      snapshotManager.delete(txnId);
+    }
+  };
+
   const columns = [
     {
       title: 'Title',
@@ -125,10 +159,19 @@ const InternshipPostingList = () => {
       title: 'Status',
       dataIndex: 'isActive',
       key: 'isActive',
-      render: (isActive) => (
-        <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? 'ACTIVE' : 'INACTIVE'}
-        </Tag>
+      render: (isActive, record) => (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={isActive}
+            onChange={() => handleToggleStatus(record.id, isActive)}
+            checkedChildren="Active"
+            unCheckedChildren="Inactive"
+            className={record._isOptimistic ? 'opacity-70' : ''}
+          />
+          {record._isOptimistic && (
+            <span className="text-xs text-gray-400">Updating...</span>
+          )}
+        </div>
       ),
     },
     {

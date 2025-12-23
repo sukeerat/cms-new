@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Card, Form, Input, DatePicker, Upload, Button, message, Row, Col, Avatar, Divider } from 'antd';
 import { SaveOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
-import { fetchProfile, updateProfile } from '../../../store/slices/studentSlice';
+import { fetchProfile, updateProfile } from '../store/studentSlice';
 import dayjs from 'dayjs';
 
 const StudentProfileEdit = () => {

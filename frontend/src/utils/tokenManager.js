@@ -50,13 +50,26 @@ export const tokenStorage = {
 
   clear: () => {
     try {
+      // Clear primary token keys
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
-      // Clean up legacy keys
+
+      // Clean up all possible legacy/alternative keys
       localStorage.removeItem('token');
       localStorage.removeItem('access_token');
       localStorage.removeItem('loginResponse');
       localStorage.removeItem('user_data');
+      localStorage.removeItem('user');
+      localStorage.removeItem('userInfo');
+      localStorage.removeItem('authState');
+
+      // Clear Redux persist
+      localStorage.removeItem('persist:root');
+      localStorage.removeItem('persist:auth');
+
+      // Clear any cached data
+      localStorage.removeItem('cachedUser');
+      localStorage.removeItem('lastActivity');
     } catch (error) {
       console.error('Failed to clear tokens:', error);
     }

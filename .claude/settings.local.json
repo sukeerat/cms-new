@@ -33,7 +33,11 @@
       "Bash(npx prisma format:*)",
       "Bash(npx prisma:*)",
       "Bash(cd:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(npx ts-node prisma/seed-faqs.ts)",
+      "Bash(npx prisma db push)",
+      "Bash(npm run lint:*)",
+      "Bash(node:*)"
     ]
   }
 }

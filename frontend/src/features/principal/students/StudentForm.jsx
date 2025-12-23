@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Form, Input, Select, DatePicker, Button, Card, Row, Col, message, Upload, Spin } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createStudent, updateStudent, fetchStudents, fetchBatches, fetchDepartments } from '../store/principalSlice';
+import { createStudent, updateStudent, fetchStudents, fetchBatches, fetchDepartments, optimisticallyAddStudent, optimisticallyUpdateStudent, rollbackStudentOperation } from '../store/principalSlice';
 import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { generateTxnId, snapshotManager, optimisticToast } from '../../../store/optimisticMiddleware';
 
 const StudentForm = () => {
   const { id } = useParams();
@@ -63,6 +64,8 @@ const StudentForm = () => {
 
   const onFinish = async (values) => {
     setLoading(true);
+    const txnId = generateTxnId();
+
     try {
       const formattedValues = {
         ...values,
@@ -70,15 +73,61 @@ const StudentForm = () => {
       };
 
       if (id) {
-        await dispatch(updateStudent({ id, data: formattedValues })).unwrap();
-        message.success('Student updated successfully');
+        // UPDATE: Optimistic update
+        const currentStudentsList = students.list;
+        snapshotManager.save(txnId, 'principal', { students: { list: currentStudentsList } });
+
+        optimisticToast.loading(txnId, 'Updating student...');
+
+        // Optimistically update the UI
+        dispatch(optimisticallyUpdateStudent({ id, data: formattedValues }));
+
+        try {
+          await dispatch(updateStudent({ id, data: formattedValues })).unwrap();
+          optimisticToast.success(txnId, 'Student updated successfully');
+          snapshotManager.delete(txnId);
+          navigate('/students');
+        } catch (error) {
+          optimisticToast.error(txnId, error?.message || 'Failed to update student');
+
+          // Rollback on error
+          const snapshot = snapshotManager.get(txnId);
+          if (snapshot) {
+            dispatch(rollbackStudentOperation(snapshot.state.students));
+            snapshotManager.delete(txnId);
+          }
+          throw error;
+        }
       } else {
-        await dispatch(createStudent(formattedValues)).unwrap();
-        message.success('Student created successfully');
+        // CREATE: Optimistic add
+        const currentStudentsList = students.list;
+        snapshotManager.save(txnId, 'principal', { students: { list: currentStudentsList } });
+
+        optimisticToast.loading(txnId, 'Creating student...');
+
+        // Optimistically add to the UI with temp ID
+        const tempStudent = { ...formattedValues, id: `temp_${Date.now()}` };
+        dispatch(optimisticallyAddStudent(tempStudent));
+
+        try {
+          const result = await dispatch(createStudent(formattedValues)).unwrap();
+          optimisticToast.success(txnId, 'Student created successfully');
+          snapshotManager.delete(txnId);
+          navigate('/students');
+        } catch (error) {
+          optimisticToast.error(txnId, error?.message || 'Failed to create student');
+
+          // Rollback on error
+          const snapshot = snapshotManager.get(txnId);
+          if (snapshot) {
+            dispatch(rollbackStudentOperation(snapshot.state.students));
+            snapshotManager.delete(txnId);
+          }
+          throw error;
+        }
       }
-      navigate('/students');
     } catch (error) {
-      message.error(error?.message || 'Operation failed');
+      // Error already handled above
     } finally {
       setLoading(false);
     }

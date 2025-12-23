@@ -44,7 +44,7 @@ import {
   selectIndustryLoading,
   selectIndustryProfile,
   setIndustryProfile,
-} from "../../../store/slices/industrySlice";
+} from "../store/industrySlice";
 import { useSmartIndustry } from "../../../hooks";
 
 const { Title, Text } = Typography;

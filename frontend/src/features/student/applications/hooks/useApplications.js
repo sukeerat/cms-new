@@ -1,30 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import API from '../../../../services/api';
 import { toast } from 'react-hot-toast';
+import { getStoredLoginResponse } from '../../../../utils/authStorage';
+import { useSWR } from '../../../../hooks/useSWR';
 
 // Utility function to get student ID from localStorage
 const getStudentId = () => {
-  try {
-    const loginData = localStorage.getItem('loginResponse');
-    if (loginData) {
-      const parsed = JSON.parse(loginData);
-      return parsed.userId || parsed.user?.id || parsed.studentId || null;
-    }
-  } catch (error) {
-    console.error('Failed to parse login response:', error);
-  }
-  return null;
+  const loginData = getStoredLoginResponse();
+  return loginData.user?.studentId || loginData.studentId || loginData.userId || null;
 };
 
 export const useApplications = () => {
-  const [loading, setLoading] = useState(true);
   const [applications, setApplications] = useState([]);
   const [selfIdentifiedApplications, setSelfIdentifiedApplications] = useState([]);
   const [error, setError] = useState(null);
 
   const fetchAllApplications = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const response = await API.get('/student/applications');
 
@@ -49,28 +40,38 @@ export const useApplications = () => {
 
       setApplications(platformApps);
       setSelfIdentifiedApplications(selfIdentifiedApps);
+      setError(null);
 
-      return true;
+      return { platformApps, selfIdentifiedApps };
     } catch (err) {
       console.error('Error fetching applications:', err);
-      setError(err.message || 'Failed to fetch applications');
-      toast.error('Failed to fetch applications');
-      return false;
-    } finally {
-      setLoading(false);
+      const errorMsg = err.message || 'Failed to fetch applications';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      throw err;
     }
   }, []);
 
-  useEffect(() => {
-    fetchAllApplications();
-  }, [fetchAllApplications]);
+  // SWR implementation for automatic caching and revalidation
+  const { isLoading, isRevalidating, revalidate } = useSWR(
+    'student-applications',
+    fetchAllApplications,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 2000,
+      focusThrottleInterval: 5000,
+    }
+  );
 
   return {
-    loading,
+    loading: isLoading,
+    isRevalidating, // NEW: Shows when fetching fresh data in background
     error,
     applications,
     selfIdentifiedApplications,
     refetch: fetchAllApplications,
+    revalidate, // NEW: Manual revalidation trigger
   };
 };
 
@@ -133,68 +134,117 @@ export const useCompletionFeedback = () => {
 
 export const useMonthlyReports = () => {
   const [reports, setReports] = useState([]);
+  const [progress, setProgress] = useState({
+    total: 0,
+    approved: 0,
+    submitted: 0,
+    draft: 0,
+    overdue: 0,
+    percentage: 0,
+  });
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [missingReports, setMissingReports] = useState([]);
   const [error, setError] = useState(null);
 
+  // Fetch reports with status from endpoint
   const fetchReports = useCallback(async (applicationId) => {
     if (!applicationId) return;
     setLoading(true);
     setError(null);
     try {
-      const response = await API.get(`/student/monthly-reports`, {
-        params: { applicationId }
-      });
-      // Handle response structure: { reports, total, page, ... }
-      const reportsData = response.data?.reports || response.data?.data || [];
-      setReports(reportsData);
+      const response = await API.get(`/student/applications/${applicationId}/reports`);
 
-      // Calculate missing reports
-      const existing = new Set(
-        reportsData.map((r) => `${r.reportMonth}-${r.reportYear}`)
-      );
-      const now = new Date();
-      const missing = [];
-      for (let i = 0; i < 6; i++) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = `${date.getMonth() + 1}-${date.getFullYear()}`;
-        if (!existing.has(key)) {
-          missing.push({
-            month: date.getMonth() + 1,
-            year: date.getFullYear(),
-          });
-        }
+      // Response structure: { reports, progress, internship }
+      const data = response.data;
+      const reportsData = data?.reports || [];
+      const progressData = data?.progress || {
+        total: 0,
+        approved: 0,
+        submitted: 0,
+        draft: 0,
+        overdue: 0,
+        percentage: 0,
+      };
+
+      // Backend calculates overdue count, but if missing, calculate from submission status
+      if (progressData.overdue === 0 && reportsData.length > 0) {
+        const overdueCount = reportsData.filter((r) => {
+          if (r.status === 'APPROVED') return false;
+          return r.submissionStatus?.status === 'OVERDUE';
+        }).length;
+        progressData.overdue = overdueCount;
       }
-      setMissingReports(missing);
+
+      // Calculate percentage if not provided
+      if (progressData.percentage === 0 && progressData.total > 0) {
+        progressData.percentage = Math.round((progressData.approved / progressData.total) * 100);
+      }
+
+      setReports(reportsData);
+      setProgress(progressData);
     } catch (err) {
       console.error('Error fetching monthly reports:', err);
       setError(err.message || 'Failed to fetch reports');
+      setReports([]);
+      setProgress({
+        total: 0,
+        approved: 0,
+        submitted: 0,
+        draft: 0,
+        overdue: 0,
+        percentage: 0,
+      });
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Upload and submit report with auto-approval
   const uploadReport = useCallback(async (applicationId, file, month, year) => {
     setUploading(true);
     try {
-      // First upload the file, then create the report
+      // Upload file first
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('applicationId', applicationId);
+      formData.append('reportMonth', month.toString());
+      formData.append('reportYear', year.toString());
 
-      // Upload file first (if there's a file upload endpoint)
-      // For now, create report with file URL
+      // Try the upload endpoint first
+      let fileUrl = null;
+      try {
+        const uploadResponse = await API.post('/student/monthly-reports/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        fileUrl = uploadResponse.data?.reportFileUrl || uploadResponse.data?.path || uploadResponse.data?.url;
+      } catch (uploadErr) {
+        // If upload endpoint fails, try generic upload
+        const genericFormData = new FormData();
+        genericFormData.append('file', file);
+        const genericUpload = await API.post('/uploads', genericFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        fileUrl = genericUpload.data?.url || genericUpload.data?.path;
+      }
+
+      // Submit report with file URL (auto-approved)
       const response = await API.post('/student/monthly-reports', {
         applicationId,
         reportMonth: month,
         reportYear: year,
-        // reportFileUrl would come from file upload
+        reportFileUrl: fileUrl,
       });
 
-      toast.success('Report created successfully!');
+      // Show auto-approval message
+      if (response.data?.autoApproved) {
+        toast.success('Report submitted and auto-approved!');
+      } else {
+        toast.success('Report submitted successfully!');
+      }
+
       return response.data;
     } catch (err) {
-      const message = err.response?.data?.message || err.message || 'Failed to create report';
+      const message = err.response?.data?.message || err.message || 'Failed to submit report';
       toast.error(message);
       throw err;
     } finally {
@@ -202,24 +252,8 @@ export const useMonthlyReports = () => {
     }
   }, []);
 
-  const submitReport = useCallback(async (reportId, data = {}) => {
-    try {
-      const response = await API.put(`/student/monthly-reports/${reportId}`, {
-        ...data,
-        status: 'SUBMITTED',
-      });
-      toast.success('Report submitted for review!');
-      return response.data;
-    } catch (err) {
-      const message = err.response?.data?.message || err.message || 'Failed to submit report';
-      toast.error(message);
-      throw err;
-    }
-  }, []);
-
   const deleteReport = useCallback(async (reportId) => {
     try {
-      // Note: Backend may need a DELETE endpoint for monthly reports
       await API.delete(`/student/monthly-reports/${reportId}`);
       toast.success('Report deleted successfully');
     } catch (err) {
@@ -229,16 +263,29 @@ export const useMonthlyReports = () => {
     }
   }, []);
 
+  // Generate expected reports for an application
+  const generateReports = useCallback(async (applicationId) => {
+    try {
+      const response = await API.post(`/student/applications/${applicationId}/generate-reports`);
+      toast.success(`Generated ${response.data?.count || 0} expected reports`);
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to generate reports';
+      toast.error(message);
+      throw err;
+    }
+  }, []);
+
   return {
     reports,
+    progress,
     loading,
     uploading,
     error,
-    missingReports,
     fetchReports,
     uploadReport,
-    submitReport,
     deleteReport,
+    generateReports,
     setReports,
   };
 };
@@ -307,5 +354,80 @@ export const useMonthlyFeedback = () => {
     fetchFeedbacks,
     submitFeedback,
     setFeedbacks,
+  };
+};
+
+export const useFacultyVisits = () => {
+  const [visits, setVisits] = useState([]);
+  const [progress, setProgress] = useState({
+    total: 0,
+    completed: 0,
+    pending: 0,
+    overdue: 0,
+    percentage: 0,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchVisits = useCallback(async (applicationId) => {
+    if (!applicationId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await API.get(`/student/applications/${applicationId}/faculty-visits`);
+
+      // Response structure: { visits, progress }
+      // Backend returns visits with: id, visitMonth, visitYear, requiredByDate, status,
+      // submissionStatus, statusLabel, statusColor, sublabel, visitDate, isCompleted, isOverdue,
+      // faculty, visitType, visitLocation, meetingMinutes
+      const data = response.data;
+      const visitsData = data?.visits || [];
+      const progressData = data?.progress || {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        overdue: 0,
+        percentage: 0,
+      };
+
+      // Backend calculates overdue from isOverdue field if not provided
+      if (progressData.overdue === 0 && visitsData.length > 0) {
+        const overdueCount = visitsData.filter((v) => v.isOverdue === true).length;
+        progressData.overdue = overdueCount;
+      }
+
+      // Calculate percentage if not provided
+      if (progressData.percentage === 0 && progressData.total > 0) {
+        progressData.percentage = Math.round((progressData.completed / progressData.total) * 100);
+      }
+
+      setVisits(visitsData);
+      setProgress(progressData);
+    } catch (err) {
+      console.error('Error fetching faculty visits:', err);
+      // Fail gracefully - visits may not be available yet
+      if (err.response?.status !== 404) {
+        setError(err.message || 'Failed to fetch visits');
+      }
+      setVisits([]);
+      setProgress({
+        total: 0,
+        completed: 0,
+        pending: 0,
+        overdue: 0,
+        percentage: 0,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return {
+    visits,
+    progress,
+    loading,
+    error,
+    fetchVisits,
+    setVisits,
   };
 };

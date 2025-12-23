@@ -61,13 +61,14 @@ import { debounce } from 'lodash';
 import analyticsService from '../../../services/analytics.service';
 import principalService from '../../../services/principal.service';
 import { fetchDepartments, fetchBatches } from '../store/principalSlice';
+import { selectDepartmentsList, selectBatchesList } from '../store/principalSelectors';
 
 const { Title, Text } = Typography;
 
 const StudentProgress = () => {
   const dispatch = useDispatch();
-  const departments = useSelector((state) => state.principal.departments?.list || []);
-  const batches = useSelector((state) => state.principal.batches?.list || []);
+  const departments = useSelector(selectDepartmentsList);
+  const batches = useSelector(selectBatchesList);
 
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);

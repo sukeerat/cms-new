@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useDebouncedCallback } from 'use-debounce';
 import {
   Card,
   Row,
@@ -23,6 +22,7 @@ import {
   Space,
   message,
 } from 'antd';
+import { useDebouncedCallback } from '../../../../hooks/useDebounce';
 import {
   FileTextOutlined,
   CheckCircleOutlined,

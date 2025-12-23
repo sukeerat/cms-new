@@ -573,6 +573,45 @@ const facultySlice = createSlice({
         feedbackHistoryKey: null,
       };
     },
+    // Optimistic update: Remove application from list immediately
+    optimisticApproveApplication: (state, action) => {
+      const { applicationId } = action.payload;
+      state.applications.list = state.applications.list.filter(app => app.id !== applicationId);
+      state.applications.total = Math.max(0, state.applications.total - 1);
+    },
+    // Optimistic update: Remove application from list immediately
+    optimisticRejectApplication: (state, action) => {
+      const { applicationId } = action.payload;
+      state.applications.list = state.applications.list.filter(app => app.id !== applicationId);
+      state.applications.total = Math.max(0, state.applications.total - 1);
+    },
+    // Rollback: Restore application to list on error
+    rollbackApplicationUpdate: (state, action) => {
+      const { application } = action.payload;
+      // Add back the application if it's not already in the list
+      const exists = state.applications.list.some(app => app.id === application.id);
+      if (!exists) {
+        state.applications.list = [application, ...state.applications.list];
+        state.applications.total += 1;
+      }
+    },
+    // Optimistic update: Update joining letter status immediately
+    optimisticallyUpdateJoiningLetter: (state, action) => {
+      const { id, updates } = action.payload;
+      const index = state.joiningLetters.list.findIndex(letter => letter.id === id);
+      if (index !== -1) {
+        state.joiningLetters.list[index] = {
+          ...state.joiningLetters.list[index],
+          ...updates,
+          _isOptimistic: true,
+        };
+      }
+    },
+    // Rollback: Restore joining letters state on error
+    rollbackJoiningLetterOperation: (state, action) => {
+      const { joiningLetters } = action.payload;
+      state.joiningLetters.list = joiningLetters.list;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -963,7 +1002,15 @@ const facultySlice = createSlice({
   },
 });
 
-export const { clearError, invalidateCache } = facultySlice.actions;
+export const {
+  clearError,
+  invalidateCache,
+  optimisticApproveApplication,
+  optimisticRejectApplication,
+  rollbackApplicationUpdate,
+  optimisticallyUpdateJoiningLetter,
+  rollbackJoiningLetterOperation
+} = facultySlice.actions;
 
 // Selectors
 export const selectDashboard = (state) => state.faculty.dashboard;

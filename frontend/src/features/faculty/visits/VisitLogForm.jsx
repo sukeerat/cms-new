@@ -3,8 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, Form, Input, Select, DatePicker, Button, message, Row, Col, Divider, Upload, Spin } from 'antd';
 import { SaveOutlined, ArrowLeftOutlined, UploadOutlined } from '@ant-design/icons';
-import { createVisitLog, updateVisitLog, fetchVisitLogById } from '../../../store/slices/facultySlice';
-import { fetchAssignedStudents } from '../../../store/slices/facultySlice';
+import { createVisitLog, updateVisitLog, fetchVisitLogById } from '../store/facultySlice';
+import { fetchAssignedStudents } from '../store/facultySlice';
 import { fetchCompanies } from '../../../store/slices/companySlice';
 import dayjs from 'dayjs';
 

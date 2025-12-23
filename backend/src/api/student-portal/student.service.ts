@@ -1,14 +1,196 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
 import { LruCacheService } from '../../core/cache/lru-cache.service';
+import { FacultyVisitService } from '../../domain/report/faculty-visit/faculty-visit.service';
 import { Prisma, ApplicationStatus, InternshipStatus, MonthlyReportStatus, DocumentType } from '@prisma/client';
+
+// Month names for display
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+// Report submission status types
+type ReportSubmissionStatus = 'NOT_YET_DUE' | 'CAN_SUBMIT' | 'OVERDUE' | 'SUBMITTED' | 'APPROVED';
+
+interface ReportPeriod {
+  month: number;
+  year: number;
+  periodStartDate: Date;
+  periodEndDate: Date;
+  submissionWindowStart: Date;
+  submissionWindowEnd: Date;
+  dueDate: Date;
+  isPartialMonth: boolean;
+  isFinalReport: boolean;
+}
 
 @Injectable()
 export class StudentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: LruCacheService,
+    private readonly facultyVisitService: FacultyVisitService,
   ) {}
+
+  /**
+   * Helper: Calculate all expected report periods for an internship
+   */
+  private calculateExpectedReportPeriods(startDate: Date, endDate: Date): ReportPeriod[] {
+    const periods: ReportPeriod[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Start from the month of startDate
+    let currentMonth = start.getMonth();
+    let currentYear = start.getFullYear();
+
+    while (true) {
+      const periodStartDate = new Date(currentYear, currentMonth, 1);
+      const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+      const periodEndDate = new Date(Math.min(lastDayOfMonth.getTime(), end.getTime()));
+
+      // Check if this month is within the internship period
+      if (periodStartDate > end) break;
+
+      // Calculate actual period start (first day of internship if partial month)
+      const actualPeriodStart = currentYear === start.getFullYear() && currentMonth === start.getMonth()
+        ? new Date(start)
+        : periodStartDate;
+
+      // Submission window: 1st to 10th of NEXT month
+      const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+      const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+      const submissionWindowStart = new Date(nextYear, nextMonth, 1);
+      const submissionWindowEnd = new Date(nextYear, nextMonth, 10, 23, 59, 59);
+
+      // Determine if this is first (partial) or last (final) report
+      const isFirstMonth = currentYear === start.getFullYear() && currentMonth === start.getMonth();
+      const isLastMonth = currentYear === end.getFullYear() && currentMonth === end.getMonth();
+      const isPartialMonth = isFirstMonth && start.getDate() > 1;
+
+      periods.push({
+        month: currentMonth + 1, // 1-12 format
+        year: currentYear,
+        periodStartDate: actualPeriodStart,
+        periodEndDate,
+        submissionWindowStart,
+        submissionWindowEnd,
+        dueDate: submissionWindowEnd,
+        isPartialMonth,
+        isFinalReport: isLastMonth,
+      });
+
+      // Move to next month
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+
+      // Safety check: don't create more than 24 months of reports
+      if (periods.length > 24) break;
+    }
+
+    return periods;
+  }
+
+  /**
+   * Helper: Get submission status for a report
+   */
+  private getReportSubmissionStatus(report: any): {
+    status: ReportSubmissionStatus;
+    label: string;
+    color: string;
+    canSubmit: boolean;
+    sublabel?: string;
+  } {
+    const now = new Date();
+
+    // If report is already submitted/approved
+    if (report.status === MonthlyReportStatus.APPROVED || report.isApproved) {
+      return { status: 'APPROVED', label: 'Approved', color: 'green', canSubmit: false };
+    }
+
+    if (report.status === MonthlyReportStatus.SUBMITTED) {
+      return { status: 'SUBMITTED', label: 'Submitted', color: 'blue', canSubmit: false };
+    }
+
+    // Calculate submission window if not stored
+    const windowStart = report.submissionWindowStart ? new Date(report.submissionWindowStart) : null;
+    const windowEnd = report.submissionWindowEnd ? new Date(report.submissionWindowEnd) : null;
+
+    if (!windowStart || !windowEnd) {
+      // Fallback calculation
+      const nextMonth = report.reportMonth === 12 ? 1 : report.reportMonth + 1;
+      const nextYear = report.reportMonth === 12 ? report.reportYear + 1 : report.reportYear;
+      const calcWindowStart = new Date(nextYear, nextMonth - 1, 1);
+      const calcWindowEnd = new Date(nextYear, nextMonth - 1, 10, 23, 59, 59);
+
+      if (now < calcWindowStart) {
+        const daysUntil = Math.ceil((calcWindowStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          status: 'NOT_YET_DUE',
+          label: 'Not Yet Due',
+          color: 'default',
+          canSubmit: false,
+          sublabel: `Opens in ${daysUntil} days`
+        };
+      }
+
+      if (now >= calcWindowStart && now <= calcWindowEnd) {
+        const daysLeft = Math.ceil((calcWindowEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          status: 'CAN_SUBMIT',
+          label: 'Submit Now',
+          color: 'blue',
+          canSubmit: true,
+          sublabel: `${daysLeft} days left`
+        };
+      }
+
+      const daysOverdue = Math.ceil((now.getTime() - calcWindowEnd.getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        status: 'OVERDUE',
+        label: 'Overdue',
+        color: 'red',
+        canSubmit: true,
+        sublabel: `${daysOverdue} days overdue`
+      };
+    }
+
+    // Use stored submission window
+    if (now < windowStart) {
+      const daysUntil = Math.ceil((windowStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        status: 'NOT_YET_DUE',
+        label: 'Not Yet Due',
+        color: 'default',
+        canSubmit: false,
+        sublabel: `Opens in ${daysUntil} days`
+      };
+    }
+
+    if (now >= windowStart && now <= windowEnd) {
+      const daysLeft = Math.ceil((windowEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        status: 'CAN_SUBMIT',
+        label: 'Submit Now',
+        color: 'blue',
+        canSubmit: true,
+        sublabel: `${daysLeft} days left`
+      };
+    }
+
+    const daysOverdue = Math.ceil((now.getTime() - windowEnd.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'OVERDUE',
+      label: 'Overdue',
+      color: 'red',
+      canSubmit: true,
+      sublabel: `${daysOverdue} days overdue`
+    };
+  }
 
   /**
    * Get student dashboard - internship status, report status
@@ -155,6 +337,30 @@ export class StudentService {
           },
         },
         internshipPreferences: true,
+        // Include internship applications for Career Track section
+        internshipApplications: {
+          include: {
+            internship: {
+              include: {
+                industry: {
+                  select: {
+                    id: true,
+                    companyName: true,
+                    city: true,
+                  },
+                },
+              },
+            },
+            mentor: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { appliedDate: 'desc' },
+        },
         _count: {
           select: {
             internshipApplications: true,
@@ -777,13 +983,16 @@ export class StudentService {
   }
 
   /**
-   * Submit monthly report
+   * Submit monthly report with AUTO-APPROVAL
+   * - If a DRAFT report exists, update it with file and auto-approve
+   * - If no report exists, create and auto-approve
+   * - Check submission window and mark overdue if applicable
    */
   async submitMonthlyReport(userId: string, reportDto: {
     applicationId: string;
     reportMonth: number;
     reportYear: number;
-    reportFileUrl?: string;
+    reportFileUrl: string; // Required for submission
     monthName?: string;
   }) {
     const student = await this.prisma.student.findUnique({
@@ -796,6 +1005,11 @@ export class StudentService {
     }
 
     const studentId = student.id;
+
+    // Require file URL for submission
+    if (!reportDto.reportFileUrl) {
+      throw new BadRequestException('Report file is required for submission');
+    }
 
     // Verify application belongs to student
     const application = await this.prisma.internshipApplication.findFirst({
@@ -818,10 +1032,58 @@ export class StudentService {
       },
     });
 
+    // Calculate submission window
+    const nextMonth = reportDto.reportMonth === 12 ? 1 : reportDto.reportMonth + 1;
+    const nextYear = reportDto.reportMonth === 12 ? reportDto.reportYear + 1 : reportDto.reportYear;
+    const submissionWindowStart = new Date(nextYear, nextMonth - 1, 1);
+    const submissionWindowEnd = new Date(nextYear, nextMonth - 1, 10, 23, 59, 59);
+    const now = new Date();
+    const isOverdue = now > submissionWindowEnd;
+
+    // If report already exists
     if (existingReport) {
-      throw new BadRequestException('Report for this month already exists');
+      // Don't allow re-submission if already approved
+      if (existingReport.status === MonthlyReportStatus.APPROVED) {
+        throw new BadRequestException('Report has already been approved');
+      }
+
+      // Calculate period dates if not already set
+      const periodStartDate = existingReport.periodStartDate || new Date(reportDto.reportYear, reportDto.reportMonth - 1, 1);
+      const periodEndDate = existingReport.periodEndDate || new Date(reportDto.reportYear, reportDto.reportMonth, 0, 23, 59, 59);
+
+      // Update existing report with file and AUTO-APPROVE
+      const updated = await this.prisma.monthlyReport.update({
+        where: { id: existingReport.id },
+        data: {
+          reportFileUrl: reportDto.reportFileUrl,
+          monthName: reportDto.monthName || MONTH_NAMES[reportDto.reportMonth - 1],
+          status: MonthlyReportStatus.APPROVED, // AUTO-APPROVAL
+          isApproved: true,
+          approvedAt: now,
+          submittedAt: now,
+          submissionWindowStart: existingReport.submissionWindowStart || submissionWindowStart,
+          submissionWindowEnd: existingReport.submissionWindowEnd || submissionWindowEnd,
+          dueDate: existingReport.dueDate || submissionWindowEnd,
+          periodStartDate,
+          periodEndDate,
+          isOverdue,
+        },
+      });
+
+      await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
+
+      return {
+        ...updated,
+        message: 'Report submitted and auto-approved successfully',
+        autoApproved: true,
+      };
     }
 
+    // Calculate period dates for the report
+    const periodStartDate = new Date(reportDto.reportYear, reportDto.reportMonth - 1, 1);
+    const periodEndDate = new Date(reportDto.reportYear, reportDto.reportMonth, 0, 23, 59, 59);
+
+    // Create new report with AUTO-APPROVAL
     const report = await this.prisma.monthlyReport.create({
       data: {
         applicationId: reportDto.applicationId,
@@ -829,15 +1091,27 @@ export class StudentService {
         reportMonth: reportDto.reportMonth,
         reportYear: reportDto.reportYear,
         reportFileUrl: reportDto.reportFileUrl,
-        monthName: reportDto.monthName,
-        status: MonthlyReportStatus.SUBMITTED,
-        submittedAt: new Date(),
+        monthName: reportDto.monthName || MONTH_NAMES[reportDto.reportMonth - 1],
+        status: MonthlyReportStatus.APPROVED, // AUTO-APPROVAL
+        isApproved: true,
+        approvedAt: now,
+        submittedAt: now,
+        submissionWindowStart,
+        submissionWindowEnd,
+        dueDate: submissionWindowEnd,
+        periodStartDate,
+        periodEndDate,
+        isOverdue,
       },
     });
 
     await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
 
-    return report;
+    return {
+      ...report,
+      message: 'Report submitted and auto-approved successfully',
+      autoApproved: true,
+    };
   }
 
   /**
@@ -881,6 +1155,46 @@ export class StudentService {
 
     await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
     return updated;
+  }
+
+  /**
+   * Delete a monthly report (student-owned, non-approved only)
+   */
+  async deleteMonthlyReport(userId: string, id: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const studentId = student.id;
+
+    const existing = await this.prisma.monthlyReport.findFirst({
+      where: { id, studentId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Monthly report not found');
+    }
+
+    // Only allow deletion of non-approved reports
+    if (existing.status === MonthlyReportStatus.APPROVED) {
+      throw new BadRequestException('Approved reports cannot be deleted');
+    }
+
+    await this.prisma.monthlyReport.delete({
+      where: { id },
+    });
+
+    await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
+
+    return {
+      success: true,
+      message: 'Monthly report deleted successfully',
+    };
   }
 
   /**
@@ -1163,5 +1477,325 @@ export class StudentService {
     });
 
     return query;
+  }
+
+  /**
+   * Generate expected reports for an application
+   * Called when internship starts or application is approved
+   */
+  async generateExpectedReports(applicationId: string) {
+    const application = await this.prisma.internshipApplication.findUnique({
+      where: { id: applicationId },
+      include: { student: true },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Check if reports already generated
+    if (application.reportsGenerated) {
+      return { message: 'Reports already generated', count: 0 };
+    }
+
+    // Get start and end dates
+    const startDate = application.startDate || application.joiningDate;
+    const endDate = application.endDate || application.completionDate;
+
+    if (!startDate || !endDate) {
+      throw new BadRequestException('Start date and end date are required to generate reports');
+    }
+
+    // Calculate expected periods
+    const periods = this.calculateExpectedReportPeriods(startDate, endDate);
+
+    // Create DRAFT reports for each period
+    const createdReports = [];
+    for (const period of periods) {
+      // Check if report already exists
+      const existing = await this.prisma.monthlyReport.findFirst({
+        where: {
+          applicationId,
+          reportMonth: period.month,
+          reportYear: period.year,
+        },
+      });
+
+      if (!existing) {
+        const report = await this.prisma.monthlyReport.create({
+          data: {
+            applicationId,
+            studentId: application.studentId,
+            reportMonth: period.month,
+            reportYear: period.year,
+            monthName: MONTH_NAMES[period.month - 1],
+            status: MonthlyReportStatus.DRAFT,
+            periodStartDate: period.periodStartDate,
+            periodEndDate: period.periodEndDate,
+            submissionWindowStart: period.submissionWindowStart,
+            submissionWindowEnd: period.submissionWindowEnd,
+            dueDate: period.dueDate,
+            isPartialMonth: period.isPartialMonth,
+            isFinalReport: period.isFinalReport,
+          },
+        });
+        createdReports.push(report);
+      }
+    }
+
+    // Update application to mark reports as generated
+    await this.prisma.internshipApplication.update({
+      where: { id: applicationId },
+      data: {
+        reportsGenerated: true,
+        totalExpectedReports: periods.length,
+      },
+    });
+
+    await this.cache.invalidateByTags(['reports', `student:${application.studentId}`]);
+
+    return {
+      message: `Generated ${createdReports.length} expected reports`,
+      count: createdReports.length,
+      totalExpected: periods.length,
+      reports: createdReports,
+    };
+  }
+
+  /**
+   * Get monthly reports with submission status for an application
+   * Returns all expected reports with their current status
+   */
+  async getMonthlyReportsWithStatus(userId: string, applicationId: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Verify ownership
+    const application = await this.prisma.internshipApplication.findFirst({
+      where: { id: applicationId, studentId: student.id },
+      include: {
+        internship: {
+          include: {
+            industry: {
+              select: { companyName: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Get all reports for this application
+    const reports = await this.prisma.monthlyReport.findMany({
+      where: { applicationId },
+      orderBy: [{ reportYear: 'asc' }, { reportMonth: 'asc' }],
+    });
+
+    // If no reports exist and we have dates, generate them
+    if (reports.length === 0 && application.startDate && application.endDate) {
+      await this.generateExpectedReports(applicationId);
+      // Re-fetch after generation
+      const newReports = await this.prisma.monthlyReport.findMany({
+        where: { applicationId },
+        orderBy: [{ reportYear: 'asc' }, { reportMonth: 'asc' }],
+      });
+      return this.formatReportsWithStatus(newReports, application);
+    }
+
+    return this.formatReportsWithStatus(reports, application);
+  }
+
+  /**
+   * Helper: Format reports with submission status
+   */
+  private formatReportsWithStatus(reports: any[], application: any) {
+    const reportsWithStatus = reports.map((report) => {
+      const submissionStatus = this.getReportSubmissionStatus(report);
+      return {
+        ...report,
+        submissionStatus,
+      };
+    });
+
+    // Calculate progress
+    const total = reports.length;
+    const approved = reports.filter((r) => r.status === MonthlyReportStatus.APPROVED).length;
+    const submitted = reports.filter((r) => r.status === MonthlyReportStatus.SUBMITTED).length;
+    const draft = reports.filter((r) => r.status === MonthlyReportStatus.DRAFT).length;
+    const overdue = reports.filter((r) => {
+      if (r.status === MonthlyReportStatus.APPROVED) return false;
+      const status = this.getReportSubmissionStatus(r);
+      return status.status === 'OVERDUE';
+    }).length;
+
+    return {
+      reports: reportsWithStatus,
+      progress: {
+        total,
+        approved,
+        submitted,
+        draft,
+        overdue,
+        percentage: total > 0 ? Math.round((approved / total) * 100) : 0,
+      },
+      internship: {
+        startDate: application.startDate,
+        endDate: application.endDate,
+        companyName: application.companyName || application.internship?.industry?.companyName,
+      },
+    };
+  }
+
+  /**
+   * View a specific monthly report
+   */
+  async viewMonthlyReport(userId: string, reportId: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const report = await this.prisma.monthlyReport.findFirst({
+      where: { id: reportId, studentId: student.id },
+      include: {
+        application: {
+          select: {
+            companyName: true,
+            startDate: true,
+            endDate: true,
+            internship: {
+              include: {
+                industry: {
+                  select: { companyName: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!report) {
+      throw new NotFoundException('Report not found');
+    }
+
+    const submissionStatus = this.getReportSubmissionStatus(report);
+
+    return {
+      ...report,
+      submissionStatus,
+    };
+  }
+
+  /**
+   * Upload report file and save as DRAFT (for cases where user wants to upload before submitting)
+   */
+  async uploadReportFile(userId: string, reportDto: {
+    applicationId: string;
+    reportMonth: number;
+    reportYear: number;
+    reportFileUrl: string;
+  }) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Verify application belongs to student
+    const application = await this.prisma.internshipApplication.findFirst({
+      where: {
+        id: reportDto.applicationId,
+        studentId: student.id,
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Check if report exists
+    const existingReport = await this.prisma.monthlyReport.findFirst({
+      where: {
+        applicationId: reportDto.applicationId,
+        reportMonth: reportDto.reportMonth,
+        reportYear: reportDto.reportYear,
+      },
+    });
+
+    if (existingReport) {
+      // Don't update if already approved
+      if (existingReport.status === MonthlyReportStatus.APPROVED) {
+        throw new BadRequestException('Approved reports cannot be modified');
+      }
+
+      // Update existing report with file
+      const updated = await this.prisma.monthlyReport.update({
+        where: { id: existingReport.id },
+        data: { reportFileUrl: reportDto.reportFileUrl },
+      });
+
+      await this.cache.invalidateByTags(['reports', `student:${student.id}`]);
+      return updated;
+    }
+
+    // Calculate submission window and period dates
+    const nextMonth = reportDto.reportMonth === 12 ? 1 : reportDto.reportMonth + 1;
+    const nextYear = reportDto.reportMonth === 12 ? reportDto.reportYear + 1 : reportDto.reportYear;
+    const submissionWindowStart = new Date(nextYear, nextMonth - 1, 1);
+    const submissionWindowEnd = new Date(nextYear, nextMonth - 1, 10, 23, 59, 59);
+    const periodStartDate = new Date(reportDto.reportYear, reportDto.reportMonth - 1, 1);
+    const periodEndDate = new Date(reportDto.reportYear, reportDto.reportMonth, 0, 23, 59, 59);
+
+    // Create new DRAFT report with file
+    const report = await this.prisma.monthlyReport.create({
+      data: {
+        applicationId: reportDto.applicationId,
+        studentId: student.id,
+        reportMonth: reportDto.reportMonth,
+        reportYear: reportDto.reportYear,
+        reportFileUrl: reportDto.reportFileUrl,
+        monthName: MONTH_NAMES[reportDto.reportMonth - 1],
+        status: MonthlyReportStatus.DRAFT,
+        submissionWindowStart,
+        submissionWindowEnd,
+        dueDate: submissionWindowEnd,
+        periodStartDate,
+        periodEndDate,
+      },
+    });
+
+    await this.cache.invalidateByTags(['reports', `student:${student.id}`]);
+    return report;
+  }
+
+  /**
+   * Get faculty visits with status for an application
+   */
+  async getFacultyVisitsWithStatus(applicationId: string) {
+    return this.facultyVisitService.getMonthlyVisitStatus(applicationId);
+  }
+
+  /**
+   * Generate expected faculty visits for an application
+   */
+  async generateExpectedVisits(applicationId: string) {
+    return this.facultyVisitService.generateExpectedVisits(applicationId);
   }
 }

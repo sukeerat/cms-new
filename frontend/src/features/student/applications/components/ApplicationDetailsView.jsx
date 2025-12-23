@@ -1,33 +1,30 @@
-import React from 'react';
-import { Card, Button, Typography, Tabs } from 'antd';
-import { ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons';
+import React, { memo } from 'react';
+import { Card, Button, Typography, Tabs, Statistic, Row, Col } from 'antd';
+import { ArrowLeftOutlined, FileTextOutlined, TeamOutlined, CalendarOutlined } from '@ant-design/icons';
 import { hasInternshipStarted } from '../utils/applicationUtils';
 import {
   ApplicationDetailsTab,
   ApplicationTimelineTab,
-  ApplicationFeedbackTab,
   ApplicationProgressTab,
 } from './tabs';
+import FacultyVisitsSection from './FacultyVisitsSection';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
 const ApplicationDetailsView = ({
   application,
   onBack,
-  onOpenFeedbackModal,
-  onOpenMonthlyFeedbackModal,
-  completionFeedback,
   monthlyReports,
+  monthlyReportsProgress,
   monthlyReportsLoading,
   monthlyReportsUploading,
-  missingReports,
   onUploadReport,
-  onSubmitReport,
   onDeleteReport,
   onRefreshReports,
-  monthlyFeedbacks,
-  monthlyFeedbacksLoading,
+  facultyVisits = [],
+  facultyVisitsProgress = {},
+  facultyVisitsLoading = false,
 }) => {
   if (!application) return null;
 
@@ -35,6 +32,7 @@ const ApplicationDetailsView = ({
   const internship = application.internship;
   const industry = internship?.industry || {};
   const internshipStarted = hasInternshipStarted(application);
+  const facultyVisitCount = facultyVisitsProgress?.completed || application._count?.facultyVisitLogs || 0;
 
   return (
     <div className="mb-8">
@@ -47,6 +45,51 @@ const ApplicationDetailsView = ({
       >
         Back to My Applications
       </Button>
+
+      {/* Quick Stats */}
+      <Row gutter={16} className="mb-4">
+        <Col xs={12} sm={6}>
+          <Card size="small" className="text-center">
+            <Statistic
+              title="Reports Approved"
+              value={`${monthlyReportsProgress?.approved || 0}/${monthlyReportsProgress?.total || 0}`}
+              prefix={<FileTextOutlined />}
+              valueStyle={{ color: monthlyReportsProgress?.percentage === 100 ? '#52c41a' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small" className="text-center">
+            <Statistic
+              title="Faculty Visits"
+              value={`${facultyVisitsProgress?.completed || 0}/${facultyVisitsProgress?.total || 0}`}
+              prefix={<TeamOutlined />}
+              valueStyle={{ color: facultyVisitsProgress?.percentage === 100 ? '#52c41a' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small" className="text-center">
+            <Statistic
+              title="Progress"
+              value={monthlyReportsProgress?.percentage || 0}
+              suffix="%"
+              prefix={<CalendarOutlined />}
+              valueStyle={{ color: monthlyReportsProgress?.percentage === 100 ? '#52c41a' : '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small" className="text-center">
+            <Text type="secondary" className="text-xs">Status</Text>
+            <div className="mt-1">
+              <Text strong className="text-lg">
+                {application.status}
+              </Text>
+            </div>
+          </Card>
+        </Col>
+      </Row>
 
       {/* Application Details Content */}
       <Card className="rounded-2xl">
@@ -69,28 +112,26 @@ const ApplicationDetailsView = ({
           <TabPane tab="Timeline" key="timeline">
             <ApplicationTimelineTab application={application} />
           </TabPane>
-          <TabPane tab="Monthly Progress" key="progress">
+          <TabPane tab="Monthly Reports" key="progress">
             <ApplicationProgressTab
               application={application}
-              monthlyFeedbacks={monthlyFeedbacks}
-              monthlyFeedbacksLoading={monthlyFeedbacksLoading}
               monthlyReports={monthlyReports}
+              monthlyReportsProgress={monthlyReportsProgress}
               monthlyReportsLoading={monthlyReportsLoading}
               monthlyReportsUploading={monthlyReportsUploading}
-              missingReports={missingReports}
               internshipStarted={internshipStarted}
-              onOpenMonthlyFeedbackModal={onOpenMonthlyFeedbackModal}
               onUploadReport={onUploadReport}
-              onSubmitReport={onSubmitReport}
               onDeleteReport={onDeleteReport}
               onRefreshReports={onRefreshReports}
             />
           </TabPane>
-          <TabPane tab="Feedback" key="feedback">
-            <ApplicationFeedbackTab
+          <TabPane tab="Faculty Visits" key="visits">
+            <FacultyVisitsSection
               application={application}
-              completionFeedback={completionFeedback}
-              onOpenFeedbackModal={onOpenFeedbackModal}
+              visits={facultyVisits}
+              progress={facultyVisitsProgress}
+              loading={facultyVisitsLoading}
+              hasStarted={internshipStarted}
             />
           </TabPane>
         </Tabs>
@@ -99,4 +140,6 @@ const ApplicationDetailsView = ({
   );
 };
 
-export default ApplicationDetailsView;
+ApplicationDetailsView.displayName = 'ApplicationDetailsView';
+
+export default memo(ApplicationDetailsView);

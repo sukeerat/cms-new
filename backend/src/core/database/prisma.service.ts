@@ -17,6 +17,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               { emit: 'event', level: 'warn' },
             ]
           : [{ emit: 'event', level: 'error' }],
+      // Connection pool configuration for MongoDB
+      // Uses DATABASE_URL with connection pool parameters
+      // Recommended: ?maxPoolSize=20&minPoolSize=5&maxIdleTimeMS=30000
     });
 
     // Log queries in development mode

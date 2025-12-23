@@ -1020,17 +1020,25 @@ export class PrincipalService {
       errors: [] as any[],
     };
 
-    for (const studentData of studentsData) {
-      try {
-        await this.createStudent(principalId, studentData);
-        results.success++;
-      } catch (error) {
-        results.failed++;
-        results.errors.push({
-          data: studentData,
-          error: error.message,
-        });
-      }
+    // Process in batches of 10 for better performance with error isolation
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < studentsData.length; i += BATCH_SIZE) {
+      const batch = studentsData.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((studentData) => this.createStudent(principalId, studentData)),
+      );
+
+      batchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.success++;
+        } else {
+          results.failed++;
+          results.errors.push({
+            data: batch[index],
+            error: result.reason?.message || 'Unknown error',
+          });
+        }
+      });
     }
 
     return results;
@@ -1065,17 +1073,25 @@ export class PrincipalService {
       errors: [] as any[],
     };
 
-    for (const staffMember of staffData) {
-      try {
-        await this.createStaff(principalId, staffMember);
-        results.success++;
-      } catch (error) {
-        results.failed++;
-        results.errors.push({
-          data: staffMember,
-          error: error.message,
-        });
-      }
+    // Process in batches of 10 for better performance with error isolation
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < staffData.length; i += BATCH_SIZE) {
+      const batch = staffData.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((staffMember) => this.createStaff(principalId, staffMember)),
+      );
+
+      batchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.success++;
+        } else {
+          results.failed++;
+          results.errors.push({
+            data: batch[index],
+            error: result.reason?.message || 'Unknown error',
+          });
+        }
+      });
     }
 
     return results;

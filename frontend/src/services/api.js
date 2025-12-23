@@ -58,18 +58,19 @@ const refreshAuthToken = async () => {
   return refreshPromise;
 };
 
-// Logout and redirect
+// Logout and redirect - comprehensive cleanup
 const handleLogout = (message) => {
+  // Clear all tokens (also clears persist:root)
   tokenStorage.clear();
 
-  // Clear Redux persist
-  localStorage.removeItem('persist:root');
+  // Clear sessionStorage
+  sessionStorage.clear();
 
   if (message) {
     toast.error(message);
   }
 
-  // Redirect to login
+  // Hard redirect to login - fully resets React state
   window.location.href = '/login';
 };
 

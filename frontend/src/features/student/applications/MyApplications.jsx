@@ -1,127 +1,83 @@
-import React, { useState, useCallback } from 'react';
-import { Card, Tabs, Empty, Spin, Button, Typography, Form } from 'antd';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Card, Tabs, Empty, Spin, Button, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { ExportOutlined } from '@ant-design/icons';
 
 import {
   ApplicationsTable,
   ApplicationDetailsView,
-  FeedbackModal,
-  MonthlyFeedbackModal,
 } from './components';
+import { useMonthlyReports, useFacultyVisits } from './hooks/useApplications';
+import { fetchApplications } from '../store/studentSlice';
 import {
-  useApplications,
-  useCompletionFeedback,
-  useMonthlyReports,
-  useMonthlyFeedback,
-} from './hooks/useApplications';
-import { hasInternshipStarted } from './utils/applicationUtils';
-import { toast } from 'react-hot-toast';
+  selectApplicationsLoading,
+  selectPlatformApplications,
+  selectSelfIdentifiedApplications,
+  selectApplicationsLastFetched,
+} from '../store/studentSelectors';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
 const MyApplications = () => {
   const navigate = useNavigate();
-  const [form] = Form.useForm();
+  const dispatch = useDispatch();
+
+  // Redux state - using memoized selectors
+  const loading = useSelector(selectApplicationsLoading);
+  const applications = useSelector(selectPlatformApplications);
+  const selfIdentifiedApplications = useSelector(selectSelfIdentifiedApplications);
+  const lastFetched = useSelector(selectApplicationsLastFetched);
+
+  // Fetch applications on mount if not cached
+  useEffect(() => {
+    if (!lastFetched) {
+      dispatch(fetchApplications({}));
+    }
+  }, [dispatch, lastFetched]);
+
+  const refetch = useCallback(() => {
+    dispatch(fetchApplications({ forceRefresh: true }));
+  }, [dispatch]);
 
   // State
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [showDetailsView, setShowDetailsView] = useState(false);
   const [activeTab, setActiveTab] = useState('1');
-  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
-  const [monthlyFeedbackModalVisible, setMonthlyFeedbackModalVisible] = useState(false);
-
-  // Hooks
-  const { loading, applications, selfIdentifiedApplications, refetch } = useApplications();
-  const {
-    feedback: completionFeedback,
-    loading: feedbackLoading,
-    fetchFeedback,
-    submitFeedback,
-    setFeedback,
-  } = useCompletionFeedback();
   const {
     reports: monthlyReports,
+    progress: monthlyReportsProgress,
     loading: monthlyReportsLoading,
     uploading: monthlyReportsUploading,
-    missingReports,
     fetchReports,
     uploadReport,
-    submitReport,
     deleteReport,
   } = useMonthlyReports();
+
   const {
-    feedbacks: monthlyFeedbacks,
-    loading: monthlyFeedbacksLoading,
-    submitting: monthlyFeedbackSubmitting,
-    fetchFeedbacks,
-    submitFeedback: submitMonthlyFeedback,
-  } = useMonthlyFeedback();
+    visits: facultyVisits,
+    progress: facultyVisitsProgress,
+    loading: facultyVisitsLoading,
+    fetchVisits,
+  } = useFacultyVisits();
 
   // Handlers
   const handleViewDetails = useCallback(async (application) => {
     setSelectedApplication(application);
     setShowDetailsView(true);
 
-    // Fetch related data
-    const feedback = await fetchFeedback(application.id);
-    await fetchReports(application.id);
-    await fetchFeedbacks(application.id);
-  }, [fetchFeedback, fetchReports, fetchFeedbacks]);
+    // Fetch monthly reports and faculty visits in parallel
+    await Promise.all([
+      fetchReports(application.id),
+      fetchVisits(application.id),
+    ]);
+  }, [fetchReports, fetchVisits]);
 
   const handleCloseDetailsView = useCallback(() => {
     setShowDetailsView(false);
     setSelectedApplication(null);
-    setFeedback(null);
-  }, [setFeedback]);
-
-  const handleOpenFeedbackModal = useCallback(async (application) => {
-    setSelectedApplication(application);
-    const feedback = await fetchFeedback(application.id);
-    setFeedbackModalVisible(true);
-  }, [fetchFeedback]);
-
-  const handleCloseFeedbackModal = useCallback(() => {
-    setFeedbackModalVisible(false);
-    form.resetFields();
-  }, [form]);
-
-  const handleSubmitFeedback = useCallback(async (values) => {
-    if (!selectedApplication) return;
-
-    try {
-      await submitFeedback(selectedApplication.id, values);
-      toast.success('Feedback submitted successfully!');
-      handleCloseFeedbackModal();
-      // Refresh feedback
-      await fetchFeedback(selectedApplication.id);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to submit feedback');
-    }
-  }, [selectedApplication, submitFeedback, handleCloseFeedbackModal, fetchFeedback]);
-
-  const handleOpenMonthlyFeedbackModal = useCallback((application) => {
-    setSelectedApplication(application);
-    setMonthlyFeedbackModalVisible(true);
   }, []);
-
-  const handleCloseMonthlyFeedbackModal = useCallback(() => {
-    setMonthlyFeedbackModalVisible(false);
-  }, []);
-
-  const handleSubmitMonthlyFeedback = useCallback(async (imageFile) => {
-    if (!selectedApplication) return;
-
-    try {
-      await submitMonthlyFeedback(selectedApplication.id, imageFile);
-      handleCloseMonthlyFeedbackModal();
-      // Refresh feedbacks
-      await fetchFeedbacks(selectedApplication.id);
-    } catch (error) {
-      // Error handled in hook
-    }
-  }, [selectedApplication, submitMonthlyFeedback, handleCloseMonthlyFeedbackModal, fetchFeedbacks]);
 
   const handleRefreshReports = useCallback(async () => {
     if (selectedApplication) {
@@ -146,37 +102,16 @@ const MyApplications = () => {
           <ApplicationDetailsView
             application={selectedApplication}
             onBack={handleCloseDetailsView}
-            onOpenFeedbackModal={handleOpenFeedbackModal}
-            onOpenMonthlyFeedbackModal={handleOpenMonthlyFeedbackModal}
-            completionFeedback={completionFeedback}
             monthlyReports={monthlyReports}
+            monthlyReportsProgress={monthlyReportsProgress}
             monthlyReportsLoading={monthlyReportsLoading}
             monthlyReportsUploading={monthlyReportsUploading}
-            missingReports={missingReports}
             onUploadReport={uploadReport}
-            onSubmitReport={submitReport}
             onDeleteReport={deleteReport}
             onRefreshReports={handleRefreshReports}
-            monthlyFeedbacks={monthlyFeedbacks}
-            monthlyFeedbacksLoading={monthlyFeedbacksLoading}
-          />
-
-          {/* Feedback Modal */}
-          <FeedbackModal
-            visible={feedbackModalVisible}
-            onCancel={handleCloseFeedbackModal}
-            onSubmit={handleSubmitFeedback}
-            loading={feedbackLoading}
-            form={form}
-            existingFeedback={completionFeedback}
-          />
-
-          {/* Monthly Feedback Modal */}
-          <MonthlyFeedbackModal
-            visible={monthlyFeedbackModalVisible}
-            onCancel={handleCloseMonthlyFeedbackModal}
-            onSubmit={handleSubmitMonthlyFeedback}
-            loading={monthlyFeedbackSubmitting}
+            facultyVisits={facultyVisits}
+            facultyVisitsProgress={facultyVisitsProgress}
+            facultyVisitsLoading={facultyVisitsLoading}
           />
         </div>
       </div>

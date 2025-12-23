@@ -54,7 +54,7 @@ import {
   selectIndustryLoading,
   selectIndustryProfile,
   setIndustryProfile,
-} from "../../../store/slices/industrySlice";
+} from "../store/industrySlice";
 // Import the CompletionFeedbackModal
 
 const { Title, Text, Paragraph } = Typography;

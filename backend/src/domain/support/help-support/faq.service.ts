@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
-import { SupportCategory } from '@prisma/client';
+import { SupportCategory, Role } from '@prisma/client';
 import { CreateFAQDto, UpdateFAQDto } from './dto';
 
 @Injectable()
@@ -72,6 +72,7 @@ export class FAQService {
           summary: data.summary,
           category: data.category,
           tags: data.tags || [],
+          targetRoles: data.targetRoles || [], // Empty array = visible to all roles
           isPublished: data.isPublished || false,
           publishedAt: data.isPublished ? new Date() : null,
           publishedBy: data.isPublished ? authorId : null,
@@ -172,17 +173,38 @@ export class FAQService {
   }
 
   /**
-   * Get all published FAQ articles
+   * Build role filter for FAQ queries
+   * - If userRole is provided, show FAQs where targetRoles is empty OR contains the user's role
+   * - If no userRole, show only FAQs with empty targetRoles (public FAQs)
    */
-  async getPublishedFAQs() {
+  private buildRoleFilter(userRole?: string) {
+    if (userRole) {
+      return {
+        OR: [
+          { targetRoles: { isEmpty: true } }, // Public FAQs visible to all
+          { targetRoles: { has: userRole } }, // FAQs targeted to user's role
+        ],
+      };
+    }
+    // No role = show only public FAQs
+    return { targetRoles: { isEmpty: true } };
+  }
+
+  /**
+   * Get all published FAQ articles filtered by user role
+   */
+  async getPublishedFAQs(userRole?: string) {
     try {
-      const cacheKey = 'faqs:published';
+      const cacheKey = userRole ? `faqs:published:${userRole}` : 'faqs:published:public';
 
       return await this.cache.getOrSet(
         cacheKey,
         async () => {
           return await this.prisma.fAQArticle.findMany({
-            where: { isPublished: true },
+            where: {
+              isPublished: true,
+              ...this.buildRoleFilter(userRole),
+            },
             orderBy: [
               { sortOrder: 'asc' },
               { viewCount: 'desc' },
@@ -264,11 +286,11 @@ export class FAQService {
   }
 
   /**
-   * Get FAQs by category
+   * Get FAQs by category filtered by user role
    */
-  async getFAQsByCategory(category: SupportCategory) {
+  async getFAQsByCategory(category: SupportCategory, userRole?: string) {
     try {
-      const cacheKey = `faqs:category:${category}`;
+      const cacheKey = userRole ? `faqs:category:${category}:${userRole}` : `faqs:category:${category}:public`;
 
       return await this.cache.getOrSet(
         cacheKey,
@@ -277,6 +299,7 @@ export class FAQService {
             where: {
               category,
               isPublished: true,
+              ...this.buildRoleFilter(userRole),
             },
             orderBy: [
               { sortOrder: 'asc' },
@@ -293,9 +316,9 @@ export class FAQService {
   }
 
   /**
-   * Search FAQs
+   * Search FAQs filtered by user role
    */
-  async searchFAQs(query: string) {
+  async searchFAQs(query: string, userRole?: string) {
     try {
       if (!query || query.trim().length < 2) {
         return [];
@@ -303,10 +326,11 @@ export class FAQService {
 
       const searchTerm = query.trim().toLowerCase();
 
-      // MongoDB text search using contains
+      // MongoDB text search using contains with role filtering
       const results = await this.prisma.fAQArticle.findMany({
         where: {
           isPublished: true,
+          ...this.buildRoleFilter(userRole),
           OR: [
             { title: { contains: searchTerm, mode: 'insensitive' } },
             { content: { contains: searchTerm, mode: 'insensitive' } },
@@ -327,11 +351,11 @@ export class FAQService {
   }
 
   /**
-   * Get categories with article counts
+   * Get categories with article counts filtered by user role
    */
-  async getCategoriesWithCounts() {
+  async getCategoriesWithCounts(userRole?: string) {
     try {
-      const cacheKey = 'faqs:categories';
+      const cacheKey = userRole ? `faqs:categories:${userRole}` : 'faqs:categories:public';
 
       return await this.cache.getOrSet(
         cacheKey,
@@ -341,7 +365,11 @@ export class FAQService {
               category,
               label: this.formatCategoryLabel(category),
               count: await this.prisma.fAQArticle.count({
-                where: { category, isPublished: true },
+                where: {
+                  category,
+                  isPublished: true,
+                  ...this.buildRoleFilter(userRole),
+                },
               }),
             }))
           );
@@ -382,12 +410,15 @@ export class FAQService {
   }
 
   /**
-   * Get popular FAQs
+   * Get popular FAQs filtered by user role
    */
-  async getPopularFAQs(limit: number = 10) {
+  async getPopularFAQs(limit: number = 10, userRole?: string) {
     try {
       return await this.prisma.fAQArticle.findMany({
-        where: { isPublished: true },
+        where: {
+          isPublished: true,
+          ...this.buildRoleFilter(userRole),
+        },
         orderBy: { viewCount: 'desc' },
         take: limit,
       });
@@ -416,11 +447,25 @@ export class FAQService {
    * Helper to invalidate FAQ cache
    */
   private async invalidateFAQCache() {
-    await this.cache.del('faqs:published');
-    await this.cache.del('faqs:categories');
-    // Invalidate all category caches
+    // All roles in the system
+    const roles = Object.values(Role);
+
+    // Invalidate public caches
+    await this.cache.del('faqs:published:public');
+    await this.cache.del('faqs:categories:public');
+
+    // Invalidate role-specific caches
+    for (const role of roles) {
+      await this.cache.del(`faqs:published:${role}`);
+      await this.cache.del(`faqs:categories:${role}`);
+    }
+
+    // Invalidate all category caches (both public and role-specific)
     for (const category of Object.values(SupportCategory)) {
-      await this.cache.del(`faqs:category:${category}`);
+      await this.cache.del(`faqs:category:${category}:public`);
+      for (const role of roles) {
+        await this.cache.del(`faqs:category:${category}:${role}`);
+      }
     }
   }
 }

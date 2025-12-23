@@ -25,6 +25,7 @@ import {
   selectInstituteLoading,
 } from "../../../store/slices/instituteSlice";
 import { toast } from "react-hot-toast";
+import { getStoredLoginResponse } from "../../../utils/authStorage";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -106,7 +107,7 @@ const SelfIdentifiedInternship = () => {
   const handleSubmit = async (values) => {
     try {
       // Get login data
-      const loginData = JSON.parse(localStorage.getItem("loginResponse"));
+      const loginData = getStoredLoginResponse();
       const studentId = loginData?.user?.studentId;
       const assignerId =
         loginData?.user?.id ||
@@ -531,7 +532,7 @@ const SelfIdentifiedInternship = () => {
               </Form.Item>
             </div>
 
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <Button
                 type="primary"
                 htmlType="submit"

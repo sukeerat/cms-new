@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Layout, Drawer } from 'antd';
 import { Outlet } from 'react-router-dom';
 import useBreakpoint from 'antd/es/grid/hooks/useBreakpoint';
@@ -18,7 +18,7 @@ import { getMenuSectionsForRole } from './config/menuConfig.jsx';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTokenMonitor } from '../../hooks/useTokenMonitor';
 import { LogoutReason } from '../../utils/authUtils';
-import { getTokenPayload } from '../../utils/tokenManager';
+import { getTokenPayload, tokenStorage } from '../../utils/tokenManager';
 
 const { Sider, Content } = Layout;
 
@@ -38,10 +38,10 @@ const Layouts = () => {
     trackActivity: true,
   });
 
-  // Get user from token
-  const getUserFromToken = () => {
+  // Get user from token - memoized to avoid parsing localStorage/JWT on every render
+  const userInfo = useMemo(() => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = tokenStorage.getToken();
       if (!token) return { role: null, name: 'User' };
       const payload = getTokenPayload(token);
       return {
@@ -51,9 +51,9 @@ const Layouts = () => {
     } catch {
       return { role: null, name: 'User' };
     }
-  };
+  }, [sessionInfo?.token]); // Recalculate when token changes
 
-  const { role, name } = getUserFromToken();
+  const { role, name } = userInfo;
   const sections = getMenuSectionsForRole(role);
 
   // Logout handlers

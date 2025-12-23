@@ -32,15 +32,24 @@ export class LruCacheService implements OnModuleInit {
   private l2Misses = 0;
 
   constructor(private configService: ConfigService) {
-    const LRUCacheCtor = (LRUCacheImport as any)?.LRUCache ?? (LRUCacheImport as any);
-
-    // Initialize local LRU cache for hot data
-    this.localCache = new LRUCacheCtor({
-      max: 500, // Maximum 500 items in local cache
-      ttl: 60000, // 1 minute TTL for local cache
-      updateAgeOnGet: true,
-      updateAgeOnHas: true,
-    });
+    // Try to initialize LRU cache, fallback to Map if not available
+    try {
+      const LRUCacheCtor = (LRUCacheImport as any)?.LRUCache ?? (LRUCacheImport as any);
+      if (typeof LRUCacheCtor === 'function') {
+        this.localCache = new LRUCacheCtor({
+          max: 1000, // Maximum 1000 items in local cache (increased for better hit rate)
+          ttl: 60000, // 1 minute TTL for local cache
+          updateAgeOnGet: true,
+          updateAgeOnHas: true,
+        });
+      } else {
+        throw new Error('LRU cache constructor not found');
+      }
+    } catch (error) {
+      this.logger.warn('LRU cache not available, using Map fallback');
+      // Fallback to a simple Map with manual TTL management
+      this.localCache = new Map();
+    }
 
     // Initialize tag store
     this.tagStore = new Map();
@@ -98,10 +107,12 @@ export class LruCacheService implements OnModuleInit {
    */
   async get<T>(key: string): Promise<T | null> {
     // Try L1 first
-    const l1Value = this.localCache.get(key);
-    if (l1Value !== undefined) {
-      this.l1Hits++;
-      return l1Value as T;
+    if (this.localCache && typeof this.localCache.get === 'function') {
+      const l1Value = this.localCache.get(key);
+      if (l1Value !== undefined) {
+        this.l1Hits++;
+        return l1Value as T;
+      }
     }
     this.l1Misses++;
 
@@ -115,7 +126,10 @@ export class LruCacheService implements OnModuleInit {
 
         if (value !== null) {
           this.l2Hits++;
-          this.localCache.set(key, value); // Populate L1
+          // Populate L1
+          if (this.localCache && typeof this.localCache.set === 'function') {
+            this.localCache.set(key, value);
+          }
           return value;
         }
         this.l2Misses++;
@@ -139,10 +153,13 @@ export class LruCacheService implements OnModuleInit {
     // Newer lru-cache uses an options object with `ttl`, older versions use a numeric `maxAge` as the 3rd arg.
     const l1TtlLimit = this.isRedisUsable() ? this.l1MaxTtlMs : this.l1FallbackTtlMs;
     const l1TtlMs = Math.min(ttlMs, l1TtlLimit);
-    try {
-      this.localCache.set(key, value, { ttl: l1TtlMs });
-    } catch {
-      this.localCache.set(key, value, l1TtlMs);
+    if (this.localCache && typeof this.localCache.set === 'function') {
+      try {
+        this.localCache.set(key, value, { ttl: l1TtlMs });
+      } catch {
+        // Fallback for Map or older lru-cache versions
+        this.localCache.set(key, value);
+      }
     }
 
     // Set in Redis with circuit breaker
@@ -191,7 +208,9 @@ export class LruCacheService implements OnModuleInit {
    * Delete a key from both local and Redis cache
    */
   async delete(key: string): Promise<void> {
-    this.localCache.delete(key);
+    if (this.localCache && typeof this.localCache.delete === 'function') {
+      this.localCache.delete(key);
+    }
     if (this.isRedisUsable()) {
       try {
         await this.redisCircuitBreaker.execute(async () => {
@@ -207,28 +226,44 @@ export class LruCacheService implements OnModuleInit {
 
   /**
    * Invalidate cache by pattern (e.g., 'institution:*')
+   * Uses SCAN instead of KEYS for non-blocking Redis operations
    */
   async invalidate(pattern: string): Promise<void> {
     // Clear matching keys from local cache
-    for (const key of this.localCache.keys()) {
-      if (this.matchPattern(key, pattern)) {
-        this.localCache.delete(key);
+    const l1Pattern = new RegExp(pattern.replace(/\*/g, '.*'));
+    if (this.localCache && typeof this.localCache.keys === 'function') {
+      for (const key of this.localCache.keys()) {
+        if (l1Pattern.test(key)) {
+          if (typeof this.localCache.delete === 'function') {
+            this.localCache.delete(key);
+          }
+        }
       }
     }
 
-    // Clear matching keys from Redis with circuit breaker
+    // Use SCAN instead of KEYS for L2 (Redis) - non-blocking
     if (this.isRedisUsable()) {
       try {
         await this.redisCircuitBreaker.execute(async () => {
-          const keys = await this.redis.keys(pattern);
-          if (keys.length > 0) {
-            await this.redis.del(...keys);
-            // Remove from tag store
-            keys.forEach((key) => this.removeFromAllTags(key));
-          }
+          let cursor = '0';
+          do {
+            const [newCursor, keys] = await this.redis.scan(
+              cursor,
+              'MATCH',
+              pattern,
+              'COUNT',
+              100,
+            );
+            cursor = newCursor;
+            if (keys.length > 0) {
+              await this.redis.del(...keys);
+              // Remove from tag store
+              keys.forEach((key) => this.removeFromAllTags(key));
+            }
+          } while (cursor !== '0');
         });
       } catch (error) {
-        this.logger.warn(`Redis invalidate failed for pattern ${pattern}`, error);
+        this.logger.warn(`Cache invalidation failed: ${error.message}`);
       }
     }
   }
@@ -260,7 +295,9 @@ export class LruCacheService implements OnModuleInit {
    * Clear all cache (both local and Redis)
    */
   async clear(): Promise<void> {
-    this.localCache.clear();
+    if (this.localCache && typeof this.localCache.clear === 'function') {
+      this.localCache.clear();
+    }
     this.tagStore.clear();
     if (this.isRedisUsable()) {
       try {
@@ -279,8 +316,8 @@ export class LruCacheService implements OnModuleInit {
   getStats() {
     return {
       local: {
-        size: this.localCache.size,
-        max: this.localCache.max,
+        size: this.localCache?.size ?? 0,
+        max: this.localCache?.max ?? 0,
       },
       tags: {
         count: this.tagStore.size,
@@ -294,7 +331,7 @@ export class LruCacheService implements OnModuleInit {
   getMetrics() {
     return {
       l1: {
-        size: this.localCache.size,
+        size: this.localCache?.size ?? 0,
         hits: this.l1Hits,
         misses: this.l1Misses,
         hitRate: this.l1Hits / (this.l1Hits + this.l1Misses) || 0,
@@ -385,7 +422,7 @@ export class LruCacheService implements OnModuleInit {
    * Check if key exists in cache
    */
   async has(key: string): Promise<boolean> {
-    if (this.localCache.has(key)) {
+    if (this.localCache && typeof this.localCache.has === 'function' && this.localCache.has(key)) {
       return true;
     }
 

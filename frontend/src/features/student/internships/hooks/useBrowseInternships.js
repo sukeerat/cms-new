@@ -22,6 +22,8 @@ export const useBrowseInternships = (pageSize = 9) => {
 
   const debouncedSearchText = useDebounce(searchText, 300);
 
+  // Fetch data once on mount - filtering happens client-side
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);

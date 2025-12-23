@@ -1,5 +1,5 @@
 // ColumnSelector Component - Select columns for report
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Checkbox,
   Button,
@@ -17,26 +17,10 @@ import {
   SortAscendingOutlined,
   SwapOutlined,
 } from "@ant-design/icons";
+import { useDebounce } from "../../hooks/useDebounce";
 
 const { Text } = Typography;
 const { Search } = Input;
-
-/**
- * Debounce hook for search input
- */
-const useDebounce = (value, delay = 300) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 
 const ColumnSelector = ({
   columns = [],

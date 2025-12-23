@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Table, Button, Space, Tag, Card, Input, Select, message, Row, Col, Statistic, Typography } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { fetchInternships, applyForInternship } from '../../../store/slices/studentSlice';
+import { fetchInternships, applyForInternship } from '../store/studentSlice';
 import { EyeOutlined, SearchOutlined, SendOutlined, ShopOutlined } from '@ant-design/icons';
 
 const { Title, Paragraph } = Typography;

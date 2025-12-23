@@ -85,11 +85,28 @@ export const useNotifications = () => {
 
   // Poll for new notifications every 60 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchNotifications();
-    }, 60000);
+    let interval;
 
-    return () => clearInterval(interval);
+    const startPolling = () => {
+      interval = setInterval(fetchNotifications, 60000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        fetchNotifications();
+        startPolling();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    if (!document.hidden) startPolling();
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchNotifications]);
 
   return {

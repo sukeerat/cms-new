@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchStudentDashboard,
@@ -12,80 +12,63 @@ import {
   updateApplication,
   submitMonthlyReport,
 } from '../store/studentSlice';
+import {
+  selectDashboard,
+  selectProfile,
+  selectInternships,
+  selectApplications,
+  selectReports,
+  selectMentor,
+  selectGrievances,
+  selectNormalizedApplicationsList,
+  selectNormalizedGrievancesList,
+  selectSelfIdentifiedApplications,
+  selectPlatformApplications,
+  selectActiveInternships,
+  selectRecentApplications,
+  selectMonthlyReportsWithInfo,
+  selectCalculatedStats,
+  selectCombinedLoadingStates,
+  selectDashboardIsLoading,
+  selectCombinedErrors,
+  selectHasDashboardError,
+  selectMentorWithFallback,
+  selectProfileData,
+  selectInternshipsList,
+  selectReportsList,
+} from '../store/studentSelectors';
+import { useSWR, getCachedData, setCachedData } from '../../../hooks/useSWR';
 
 /**
  * Custom hook for Student Dashboard data management
- * Uses Redux for state management and caching
+ * Uses Redux for state management and SWR pattern for optimal caching
+ *
+ * SWR Pattern Benefits:
+ * - Shows cached data immediately (no loading spinner on subsequent visits)
+ * - Fetches fresh data in background
+ * - Shows subtle revalidation indicator while fetching
+ * - Auto-revalidates on window focus and network reconnect
  */
 export const useStudentDashboard = () => {
   const dispatch = useDispatch();
 
-  // Selectors with safe defaults
-  const dashboard = useSelector((state) => state.student?.dashboard || { loading: false, stats: null, error: null });
-  const profile = useSelector((state) => state.student?.profile || { loading: false, data: null, error: null });
-  const internships = useSelector((state) => state.student?.internships || { loading: false, list: [], error: null });
-  const applications = useSelector((state) => state.student?.applications || { loading: false, list: [], error: null });
-  const reports = useSelector((state) => state.student?.reports || { loading: false, list: [], error: null });
-  const mentor = useSelector((state) => state.student?.mentor || { loading: false, data: null, error: null });
-  const grievances = useSelector((state) => state.student?.grievances || { loading: false, list: [], error: null });
+  // Redux state - using memoized selectors
+  const dashboard = useSelector(selectDashboard);
+  const profile = useSelector(selectProfile);
+  const internships = useSelector(selectInternships);
+  const applications = useSelector(selectApplications);
+  const reports = useSelector(selectReports);
+  const mentor = useSelector(selectMentor);
+  const grievances = useSelector(selectGrievances);
 
-  // Detailed loading states
-  const loadingStates = useMemo(() => ({
-    dashboard: dashboard.loading,
-    profile: profile.loading,
-    internships: internships.loading,
-    applications: applications.loading,
-    reports: reports.loading,
-    mentor: mentor.loading,
-    grievances: grievances.loading,
-  }), [
-    dashboard.loading,
-    profile.loading,
-    internships.loading,
-    applications.loading,
-    reports.loading,
-    mentor.loading,
-    grievances.loading,
-  ]);
+  // Derived selectors
+  const loadingStates = useSelector(selectCombinedLoadingStates);
+  const reduxIsLoading = useSelector(selectDashboardIsLoading);
+  const errors = useSelector(selectCombinedErrors);
+  const hasError = useSelector(selectHasDashboardError);
 
-  // Overall loading state
-  const isLoading = useMemo(() => (
-    dashboard.loading ||
-    profile.loading ||
-    internships.loading ||
-    applications.loading ||
-    reports.loading
-  ), [
-    dashboard.loading,
-    profile.loading,
-    internships.loading,
-    applications.loading,
-    reports.loading,
-  ]);
-
-  // Detailed error states
-  const errors = useMemo(() => ({
-    dashboard: dashboard.error,
-    profile: profile.error,
-    internships: internships.error,
-    applications: applications.error,
-    reports: reports.error,
-    mentor: mentor.error,
-    grievances: grievances.error,
-  }), [
-    dashboard.error,
-    profile.error,
-    internships.error,
-    applications.error,
-    reports.error,
-    mentor.error,
-    grievances.error,
-  ]);
-
-  // Check if any error exists
-  const hasError = useMemo(() => (
-    !!(dashboard.error || profile.error || applications.error || reports.error)
-  ), [dashboard.error, profile.error, applications.error, reports.error]);
+  // SWR state for tracking background revalidation
+  const [isRevalidating, setIsRevalidating] = useState(false);
 
   // Fetch all dashboard data - optimized to reduce redundant calls
   const fetchDashboardData = useCallback(async (forceRefresh = false) => {
@@ -103,86 +86,38 @@ export const useStudentDashboard = () => {
     dispatch(fetchGrievances());
   }, [dispatch]);
 
-  // Initial fetch on mount
+  // SWR implementation - fetches with stale-while-revalidate pattern
+  const { isLoading: swrIsLoading, isRevalidating: swrIsRevalidating, revalidate } = useSWR(
+    'student-dashboard-data',
+    async () => {
+      await fetchDashboardData(false);
+      return true; // Return success indicator
+    },
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 2000,
+      focusThrottleInterval: 5000,
+    }
+  );
+
+  // Update local revalidation state
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    setIsRevalidating(swrIsRevalidating);
+  }, [swrIsRevalidating]);
 
-  // Normalize applications list
-  const normalizedApplications = useMemo(() => {
-    if (Array.isArray(applications.list)) {
-      return applications.list;
-    }
-    return applications.list?.applications || [];
-  }, [applications.list]);
+  // Combined loading state: only show full loading on initial load with no cache
+  const isLoading = swrIsLoading || reduxIsLoading;
 
-  // Normalize grievances list
-  const normalizedGrievances = useMemo(() => {
-    if (Array.isArray(grievances.list)) {
-      return grievances.list;
-    }
-    return grievances.list?.grievances || [];
-  }, [grievances.list]);
-
-  // Filter self-identified from applications (applications already contains all)
-  const selfIdentifiedApplications = useMemo(() => (
-    normalizedApplications.filter(app => app.isSelfIdentified)
-  ), [normalizedApplications]);
-
-  // Filter platform applications (non self-identified)
-  const platformApplications = useMemo(() => (
-    normalizedApplications.filter(app => !app.isSelfIdentified)
-  ), [normalizedApplications]);
-
-  // Calculate statistics from data
-  // For self-identified internships: APPROVED is the active status
-  // For regular internships: SELECTED is the active status
-  const stats = useMemo(() => ({
-    totalApplications: normalizedApplications.length,
-    activeApplications: normalizedApplications.filter(app =>
-      ['APPLIED', 'SHORTLISTED', 'UNDER_REVIEW'].includes(app.status)
-    ).length,
-    // Include APPROVED for self-identified internships
-    selectedApplications: normalizedApplications.filter(app =>
-      app.status === 'SELECTED' || app.status === 'APPROVED'
-    ).length,
-    completedInternships: normalizedApplications.filter(app => app.status === 'COMPLETED').length,
-    totalInternships: (internships.list || []).length,
-    grievances: normalizedGrievances.length,
-    // Self-identified specific stats
-    selfIdentifiedCount: selfIdentifiedApplications.length,
-    ongoingInternships: normalizedApplications.filter(app =>
-      ['SELECTED', 'APPROVED', 'JOINED', 'ACTIVE'].includes(app.status)
-    ).length,
-  }), [normalizedApplications, selfIdentifiedApplications, internships.list, normalizedGrievances]);
-
-  // Get active internship(s)
-  // Include APPROVED status for self-identified internships
-  const activeInternships = useMemo(() => (
-    normalizedApplications.filter(app =>
-      app.status === 'SELECTED' || app.status === 'ACTIVE' ||
-      app.status === 'JOINED' || app.status === 'APPROVED'
-    )
-  ), [normalizedApplications]);
-
-  // Get recent applications
-  const recentApplications = useMemo(() => (
-    [...normalizedApplications]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 5)
-  ), [normalizedApplications]);
-
-  // Get monthly reports with internship info
-  const monthlyReports = useMemo(() => (
-    normalizedApplications.flatMap(app =>
-      (app.monthlyReports || []).map(report => ({
-        ...report,
-        applicationId: app.id,
-        internshipTitle: app.internship?.title || app.title,
-        companyName: app.internship?.industry?.companyName || app.companyName,
-      }))
-    )
-  ), [normalizedApplications]);
+  // Use memoized selectors for derived data
+  const normalizedApplications = useSelector(selectNormalizedApplicationsList);
+  const normalizedGrievances = useSelector(selectNormalizedGrievancesList);
+  const selfIdentifiedApplications = useSelector(selectSelfIdentifiedApplications);
+  const platformApplications = useSelector(selectPlatformApplications);
+  const stats = useSelector(selectCalculatedStats);
+  const activeInternships = useSelector(selectActiveInternships);
+  const recentApplications = useSelector(selectRecentApplications);
+  const monthlyReports = useSelector(selectMonthlyReportsWithInfo);
 
   // Action handlers with error handling
   const handleWithdrawApplication = useCallback(async (applicationId) => {
@@ -213,33 +148,36 @@ export const useStudentDashboard = () => {
   }, [dispatch]);
 
   const refresh = useCallback(() => {
-    fetchDashboardData(true);
-  }, [fetchDashboardData]);
+    setIsRevalidating(true);
+    fetchDashboardData(true).finally(() => {
+      setIsRevalidating(false);
+      revalidate();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revalidate]);
 
   // Extract mentor from profile or fallback to mentor state
-  const mentorData = useMemo(() => {
-    // First try from profile's mentorAssignments
-    if (profile.data?.mentorAssignments?.length > 0) {
-      const activeAssignment = profile.data.mentorAssignments.find(a => a.isActive);
-      return activeAssignment?.mentor || null;
-    }
-    // Fallback to mentor state
-    return mentor.data;
-  }, [profile.data, mentor.data]);
+  const mentorData = useSelector(selectMentorWithFallback);
+
+  // Direct data access
+  const profileData = useSelector(selectProfileData);
+  const internshipsList = useSelector(selectInternshipsList);
+  const reportsList = useSelector(selectReportsList);
 
   return {
     // State
     isLoading,
+    isRevalidating, // NEW: Shows subtle indicator during background refresh
     loadingStates,
     dashboard: dashboard.stats,
-    profile: profile.data,
+    profile: profileData,
     mentor: mentorData,
     grievances: normalizedGrievances,
     applications: normalizedApplications, // All applications (platform + self-identified)
     selfIdentified: selfIdentifiedApplications, // Filtered self-identified only
     platformApplications, // Filtered platform only
-    internships: internships.list || [],
-    reports: reports.list || [],
+    internships: internshipsList,
+    reports: reportsList,
 
     // Computed
     stats,
@@ -253,6 +191,7 @@ export const useStudentDashboard = () => {
     handleWithdrawApplication,
     handleUpdateApplication,
     handleSubmitReport,
+    revalidate, // NEW: Manual revalidation trigger
 
     // Errors
     errors,

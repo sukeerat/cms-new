@@ -189,6 +189,71 @@ export class StudentController {
     return this.studentService.updateMonthlyReport(req.user.userId, id, reportDto);
   }
 
+  @Delete('monthly-reports/:id')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Delete monthly report' })
+  @ApiResponse({ status: 200, description: 'Monthly report deleted successfully' })
+  async deleteMonthlyReport(@Req() req, @Param('id') id: string) {
+    return this.studentService.deleteMonthlyReport(req.user.userId, id);
+  }
+
+  @Get('monthly-reports/:id/view')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'View monthly report details' })
+  @ApiResponse({ status: 200, description: 'Report details retrieved successfully' })
+  async viewMonthlyReport(@Req() req, @Param('id') id: string) {
+    return this.studentService.viewMonthlyReport(req.user.userId, id);
+  }
+
+  @Get('applications/:id/reports')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Get monthly reports with status for an application' })
+  @ApiResponse({ status: 200, description: 'Reports with status retrieved successfully' })
+  async getApplicationReports(@Req() req, @Param('id') applicationId: string) {
+    return this.studentService.getMonthlyReportsWithStatus(req.user.userId, applicationId);
+  }
+
+  @Post('applications/:id/generate-reports')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Generate expected reports for an application' })
+  @ApiResponse({ status: 201, description: 'Reports generated successfully' })
+  async generateApplicationReports(@Req() req, @Param('id') applicationId: string) {
+    // First verify ownership
+    await this.studentService.getApplicationDetails(req.user.userId, applicationId);
+    return this.studentService.generateExpectedReports(applicationId);
+  }
+
+  @Post('monthly-reports/upload')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Upload report file as draft' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, description: 'Report file uploaded successfully' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadReportFile(
+    @Req() req,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() reportDto: any,
+  ) {
+    const fileUrl = (file as any)?.path || (file as any)?.location || (file as any)?.url || '';
+    return this.studentService.uploadReportFile(req.user.userId, {
+      applicationId: reportDto.applicationId,
+      reportMonth: parseInt(reportDto.reportMonth, 10),
+      reportYear: parseInt(reportDto.reportYear, 10),
+      reportFileUrl: fileUrl,
+    });
+  }
+
+  // Faculty Visits
+  @Get('applications/:id/faculty-visits')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Get faculty visits with status for an application' })
+  @ApiResponse({ status: 200, description: 'Faculty visits retrieved successfully' })
+  async getApplicationFacultyVisits(@Req() req, @Param('id') applicationId: string) {
+    // Verify ownership first
+    await this.studentService.getApplicationDetails(req.user.userId, applicationId);
+    return this.studentService.getFacultyVisitsWithStatus(applicationId);
+  }
+
   // Documents
   @Get('documents')
   @Roles(Role.STUDENT)

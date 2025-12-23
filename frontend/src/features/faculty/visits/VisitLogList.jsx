@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Card, Table, Button, Tag, Space, Modal, message, Input, DatePicker, Descriptions, Drawer, Typography } from 'antd';
 import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons';
-import { fetchVisitLogs, deleteVisitLog } from '../../../store/slices/facultySlice';
+import { fetchVisitLogs, deleteVisitLog } from '../store/facultySlice';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;

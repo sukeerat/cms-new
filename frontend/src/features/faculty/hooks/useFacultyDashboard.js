@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchFacultyDashboard,
@@ -23,10 +23,17 @@ import {
   selectMonthlyReports,
   selectJoiningLetters,
 } from '../store/facultySlice';
+import { useSWR } from '../../../hooks/useSWR';
 
 /**
  * Custom hook for Faculty Dashboard data management
- * Uses Redux for state management and caching
+ * Uses Redux for state management and SWR pattern for optimal caching
+ *
+ * SWR Pattern Benefits:
+ * - Shows cached data immediately (no loading spinner on subsequent visits)
+ * - Fetches fresh data in background
+ * - Shows subtle revalidation indicator while fetching
+ * - Auto-revalidates on window focus and network reconnect
  */
 export const useFacultyDashboard = () => {
   const dispatch = useDispatch();
@@ -40,8 +47,11 @@ export const useFacultyDashboard = () => {
   const monthlyReports = useSelector(selectMonthlyReports);
   const joiningLetters = useSelector(selectJoiningLetters);
 
-  // Derived loading state
-  const isLoading = useMemo(() => (
+  // SWR state for tracking background revalidation
+  const [isRevalidating, setIsRevalidating] = useState(false);
+
+  // Derived loading state from Redux
+  const reduxIsLoading = useMemo(() => (
     dashboard.loading ||
     students.loading ||
     visitLogs.loading ||
@@ -60,10 +70,28 @@ export const useFacultyDashboard = () => {
     dispatch(fetchJoiningLetters({ forceRefresh }));
   }, [dispatch]);
 
-  // Initial fetch on mount
+  // SWR implementation - fetches with stale-while-revalidate pattern
+  const { isLoading: swrIsLoading, isRevalidating: swrIsRevalidating, revalidate } = useSWR(
+    'faculty-dashboard-data',
+    async () => {
+      await fetchDashboardData(false);
+      return true; // Return success indicator
+    },
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 2000,
+      focusThrottleInterval: 5000,
+    }
+  );
+
+  // Update local revalidation state
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    setIsRevalidating(swrIsRevalidating);
+  }, [swrIsRevalidating]);
+
+  // Combined loading state: only show full loading on initial load with no cache
+  const isLoading = swrIsLoading || reduxIsLoading;
 
   // Calculate statistics from dashboard data
   const stats = useMemo(() => {
@@ -128,8 +156,13 @@ export const useFacultyDashboard = () => {
   }, [dispatch]);
 
   const refresh = useCallback(() => {
+    setIsRevalidating(true);
     fetchDashboardData(true);
-  }, [fetchDashboardData]);
+    revalidate().finally(() => {
+      setIsRevalidating(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revalidate]);
 
   // Get pending joining letters
   const pendingJoiningLetters = useMemo(() => {
@@ -144,6 +177,7 @@ export const useFacultyDashboard = () => {
   return {
     // State
     isLoading,
+    isRevalidating, // NEW: Shows subtle indicator during background refresh
     dashboard: {
       ...dashboard.stats,
       monthlyReports: monthlyReports.list,
@@ -179,6 +213,7 @@ export const useFacultyDashboard = () => {
     handleRejectApplication,
     handleSubmitFeedback,
     handleReviewReport,
+    revalidate, // NEW: Manual revalidation trigger
 
     // Errors
     error: dashboard.error || students.error || visitLogs.error || monthlyReports.error || joiningLetters.error,

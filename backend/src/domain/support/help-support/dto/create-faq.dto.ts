@@ -39,6 +39,11 @@ export class CreateFAQDto {
   @IsOptional()
   tags?: string[];
 
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  targetRoles?: string[]; // Which roles can see this FAQ (empty = all roles)
+
   @IsBoolean()
   @IsOptional()
   isPublished?: boolean;
@@ -80,6 +85,11 @@ export class UpdateFAQDto {
   @IsString({ each: true })
   @IsOptional()
   tags?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  targetRoles?: string[]; // Which roles can see this FAQ (empty = all roles)
 
   @IsBoolean()
   @IsOptional()

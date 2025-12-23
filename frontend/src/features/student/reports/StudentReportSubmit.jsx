@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Card, Form, Input, Select, DatePicker, InputNumber, Upload, Button, message, Row, Col, Divider } from 'antd';
 import { UploadOutlined, SaveOutlined } from '@ant-design/icons';
-import { submitReport } from '../../../store/slices/studentSlice';
+import { submitReport } from '../store/studentSlice';
 
 const StudentReportSubmit = () => {
   const dispatch = useDispatch();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Debounce hook for optimizing search and filter inputs
@@ -45,6 +45,55 @@ export const useDebounce = (value, delay = 300, options = {}) => {
   }, [value, delay, immediate, isFirstRun]);
 
   return debouncedValue;
+};
+
+/**
+ * Debounced callback hook for optimizing function calls
+ * @param {Function} callback - The function to debounce
+ * @param {number} delay - The delay in milliseconds (default: 300ms)
+ * @param {Array} deps - Additional dependencies for the callback (default: [])
+ * @returns {Function} - The debounced function
+ *
+ * @example
+ * const debouncedSearch = useDebouncedCallback((searchTerm) => {
+ *   performSearch(searchTerm);
+ * }, 500);
+ *
+ * // Call the debounced function
+ * debouncedSearch('query');
+ */
+export const useDebouncedCallback = (callback, delay = 300, deps = []) => {
+  const timeoutRef = useRef(null);
+  const callbackRef = useRef(callback);
+
+  // Update callback ref when callback changes
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  // Create debounced function
+  const debouncedFn = useCallback(
+    (...args) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current(...args);
+      }, delay);
+    },
+    [delay, ...deps]
+  );
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return debouncedFn;
 };
 
 export default useDebounce;

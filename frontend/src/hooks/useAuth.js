@@ -1,8 +1,7 @@
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import { logout as logoutAction } from '../features/auth/store/authSlice';
 import { tokenStorage } from '../utils/tokenManager';
-import { persistor } from '../app/store/index';
+import { authService } from '../features/auth/services/auth.service';
 
 // Backend role constants
 const ROLES = {
@@ -15,20 +14,30 @@ const ROLES = {
 
 export const useAuth = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { user, isAuthenticated, loading } = useSelector((state) => state.auth);
 
   const logout = async () => {
+    try {
+      // Call backend to invalidate token server-side
+      await authService.logout().catch(() => {});
+    } catch (error) {
+      console.error('Logout API error:', error);
+    }
+
     // Dispatch Redux logout action (clears state and tokens via tokenStorage)
     dispatch(logoutAction());
 
-    // Purge persisted Redux state
-    if (persistor) {
-      await persistor.purge();
-    }
+    // Clear all localStorage items
+    tokenStorage.clear();
+    localStorage.removeItem('persist:root');
+    localStorage.removeItem('loginResponse');
+    localStorage.removeItem('user_data');
 
-    // Navigate to login
-    navigate('/login', { replace: true });
+    // Clear sessionStorage
+    sessionStorage.clear();
+
+    // Hard redirect to fully reset React state
+    window.location.href = '/login';
   };
 
   const hasRole = (role) => {

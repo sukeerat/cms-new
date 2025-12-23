@@ -1,5 +1,5 @@
 // src/pages/internships/InternshipDetails.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Card,
   Row,
@@ -41,9 +41,11 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import API from "../../../services/api";
 import { toast } from "react-hot-toast";
 import { theme } from "antd";
+import { selectApplicationsList } from "../store/studentSelectors";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -54,14 +56,31 @@ const InternshipDetails = () => {
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [internship, setInternship] = useState(null);
-  const [hasApplied, setHasApplied] = useState(false);
-  const [applicationData, setApplicationData] = useState(null);
   const [applicationModal, setApplicationModal] = useState(false);
   const [resumeFile, setResumeFile] = useState(null);
   const [resumeList, setResumeList] = useState([]);
   const [form] = Form.useForm();
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // Get applications from Redux store
+  const applicationsFromStore = useSelector(selectApplicationsList);
+
+  // Use useMemo to derive hasApplied and applicationData from Redux store
+  const { hasApplied, applicationData } = useMemo(() => {
+    if (!applicationsFromStore || applicationsFromStore.length === 0) {
+      return { hasApplied: false, applicationData: null };
+    }
+
+    const existingApplication = applicationsFromStore.find(
+      (app) => app.internshipId === id
+    );
+
+    return {
+      hasApplied: !!existingApplication,
+      applicationData: existingApplication || null,
+    };
+  }, [applicationsFromStore, id]);
 
   // Get user profile
   const getUserProfile = () => {
@@ -84,27 +103,11 @@ const InternshipDetails = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch both internship details and user's applications
-      const [internshipResponse, applicationsResponse] = await Promise.all([
-        API.get(`/internships/${id}`),
-        API.get("/student/applications"),
-      ]);
+      // Only fetch internship details - application status comes from Redux store
+      const internshipResponse = await API.get(`/internships/${id}`);
 
       if (internshipResponse) {
         setInternship(internshipResponse.data);
-      }
-
-      // Check if student has already applied to this internship
-      if (applicationsResponse.data && applicationsResponse.data.success) {
-        const applications = applicationsResponse.data.data || [];
-        const existingApplication = applications.find(
-          (app) => app.internshipId === id
-        );
-
-        if (existingApplication) {
-          setHasApplied(true);
-          setApplicationData(existingApplication);
-        }
       }
     } catch (error) {
       toast.error(error.message || "Failed to load internship details");
@@ -147,16 +150,8 @@ const InternshipDetails = () => {
         setResumeFile(null);
         setResumeList([]);
 
-        // Update application status
-        setHasApplied(true);
-        setApplicationData({
-          id: response.data.id,
-          status: "APPLIED",
-          coverLetter: values.coverLetter,
-          additionalInfo: values.additionalInfo,
-          resume: response.data.resume,
-          appliedDate: new Date().toISOString(),
-        });
+        // Note: Application status will be automatically updated via Redux
+        // when the applications list is refetched on the Applications page
 
         // Show confirmation modal
         Modal.success({

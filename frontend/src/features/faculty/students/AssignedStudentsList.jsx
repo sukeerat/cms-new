@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Card, Table, Button, Tag, Space, Input, Select, Drawer, Descriptions, Avatar, Divider, Progress } from 'antd';
 import { SearchOutlined, UserOutlined, EyeOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
-import { fetchAssignedStudents } from '../../../store/slices/facultySlice';
+import { fetchAssignedStudents } from '../store/facultySlice';
 
 const AssignedStudentsList = () => {
   const dispatch = useDispatch();

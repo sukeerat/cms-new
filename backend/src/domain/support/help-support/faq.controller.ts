@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { FAQService } from './faq.service';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../../core/auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../../core/auth/guards/roles.guard';
 import { Roles } from '../../../core/auth/decorators/roles.decorator';
 import { CreateFAQDto, UpdateFAQDto } from './dto';
@@ -22,49 +23,59 @@ export class FAQController {
   constructor(private readonly faqService: FAQService) {}
 
   /**
-   * Get all published FAQ articles
-   * Access: Public (no auth required)
+   * Get all published FAQ articles filtered by user role
+   * Access: Public (optional auth - filters by role if authenticated)
    */
   @Get()
-  async getPublishedFAQs() {
-    return this.faqService.getPublishedFAQs();
+  @UseGuards(OptionalJwtAuthGuard)
+  async getPublishedFAQs(@Request() req: any) {
+    const userRole = req.user?.role;
+    return this.faqService.getPublishedFAQs(userRole);
   }
 
   /**
-   * Search FAQs
-   * Access: Public
+   * Search FAQs filtered by user role
+   * Access: Public (optional auth)
    */
   @Get('search')
-  async searchFAQs(@Query('q') query: string) {
-    return this.faqService.searchFAQs(query);
+  @UseGuards(OptionalJwtAuthGuard)
+  async searchFAQs(@Query('q') query: string, @Request() req: any) {
+    const userRole = req.user?.role;
+    return this.faqService.searchFAQs(query, userRole);
   }
 
   /**
-   * Get categories with article counts
-   * Access: Public
+   * Get categories with article counts filtered by user role
+   * Access: Public (optional auth)
    */
   @Get('categories')
-  async getCategories() {
-    return this.faqService.getCategoriesWithCounts();
+  @UseGuards(OptionalJwtAuthGuard)
+  async getCategories(@Request() req: any) {
+    const userRole = req.user?.role;
+    return this.faqService.getCategoriesWithCounts(userRole);
   }
 
   /**
-   * Get popular FAQs
-   * Access: Public
+   * Get popular FAQs filtered by user role
+   * Access: Public (optional auth)
    */
   @Get('popular')
-  async getPopularFAQs(@Query('limit') limit?: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getPopularFAQs(@Query('limit') limit?: string, @Request() req?: any) {
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.faqService.getPopularFAQs(limitNum);
+    const userRole = req?.user?.role;
+    return this.faqService.getPopularFAQs(limitNum, userRole);
   }
 
   /**
-   * Get FAQs by category
-   * Access: Public
+   * Get FAQs by category filtered by user role
+   * Access: Public (optional auth)
    */
   @Get('category/:category')
-  async getFAQsByCategory(@Param('category') category: SupportCategory) {
-    return this.faqService.getFAQsByCategory(category);
+  @UseGuards(OptionalJwtAuthGuard)
+  async getFAQsByCategory(@Param('category') category: SupportCategory, @Request() req: any) {
+    const userRole = req.user?.role;
+    return this.faqService.getFAQsByCategory(category, userRole);
   }
 
   /**

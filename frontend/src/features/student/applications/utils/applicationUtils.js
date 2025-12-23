@@ -128,3 +128,247 @@ export const hasInternshipStarted = (application) => {
 
   return dayjs(startDate).isSameOrBefore(dayjs(), 'day');
 };
+
+/**
+ * Calculate submission window for a report (1st-10th of next month)
+ */
+export const getSubmissionWindow = (reportMonth, reportYear) => {
+  const nextMonth = reportMonth === 12 ? 1 : reportMonth + 1;
+  const nextYear = reportMonth === 12 ? reportYear + 1 : reportYear;
+
+  const windowStart = dayjs(`${nextYear}-${String(nextMonth).padStart(2, '0')}-01`);
+  const windowEnd = dayjs(`${nextYear}-${String(nextMonth).padStart(2, '0')}-10`).endOf('day');
+
+  return {
+    windowStart: windowStart.toDate(),
+    windowEnd: windowEnd.toDate(),
+    windowStartFormatted: windowStart.format('MMM D, YYYY'),
+    windowEndFormatted: windowEnd.format('MMM D, YYYY'),
+  };
+};
+
+/**
+ * Get report submission status with label, color, and actionability
+ * @param {Object} report - The report object
+ * @returns {Object} - { status, label, color, canSubmit, sublabel }
+ */
+export const getReportSubmissionStatus = (report) => {
+  const now = dayjs();
+
+  // If report is already approved
+  if (report.status === 'APPROVED' || report.isApproved) {
+    return {
+      status: 'APPROVED',
+      label: 'Approved',
+      color: 'green',
+      canSubmit: false,
+      sublabel: report.approvedAt ? `Approved on ${dayjs(report.approvedAt).format('MMM D')}` : 'Auto-approved',
+    };
+  }
+
+  // If report is submitted (waiting for approval - though we auto-approve)
+  if (report.status === 'SUBMITTED') {
+    return {
+      status: 'SUBMITTED',
+      label: 'Submitted',
+      color: 'blue',
+      canSubmit: false,
+      sublabel: report.submittedAt ? `Submitted on ${dayjs(report.submittedAt).format('MMM D')}` : null,
+    };
+  }
+
+  // Calculate submission window
+  let windowStart, windowEnd;
+
+  if (report.submissionWindowStart && report.submissionWindowEnd) {
+    windowStart = dayjs(report.submissionWindowStart);
+    windowEnd = dayjs(report.submissionWindowEnd);
+  } else {
+    const window = getSubmissionWindow(report.reportMonth, report.reportYear);
+    windowStart = dayjs(window.windowStart);
+    windowEnd = dayjs(window.windowEnd);
+  }
+
+  // Before submission window
+  if (now.isBefore(windowStart)) {
+    const daysUntil = Math.ceil((windowStart.toDate().getTime() - now.toDate().getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'NOT_YET_DUE',
+      label: 'Not Yet Due',
+      color: 'default',
+      canSubmit: false,
+      sublabel: `Opens in ${daysUntil} days`,
+    };
+  }
+
+  // Within submission window
+  if (now.isSameOrBefore(windowEnd)) {
+    const daysLeft = Math.ceil((windowEnd.toDate().getTime() - now.toDate().getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'CAN_SUBMIT',
+      label: 'Submit Now',
+      color: 'blue',
+      canSubmit: true,
+      sublabel: `${daysLeft} days left`,
+    };
+  }
+
+  // After submission window (overdue)
+  const daysOverdue = Math.ceil((now.toDate().getTime() - windowEnd.toDate().getTime()) / (1000 * 60 * 60 * 24));
+  return {
+    status: 'OVERDUE',
+    label: 'Overdue',
+    color: 'red',
+    canSubmit: true, // Still allow late submissions
+    sublabel: `${daysOverdue} days overdue`,
+  };
+};
+
+/**
+ * Calculate all expected report periods for an internship
+ * @param {Date|string} startDate - Internship start date
+ * @param {Date|string} endDate - Internship end date
+ * @returns {Array} - Array of report periods
+ */
+export const calculateExpectedReports = (startDate, endDate) => {
+  if (!startDate || !endDate) return [];
+
+  const start = dayjs(startDate);
+  const end = dayjs(endDate);
+  const periods = [];
+
+  let current = start.startOf('month');
+
+  while (current.isSameOrBefore(end, 'month')) {
+    const month = current.month() + 1; // 1-12
+    const year = current.year();
+    const window = getSubmissionWindow(month, year);
+
+    const isFirstMonth = current.isSame(start, 'month');
+    const isLastMonth = current.isSame(end, 'month');
+
+    periods.push({
+      month,
+      year,
+      monthName: MONTH_NAMES[month - 1],
+      periodStart: isFirstMonth ? start.toDate() : current.toDate(),
+      periodEnd: isLastMonth ? end.toDate() : current.endOf('month').toDate(),
+      submissionWindowStart: window.windowStart,
+      submissionWindowEnd: window.windowEnd,
+      dueDate: window.windowEnd,
+      isPartialMonth: isFirstMonth && start.date() > 1,
+      isFinalReport: isLastMonth,
+    });
+
+    current = current.add(1, 'month');
+
+    // Safety limit
+    if (periods.length > 24) break;
+  }
+
+  return periods;
+};
+
+/**
+ * Get faculty visit due date (last day of month or internship end, whichever is earlier)
+ * @param {number} month - Month (1-12)
+ * @param {number} year - Year
+ * @param {Date|string} internshipEndDate - Internship end date
+ * @returns {Date} - Due date for the visit
+ */
+export const getVisitDueDate = (month, year, internshipEndDate) => {
+  const lastDayOfMonth = dayjs(`${year}-${String(month).padStart(2, '0')}-01`).endOf('month');
+
+  if (!internshipEndDate) {
+    return lastDayOfMonth.toDate();
+  }
+
+  const endDate = dayjs(internshipEndDate);
+
+  // If internship ends in this month, due date is the internship end date
+  if (endDate.year() === year && endDate.month() + 1 === month) {
+    return endDate.toDate();
+  }
+
+  return lastDayOfMonth.toDate();
+};
+
+/**
+ * Get visit status for faculty visits
+ * @param {Object} visit - The visit object
+ * @returns {Object} - { status, label, color, sublabel }
+ */
+export const getVisitStatus = (visit) => {
+  const now = dayjs();
+  const requiredByDate = visit.requiredByDate ? dayjs(visit.requiredByDate) : null;
+
+  // If visit is completed
+  if (visit.status === 'COMPLETED') {
+    return {
+      status: 'COMPLETED',
+      label: 'Completed',
+      color: 'green',
+      sublabel: visit.visitDate ? `Visited on ${dayjs(visit.visitDate).format('MMM D, YYYY')}` : undefined,
+    };
+  }
+
+  if (!requiredByDate) {
+    return {
+      status: 'PENDING',
+      label: 'Pending',
+      color: 'blue',
+    };
+  }
+
+  // Check if overdue
+  if (now.isAfter(requiredByDate)) {
+    const daysOverdue = Math.floor((now.toDate().getTime() - requiredByDate.toDate().getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'OVERDUE',
+      label: 'Overdue',
+      color: 'red',
+      sublabel: `${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue`,
+    };
+  }
+
+  // Check if current month (pending)
+  const currentMonth = now.month() + 1; // dayjs months are 0-indexed
+  const currentYear = now.year();
+  if (visit.visitMonth === currentMonth && visit.visitYear === currentYear) {
+    const daysLeft = Math.ceil((requiredByDate.toDate().getTime() - now.toDate().getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'PENDING',
+      label: 'Pending',
+      color: 'blue',
+      sublabel: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
+    };
+  }
+
+  // Future month
+  return {
+    status: 'UPCOMING',
+    label: 'Upcoming',
+    color: 'gray',
+    sublabel: `Due by ${requiredByDate.format('MMM D, YYYY')}`,
+  };
+};
+
+/**
+ * Format report period for display
+ * @param {Object} report - Report with reportMonth, reportYear, isPartialMonth, isFinalReport
+ * @returns {string} - Formatted period string
+ */
+export const formatReportPeriod = (report) => {
+  const monthName = MONTH_NAMES[report.reportMonth - 1];
+  let period = `${monthName} ${report.reportYear}`;
+
+  if (report.isPartialMonth && report.periodStartDate) {
+    period += ` (from ${dayjs(report.periodStartDate).format('D')})`;
+  }
+
+  if (report.isFinalReport) {
+    period += ' (Final)';
+  }
+
+  return period;
+};

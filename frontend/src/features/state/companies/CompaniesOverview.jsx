@@ -57,19 +57,10 @@ import {
   setSelectedCompany,
   clearSelectedCompany,
 } from '../store/stateSlice';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
-
-// Debounce hook
-const useDebounce = (value, delay = 300) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debouncedValue;
-};
 
 const CompaniesOverview = () => {
   const dispatch = useDispatch();
@@ -93,32 +84,36 @@ const CompaniesOverview = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [isInitialMount, setIsInitialMount] = useState(true);
 
   const debouncedSearch = useDebounce(searchInput);
 
-  // Fetch companies
+  // Fetch companies - only fetch when necessary
   const fetchCompanies = useCallback((params = {}) => {
     dispatch(fetchAllCompanies({
       page: params.page || currentPage,
       limit: params.limit || pageSize,
       search: params.search !== undefined ? params.search : debouncedSearch,
-      industryType: params.industryType !== undefined ? params.industryType : industryType,
-      sortBy: params.sortBy || sortBy,
-      sortOrder: params.sortOrder || sortOrder,
+      // Don't send industryType/sortBy/sortOrder to server - we'll filter client-side
       forceRefresh: params.forceRefresh,
     }));
-  }, [dispatch, currentPage, pageSize, debouncedSearch, industryType, sortBy, sortOrder]);
+  }, [dispatch, currentPage, pageSize, debouncedSearch]);
 
-  // Initial fetch
+  // Initial fetch without force refresh to use cache if available
   useEffect(() => {
-    fetchCompanies({ forceRefresh: true });
+    fetchCompanies();
+    setIsInitialMount(false);
   }, []);
 
-  // Fetch on filter changes
+  // Only refetch when debounced search changes (requires server-side filtering)
+  // Don't refetch for sort/industryType changes - we'll handle those client-side
   useEffect(() => {
-    fetchCompanies({ page: 1 });
-    setCurrentPage(1);
-  }, [debouncedSearch, industryType, sortBy, sortOrder]);
+    // Skip the initial mount to avoid double fetch
+    if (!isInitialMount) {
+      fetchCompanies({ page: 1 });
+      setCurrentPage(1);
+    }
+  }, [debouncedSearch]);
 
   // Handle view company details
   const handleViewDetails = (company) => {
@@ -136,21 +131,68 @@ const CompaniesOverview = () => {
     }, 300);
   };
 
-  // Handle pagination change - force refresh to ensure fresh data
+  // Handle pagination change - use cache when possible
   const handleTableChange = (paginationConfig) => {
+    const pageChanged = paginationConfig.current !== currentPage;
+    const pageSizeChanged = paginationConfig.pageSize !== pageSize;
+
     setCurrentPage(paginationConfig.current);
     setPageSize(paginationConfig.pageSize);
-    fetchCompanies({
-      page: paginationConfig.current,
-      limit: paginationConfig.pageSize,
-      forceRefresh: true
-    });
+
+    // Only fetch if page or pageSize actually changed
+    if (pageChanged || pageSizeChanged) {
+      fetchCompanies({
+        page: paginationConfig.current,
+        limit: paginationConfig.pageSize,
+        // Don't force refresh - let cache logic handle it
+      });
+    }
   };
 
   // Toggle sort order
   const toggleSortOrder = () => {
     setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
   };
+
+  // Client-side filtering and sorting of companies
+  const filteredAndSortedCompanies = useMemo(() => {
+    let result = [...companies];
+
+    // Client-side industry type filtering
+    if (industryType) {
+      result = result.filter(company => company.industryType === industryType);
+    }
+
+    // Client-side sorting
+    result.sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortBy) {
+        case 'studentCount':
+          aVal = a.totalStudents || 0;
+          bVal = b.totalStudents || 0;
+          break;
+        case 'institutionCount':
+          aVal = a.institutionCount || 0;
+          bVal = b.institutionCount || 0;
+          break;
+        case 'companyName':
+          aVal = (a.companyName || '').toLowerCase();
+          bVal = (b.companyName || '').toLowerCase();
+          break;
+        default:
+          return 0;
+      }
+
+      if (sortOrder === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+
+    return result;
+  }, [companies, industryType, sortBy, sortOrder]);
 
   // Table columns
   const columns = useMemo(() => [
@@ -179,7 +221,7 @@ const CompaniesOverview = () => {
                 </Tag>
               )}
             </div>
-            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+            <div className="flex items-center gap-1 text-xs text-text-tertiary mt-0.5">
               <EnvironmentOutlined className="text-[10px]" />
               <span className="truncate max-w-[200px]">
                 {record.city && record.state
@@ -210,8 +252,8 @@ const CompaniesOverview = () => {
       sorter: false,
       render: (_, record) => (
         <div className="flex flex-col items-center">
-          <div className="text-xl font-bold text-blue-600">{record.totalStudents || 0}</div>
-          <div className="text-[10px] text-gray-500">students</div>
+          <div className="text-xl font-bold text-primary">{record.totalStudents || 0}</div>
+          <div className="text-[10px] text-text-tertiary">students</div>
         </div>
       ),
     },
@@ -222,8 +264,8 @@ const CompaniesOverview = () => {
       align: 'center',
       render: (_, record) => (
         <div className="flex flex-col items-center">
-          <div className="text-xl font-bold text-green-600">{record.institutionCount || 0}</div>
-          <div className="text-[10px] text-gray-500">institutions</div>
+          <div className="text-xl font-bold text-success">{record.institutionCount || 0}</div>
+          <div className="text-[10px] text-text-tertiary">institutions</div>
         </div>
       ),
     },
@@ -322,12 +364,12 @@ const CompaniesOverview = () => {
         <Col xs={24} sm={12} lg={6}>
           <Card size="small" className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-slate-800 dark:to-slate-700 border-blue-200">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
                 <BankOutlined className="text-white text-xl" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-blue-600">{summary?.totalCompanies || 0}</div>
-                <div className="text-xs text-gray-500">Total Companies</div>
+                <div className="text-2xl font-bold text-primary">{summary?.totalCompanies || 0}</div>
+                <div className="text-xs text-text-tertiary">Total Companies</div>
               </div>
             </div>
           </Card>
@@ -335,12 +377,12 @@ const CompaniesOverview = () => {
         <Col xs={24} sm={12} lg={6}>
           <Card size="small" className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-slate-800 dark:to-slate-700 border-green-200">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-success flex items-center justify-center">
                 <TeamOutlined className="text-white text-xl" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-600">{summary?.totalStudentsPlaced || 0}</div>
-                <div className="text-xs text-gray-500">Total Students Placed</div>
+                <div className="text-2xl font-bold text-success">{summary?.totalStudentsPlaced || 0}</div>
+                <div className="text-xs text-text-tertiary">Total Students Placed</div>
               </div>
             </div>
           </Card>
@@ -348,12 +390,12 @@ const CompaniesOverview = () => {
         <Col xs={24} sm={12} lg={6}>
           <Card size="small" className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-slate-800 dark:to-slate-700 border-purple-200">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
                 <SafetyCertificateOutlined className="text-white text-xl" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-purple-600">{summary?.totalSelfIdentified || 0}</div>
-                <div className="text-xs text-gray-500">Self-Identified Placements</div>
+                <div className="text-2xl font-bold text-secondary">{summary?.totalSelfIdentified || 0}</div>
+                <div className="text-xs text-text-tertiary">Self-Identified Placements</div>
               </div>
             </div>
           </Card>
@@ -361,12 +403,12 @@ const CompaniesOverview = () => {
         <Col xs={24} sm={12} lg={6}>
           <Card size="small" className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-slate-800 dark:to-slate-700 border-orange-200">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-warning flex items-center justify-center">
                 <RiseOutlined className="text-white text-xl" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-600">{summary?.selfIdentifiedRate || 0}%</div>
-                <div className="text-xs text-gray-500">Self-Identified Rate</div>
+                <div className="text-2xl font-bold text-warning">{summary?.selfIdentifiedRate || 0}%</div>
+                <div className="text-xs text-text-tertiary">Self-Identified Rate</div>
               </div>
             </div>
           </Card>
@@ -382,7 +424,7 @@ const CompaniesOverview = () => {
             onChange={(e) => setSearchInput(e.target.value)}
             style={{ width: 280 }}
             allowClear
-            prefix={<SearchOutlined className="text-gray-400" />}
+            prefix={<SearchOutlined className="text-text-tertiary" />}
           />
           <Select
             placeholder="Industry Type"
@@ -420,7 +462,7 @@ const CompaniesOverview = () => {
       <Card>
         <Table
           columns={columns}
-          dataSource={companies}
+          dataSource={filteredAndSortedCompanies}
           rowKey="id"
           loading={loading}
           pagination={{
@@ -507,7 +549,7 @@ const CompaniesOverview = () => {
               <Row gutter={[24, 16]}>
                 <Col xs={24} sm={8}>
                   <div className="flex items-center gap-2 mb-1">
-                    <BuildOutlined className="text-gray-400" />
+                    <BuildOutlined className="text-text-tertiary" />
                     <Text type="secondary" className="text-xs">Industry Type</Text>
                   </div>
                   <Tag color={selectedCompanyDetails.isSelfIdentifiedCompany ? 'purple' : 'cyan'}>
@@ -516,7 +558,7 @@ const CompaniesOverview = () => {
                 </Col>
                 <Col xs={24} sm={8}>
                   <div className="flex items-center gap-2 mb-1">
-                    <EnvironmentOutlined className="text-gray-400" />
+                    <EnvironmentOutlined className="text-text-tertiary" />
                     <Text type="secondary" className="text-xs">Location</Text>
                   </div>
                   <Text>
@@ -527,7 +569,7 @@ const CompaniesOverview = () => {
                 </Col>
                 <Col xs={24} sm={8}>
                   <div className="flex items-center gap-2 mb-1">
-                    <SafetyCertificateOutlined className="text-gray-400" />
+                    <SafetyCertificateOutlined className="text-text-tertiary" />
                     <Text type="secondary" className="text-xs">Status</Text>
                   </div>
                   {selectedCompanyDetails.isSelfIdentifiedCompany ? (
@@ -543,14 +585,14 @@ const CompaniesOverview = () => {
                   <>
                     <Col xs={24} sm={12}>
                       <div className="flex items-center gap-2 mb-1">
-                        <MailOutlined className="text-gray-400" />
+                        <MailOutlined className="text-text-tertiary" />
                         <Text type="secondary" className="text-xs">Email</Text>
                       </div>
                       <Text>{selectedCompanyDetails.email || 'N/A'}</Text>
                     </Col>
                     <Col xs={24} sm={12}>
                       <div className="flex items-center gap-2 mb-1">
-                        <PhoneOutlined className="text-gray-400" />
+                        <PhoneOutlined className="text-text-tertiary" />
                         <Text type="secondary" className="text-xs">Phone</Text>
                       </div>
                       <Text>{selectedCompanyDetails.phone || 'N/A'}</Text>
@@ -569,13 +611,13 @@ const CompaniesOverview = () => {
                     header={
                       <div className="flex items-center justify-between w-full pr-4">
                         <div className="flex items-center gap-2">
-                          <Avatar size="small" className="bg-blue-500">{institution.code?.[0] || 'I'}</Avatar>
+                          <Avatar size="small" className="bg-primary">{institution.code?.[0] || 'I'}</Avatar>
                           <div>
                             <Text strong>{institution.name}</Text>
                             <Text type="secondary" className="ml-2 text-xs">({institution.code})</Text>
                           </div>
                         </div>
-                        <Badge count={institution.studentCount} className="[&_.ant-badge-count]:!bg-blue-500" />
+                        <Badge count={institution.studentCount} className="[&_.ant-badge-count]:!bg-primary" />
                       </div>
                     }
                   >
@@ -601,10 +643,10 @@ const CompaniesOverview = () => {
                             key: 'student',
                             render: (_, record) => (
                               <div className="flex items-center gap-2">
-                                <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
+                                <Avatar size="small" icon={<UserOutlined />} className="bg-primary" />
                                 <div>
                                   <div className="font-medium text-sm">{record.name}</div>
-                                  <div className="text-xs text-gray-500">{record.email}</div>
+                                  <div className="text-xs text-text-tertiary">{record.email}</div>
                                 </div>
                               </div>
                             ),

@@ -4,7 +4,7 @@ import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import * as handlebars from 'handlebars';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 
 interface MailData {
@@ -18,6 +18,7 @@ interface MailData {
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
+  private templateCache: Map<string, handlebars.TemplateDelegate> = new Map();
 
   constructor(
     @InjectQueue('mail') private mailQueue: Queue,
@@ -44,13 +45,7 @@ export class MailService {
     context: any,
   ): Promise<void> {
     try {
-      const templatePath = path.join(
-        __dirname,
-        'templates',
-        `${template}.hbs`,
-      );
-      const templateContent = fs.readFileSync(templatePath, 'utf-8');
-      const compiledTemplate = handlebars.compile(templateContent);
+      const compiledTemplate = await this.getCompiledTemplate(template);
       const html = compiledTemplate(context);
 
       await this.transporter.sendMail({
@@ -65,6 +60,21 @@ export class MailService {
       this.logger.error(`Failed to send email to ${to}`, error.stack);
       throw error;
     }
+  }
+
+  /**
+   * Get compiled template from cache or load and compile it
+   */
+  private async getCompiledTemplate(template: string): Promise<handlebars.TemplateDelegate> {
+    if (this.templateCache.has(template)) {
+      return this.templateCache.get(template)!;
+    }
+
+    const templatePath = path.join(__dirname, 'templates', `${template}.hbs`);
+    const templateContent = await fs.readFile(templatePath, 'utf-8');
+    const compiledTemplate = handlebars.compile(templateContent);
+    this.templateCache.set(template, compiledTemplate);
+    return compiledTemplate;
   }
 
   /**

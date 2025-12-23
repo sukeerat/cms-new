@@ -66,20 +66,9 @@ import {
   selectInstituteFacultyPrincipal,
   selectSelectedInstitute,
 } from '../../store/stateSlice';
+import { useDebounce } from '../../../../hooks/useDebounce';
 
 const { Title, Text } = Typography;
-
-// Debounce hook for search optimization
-const useDebounce = (value, delay = 300) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 
 // Status color helper - memoized outside component
 const STATUS_COLORS = {
@@ -102,7 +91,7 @@ const OverviewTab = memo(({ data, loading, error }) => {
   return (
     <div className="space-y-4">
       {/* Compliance Score */}
-      <Card size="small" className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700">
+      <Card size="small" className="bg-gradient-to-r from-primary/10 to-secondary/10 dark:from-slate-800 dark:to-slate-700">
         <Row gutter={[16, 16]} align="middle">
           <Col xs={24} sm={8}>
             <div className="text-center">
@@ -110,10 +99,10 @@ const OverviewTab = memo(({ data, loading, error }) => {
                 type="circle"
                 percent={data.complianceScore || 0}
                 size={100}
-                strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
+                strokeColor={{ '0%': 'rgb(var(--color-info))', '100%': 'rgb(var(--color-success))' }}
                 format={(p) => <span className="text-lg font-bold">{p}%</span>}
               />
-              <div className="mt-2 text-sm font-medium text-gray-600 dark:text-slate-300">
+              <div className="mt-2 text-sm font-medium text-text-secondary">
                 Compliance Score
               </div>
             </div>
@@ -160,13 +149,13 @@ const OverviewTab = memo(({ data, loading, error }) => {
             <Statistic title="Total" value={data.selfIdentifiedInternships?.total || 0} className="dark:text-slate-200 [&_.ant-statistic-title]:dark:text-slate-400" />
           </Col>
           <Col xs={12} sm={6}>
-            <Statistic title="Approved" value={data.selfIdentifiedInternships?.approved || 0} valueStyle={{ color: '#3f8600' }} prefix={<CheckCircleOutlined />} className="[&_.ant-statistic-title]:text-slate-600 [&_.ant-statistic-title]:dark:text-slate-400" />
+            <Statistic title="Approved" value={data.selfIdentifiedInternships?.approved || 0} valueStyle={{ color: 'rgb(var(--color-success))' }} prefix={<CheckCircleOutlined />} className="[&_.ant-statistic-title]:text-slate-600 [&_.ant-statistic-title]:dark:text-slate-400" />
           </Col>
           <Col xs={12} sm={6}>
-            <Statistic title="Pending" value={data.selfIdentifiedInternships?.pending || 0} valueStyle={{ color: '#faad14' }} prefix={<ClockCircleOutlined />} className="[&_.ant-statistic-title]:text-slate-600 [&_.ant-statistic-title]:dark:text-slate-400" />
+            <Statistic title="Pending" value={data.selfIdentifiedInternships?.pending || 0} valueStyle={{ color: 'rgb(var(--color-warning))' }} prefix={<ClockCircleOutlined />} className="[&_.ant-statistic-title]:text-slate-600 [&_.ant-statistic-title]:dark:text-slate-400" />
           </Col>
           <Col xs={12} sm={6}>
-            <Statistic title="Rejected" value={data.selfIdentifiedInternships?.rejected || 0} valueStyle={{ color: '#cf1322' }} prefix={<CloseCircleOutlined />} className="[&_.ant-statistic-title]:text-slate-600 [&_.ant-statistic-title]:dark:text-slate-400" />
+            <Statistic title="Rejected" value={data.selfIdentifiedInternships?.rejected || 0} valueStyle={{ color: 'rgb(var(--color-error))' }} prefix={<CloseCircleOutlined />} className="[&_.ant-statistic-title]:text-slate-600 [&_.ant-statistic-title]:dark:text-slate-400" />
           </Col>
         </Row>
       </Card>
@@ -592,19 +581,35 @@ const InstituteDetailView = () => {
     });
   }, [dispatch, applyFilters]);
 
+  // Handler for viewing student details
+  const handleViewStudentDetails = useCallback((record) => {
+    setSelectedStudent(record);
+    setStudentModalVisible(true);
+  }, []);
+
+  // Handler for approving report
+  const handleApproveReport = useCallback(() => {
+    message.info('Report approval coming soon');
+  }, []);
+
+  // Handler for rejecting report
+  const handleRejectReport = useCallback(() => {
+    message.info('Report rejection coming soon');
+  }, []);
+
   // Student action menu
   const getStudentActionItems = useCallback((record) => {
     const hasMentor = record.mentorAssignments?.some(ma => ma.isActive);
     return [
-      { key: 'view', icon: <EyeOutlined />, label: 'View Details', onClick: () => { setSelectedStudent(record); setStudentModalVisible(true); } },
+      { key: 'view', icon: <EyeOutlined />, label: 'View Details', onClick: () => handleViewStudentDetails(record) },
       { type: 'divider' },
       { key: 'mentor', icon: <EditOutlined />, label: hasMentor ? 'Change Mentor' : 'Assign Mentor', onClick: () => handleEditMentor(record) },
       ...(hasMentor ? [{ key: 'remove-mentor', icon: <DeleteOutlined />, label: 'Remove Mentor', danger: true, onClick: () => handleRemoveMentor(record) }] : []),
       { type: 'divider' },
-      { key: 'approve-report', icon: <CheckCircleOutlined />, label: 'Approve Report', disabled: !record.currentMonthReport || record.currentMonthReport.status !== 'SUBMITTED', onClick: () => message.info('Report approval coming soon') },
-      { key: 'reject-report', icon: <CloseCircleOutlined />, label: 'Reject Report', danger: true, disabled: !record.currentMonthReport || record.currentMonthReport.status !== 'SUBMITTED', onClick: () => message.info('Report rejection coming soon') },
+      { key: 'approve-report', icon: <CheckCircleOutlined />, label: 'Approve Report', disabled: !record.currentMonthReport || record.currentMonthReport.status !== 'SUBMITTED', onClick: handleApproveReport },
+      { key: 'reject-report', icon: <CloseCircleOutlined />, label: 'Reject Report', danger: true, disabled: !record.currentMonthReport || record.currentMonthReport.status !== 'SUBMITTED', onClick: handleRejectReport },
     ];
-  }, [handleEditMentor, handleRemoveMentor]);
+  }, [handleEditMentor, handleRemoveMentor, handleViewStudentDetails, handleApproveReport, handleRejectReport]);
 
   // Memoized student columns
   const studentColumns = useMemo(() => [
@@ -672,6 +677,12 @@ const InstituteDetailView = () => {
     { title: 'Last Visit', key: 'lastVisit', width: 100, render: (_, record) => record.lastFacultyVisit ? <Tooltip title={`Status: ${record.lastFacultyVisit.status}`}><Text className="text-xs">{new Date(record.lastFacultyVisit.date).toLocaleDateString()}</Text></Tooltip> : <Text type="secondary">None</Text> },
     { title: 'Action', key: 'action', width: 60, fixed: 'right', render: (_, record) => <Dropdown menu={{ items: getStudentActionItems(record) }} trigger={['click']} placement="bottomRight"><Button type="text" icon={<MoreOutlined />} /></Dropdown> },
   ], [getStudentActionItems]);
+
+  // Handler for viewing company details
+  const handleViewCompanyDetails = useCallback((record) => {
+    setSelectedCompany(record);
+    setCompanyModalVisible(true);
+  }, []);
 
   // Memoized company columns - Enhanced design
   const companyColumns = useMemo(() => [
@@ -805,13 +816,13 @@ const InstituteDetailView = () => {
           ghost
           size="small"
           icon={<EyeOutlined />}
-          onClick={() => { setSelectedCompany(record); setCompanyModalVisible(true); }}
+          onClick={() => handleViewCompanyDetails(record)}
         >
           Details
         </Button>
       ),
     },
-  ], []);
+  ], [handleViewCompanyDetails]);
 
   // No institute selected
   if (!selectedInstitute?.id) {
@@ -1109,18 +1120,17 @@ const InstituteDetailView = () => {
                 {(selectedCompany.email || selectedCompany.companyEmail || selectedCompany.phoneNo || selectedCompany.companyContact) && (
                   <>
                     <Col xs={24} sm={12}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <MailOutlined className="text-gray-400" />
-                        <Text type="secondary" className="text-xs">Email</Text>
-                      </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <MailOutlined className="text-text-tertiary text-[10px]" />
+                    <Text type="secondary" className="text-xs">Email</Text>
+                  </div>
                       <Text>{selectedCompany.email || selectedCompany.companyEmail || 'N/A'}</Text>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <PhoneOutlined className="text-gray-400" />
-                        <Text type="secondary" className="text-xs">Phone</Text>
-                      </div>
-                      <Text>{selectedCompany.phoneNo || selectedCompany.companyContact || 'N/A'}</Text>
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <PhoneOutlined className="text-text-tertiary text-[10px]" />
+                                          <Text type="secondary" className="text-xs">Phone</Text>
+                                        </div>                      <Text>{selectedCompany.phoneNo || selectedCompany.companyContact || 'N/A'}</Text>
                     </Col>
                   </>
                 )}
@@ -1250,4 +1260,4 @@ const InstituteDetailView = () => {
   );
 };
 
-export default InstituteDetailView;
+export default memo(InstituteDetailView);

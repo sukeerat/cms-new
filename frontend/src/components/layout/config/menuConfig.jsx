@@ -141,20 +141,18 @@ export const menuConfig = {
   // ==========================================
   STUDENT: {
     key: 'student',
-    title: 'Student Profile',
+    title: 'Student Portal',
     icon: <IdcardOutlined />,
     items: [
       { key: 'student-dashboard', label: 'Dashboard', icon: <DashboardOutlined />, path: '/dashboard' },
       { key: 'profile', label: 'My Profile', icon: <IdcardOutlined />, path: '/profile' },
-      { key: 'profile-edit', label: 'Edit Profile', icon: <FormOutlined />, path: '/profile/edit' },
     ],
   },
   INTERNSHIP_PORTAL: {
     key: 'internship-portal',
-    title: 'Internship Portal',
+    title: 'Internship',
     icon: <LaptopOutlined />,
     items: [
-      { key: 'internships', label: 'Browse Internships', icon: <SearchOutlined />, path: '/internships' },
       { key: 'my-applications', label: 'My Applications', icon: <FileSyncOutlined />, path: '/my-applications' },
       { key: 'monthly-reports', label: 'Monthly Reports', icon: <FileTextOutlined />, path: '/reports/submit' },
       { key: 'submit-grievance', label: 'Submit Grievance', icon: <AlertOutlined />, path: '/submit-grievance' },

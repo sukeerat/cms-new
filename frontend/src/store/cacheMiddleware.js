@@ -1,5 +1,8 @@
-// Cache duration in milliseconds (5 minutes)
-export const CACHE_DURATION = 5 * 60 * 1000;
+// Cache duration in milliseconds (15 minutes)
+export const CACHE_DURATION = 15 * 60 * 1000;
+
+// Volatile cache duration for frequently changing data (5 minutes)
+export const VOLATILE_CACHE_DURATION = 5 * 60 * 1000;
 
 // Check if data is stale
 export const isStale = (lastFetched) => {

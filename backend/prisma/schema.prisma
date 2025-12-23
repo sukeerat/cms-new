@@ -63,10 +63,10 @@ model User {
   technicalQueries TechnicalQuery[]
 
   // Help & Support relations
-  submittedTickets  SupportTicket[]   @relation("TicketSubmitter")
-  assignedTickets   SupportTicket[]   @relation("TicketAssignee")
-  supportResponses  SupportResponse[] @relation("ResponseAuthor")
-  faqArticles       FAQArticle[]      @relation("FAQAuthor")
+  submittedTickets SupportTicket[]   @relation("TicketSubmitter")
+  assignedTickets  SupportTicket[]   @relation("TicketAssignee")
+  supportResponses SupportResponse[] @relation("ResponseAuthor")
+  faqArticles      FAQArticle[]      @relation("FAQAuthor")
 
   // consent
   consent   Boolean?  @default(false)
@@ -626,7 +626,7 @@ model Institution {
   technicalQueries     TechnicalQuery[]
 
   // Help & Support
-  supportTickets       SupportTicket[]
+  supportTickets SupportTicket[]
 }
 
 model InstitutionSettings {
@@ -1209,6 +1209,11 @@ model InternshipApplication {
   secondVisit        DateTime?
   facultyVisitLogs   FacultyVisitLog[]
 
+  // Report & Visit Generation Tracking
+  reportsGenerated     Boolean @default(false) // True when expected reports have been generated
+  totalExpectedReports Int? // Total number of reports expected for this internship
+  totalExpectedVisits  Int? // Total number of faculty visits expected
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1222,6 +1227,7 @@ model InternshipApplication {
   @@index([isSelfIdentified])
   @@index([applicationDate])
   @@index([mentorId, appliedDate])
+  @@index([isSelfIdentified, status, applicationDate])
   @@map("internship_applications")
 }
 
@@ -1284,6 +1290,7 @@ model MonthlyFeedback {
   @@index([feedbackMonth])
   @@index([applicationId, feedbackMonth])
   @@index([studentId, feedbackMonth])
+  @@index([studentId, internshipId, feedbackMonth])
   @@map("monthly_feedbacks")
 }
 
@@ -1320,6 +1327,18 @@ model MonthlyReport {
   approvedBy String?   @db.ObjectId
   approvedAt DateTime?
 
+  // Submission Window (1st-10th of next month)
+  dueDate               DateTime? // 10th of next month
+  submissionWindowStart DateTime? // 1st of next month
+  submissionWindowEnd   DateTime? // 10th of next month
+  isOverdue             Boolean   @default(false)
+
+  // Report Period Details
+  periodStartDate DateTime? // First day of internship month
+  periodEndDate   DateTime? // Last day of internship month
+  isPartialMonth  Boolean   @default(false) // True for first/last partial months
+  isFinalReport   Boolean   @default(false) // True if last report of internship
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1329,6 +1348,7 @@ model MonthlyReport {
   @@index([studentId])
   @@index([status])
   @@index([reportMonth, reportYear])
+  @@index([dueDate])
   @@map("monthly_reports")
 }
 
@@ -1382,8 +1402,8 @@ model FacultyVisitLog {
   internshipId String?     @db.ObjectId
   internship   Internship? @relation(fields: [internshipId], references: [id])
 
-  facultyId String @db.ObjectId
-  faculty   User   @relation("FacultyVisits", fields: [facultyId], references: [id])
+  facultyId String? @db.ObjectId
+  faculty   User?   @relation("FacultyVisits", fields: [facultyId], references: [id])
 
   //location of visit
   visitLocation String?
@@ -1394,9 +1414,9 @@ model FacultyVisitLog {
 
   // Visit Details
   visitNumber   Int?
-  visitDate     DateTime
+  visitDate     DateTime? // Optional for scheduled visits, set when visit is completed
   visitDuration String? // e.g., "2 hours"
-  visitType     VisitType @default(PHYSICAL)
+  visitType     VisitType      @default(PHYSICAL)
   status        VisitLogStatus @default(SCHEDULED)
 
   // Observations
@@ -1442,6 +1462,12 @@ model FacultyVisitLog {
   followUpRequired  Boolean   @default(false)
   nextVisitDate     DateTime?
 
+  // Monthly Visit Tracking
+  visitMonth     Int? // Month number (1-12)
+  visitYear      Int? // Year of the visit
+  requiredByDate DateTime? // Due date for this visit (last day of month or internship end)
+  isMonthlyVisit Boolean   @default(true) // True if this is a required monthly visit
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1452,6 +1478,7 @@ model FacultyVisitLog {
   @@index([visitDate])
   @@index([applicationId, visitDate])
   @@index([facultyId, visitDate])
+  @@index([visitMonth, visitYear])
   @@map("faculty_visit_logs")
 }
 
@@ -2147,15 +2174,15 @@ enum SupportTicketPriority {
 
 // Support Ticket - Main ticket model for help requests
 model SupportTicket {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  ticketNumber String   @unique // Format: SUP-YYYYMMDD-XXXX
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  ticketNumber String @unique // Format: SUP-YYYYMMDD-XXXX
 
   // Submitter information
-  submittedById   String @db.ObjectId
-  submittedBy     User   @relation("TicketSubmitter", fields: [submittedById], references: [id])
-  submitterRole   Role
-  submitterName   String // Cached for quick reference
-  submitterEmail  String?
+  submittedById  String  @db.ObjectId
+  submittedBy    User    @relation("TicketSubmitter", fields: [submittedById], references: [id])
+  submitterRole  Role
+  submitterName  String // Cached for quick reference
+  submitterEmail String?
 
   // Ticket content
   subject     String
@@ -2165,21 +2192,21 @@ model SupportTicket {
   attachments String[]              @default([])
 
   // Status tracking
-  status       SupportTicketStatus @default(OPEN)
-  statusHistory Json[]             @default([]) // Track status changes
+  status        SupportTicketStatus @default(OPEN)
+  statusHistory Json[]              @default([]) // Track status changes
 
   // Assignment
-  assignedToId String? @db.ObjectId
-  assignedTo   User?   @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  assignedToId String?   @db.ObjectId
+  assignedTo   User?     @relation("TicketAssignee", fields: [assignedToId], references: [id])
   assignedAt   DateTime?
-  assignedBy   String?  @db.ObjectId
+  assignedBy   String?   @db.ObjectId
 
   // Resolution
   resolution     String?
   resolvedAt     DateTime?
-  resolvedById   String?  @db.ObjectId
+  resolvedById   String?   @db.ObjectId
   closedAt       DateTime?
-  closedById     String?  @db.ObjectId
+  closedById     String?   @db.ObjectId
   closureRemarks String?
 
   // Responses/Thread
@@ -2212,8 +2239,8 @@ model SupportTicket {
 
 // Support Response - Conversation thread for tickets
 model SupportResponse {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  ticketId String @db.ObjectId
+  id       String        @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId String        @db.ObjectId
   ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   // Responder info
@@ -2247,7 +2274,11 @@ model FAQArticle {
   content  String // Markdown/HTML content
   summary  String? // Brief summary for search results
   category SupportCategory
-  tags     String[] @default([])
+  tags     String[]        @default([])
+
+  // Role-based visibility - which roles can see this FAQ
+  // Empty array means visible to ALL roles (public)
+  targetRoles String[] @default([])
 
   // Publishing
   isPublished Boolean   @default(false)
@@ -2264,7 +2295,7 @@ model FAQArticle {
   helpfulCount Int @default(0)
 
   // SEO & Search
-  slug        String  @unique // URL-friendly slug
+  slug        String   @unique // URL-friendly slug
   searchTerms String[] @default([]) // Additional search keywords
 
   // Ordering

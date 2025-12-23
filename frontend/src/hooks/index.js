@@ -4,7 +4,7 @@
  */
 
 export { useAuth } from './useAuth';
-export { useDebounce } from './useDebounce';
+export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useInfiniteScroll } from './useInfiniteScroll';
 export { useSmartFetch } from './useSmartFetch';
 export { useNotifications } from './useNotifications';

@@ -14,16 +14,17 @@ export { isTokenExpired, getTokenPayload } from './tokenManager';
 export const logoutUser = (navigate, options = {}) => {
   const { showMessage = true, reason = LogoutReason.USER_LOGOUT, message } = options;
 
-  // Clear all tokens via centralized manager
+  // Clear all tokens via centralized manager (also clears persist:root)
   tokenStorage.clear();
 
-  // Clear Redux persist
-  localStorage.removeItem('persist:root');
+  // Clear sessionStorage
+  sessionStorage.clear();
 
   if (showMessage && message) {
     toast.info(message);
   }
 
+  // Hard redirect to fully reset React state and cache
   window.location.href = '/login';
 };
 

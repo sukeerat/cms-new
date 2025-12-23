@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Form, Input, Select, Button, Card, Row, Col, message, Upload, InputNumber } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createMonthlyReport, updateMonthlyReport } from '../../../store/slices/studentSlice';
+import { createMonthlyReport, updateMonthlyReport } from '../store/studentSlice';
 import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 

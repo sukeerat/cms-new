@@ -113,7 +113,7 @@ const InternshipCard = ({ internship, isApplied, onViewDetails }) => {
             <span>{internship.numberOfPositions} positions</span>
           </div>
           <div className="flex items-center text-text-tertiary">
-            <CalendarOutlined className="mr-2 text-info" />
+            <CalendarOutlined className="mr-2 text-blue-500" />
             <span>Start: {new Date(internship.startDate).toLocaleDateString()}</span>
           </div>
           <div className="flex items-center text-text-tertiary">

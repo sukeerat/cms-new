@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react';
-import { Row, Col, Spin, Alert, Modal, message } from 'antd';
+import React, { useState, useCallback, memo } from 'react';
+import { Row, Col, Spin, Alert, Modal, message, Progress } from 'antd';
+import { SyncOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import dayjs from 'dayjs';
@@ -30,9 +31,11 @@ const StudentDashboard = () => {
   const institute = useSelector(selectInstitute);
   const instituteLoading = useSelector(selectInstituteLoading);
 
-  // Use custom hook for dashboard data
+  // Use custom hook for dashboard data with SWR
   const {
     isLoading,
+    isRevalidating, // NEW: SWR revalidation state
+    loadingStates,
     profile,
     internships,
     applications,
@@ -67,9 +70,9 @@ const StudentDashboard = () => {
     navigate(`/applications/${applicationId}`);
   }, [navigate]);
 
-  // Navigate to internship details
-  const handleViewInternship = useCallback((internshipId) => {
-    navigate(`/internships/${internshipId}`);
+  // Navigate to my applications (self-identified internship details)
+  const handleViewInternship = useCallback(() => {
+    navigate('/my-applications');
   }, [navigate]);
 
   // Handle application withdrawal with confirmation
@@ -113,6 +116,31 @@ const StudentDashboard = () => {
     }
   }, [handleCreateGrievance]);
 
+  // Navigate to applications
+  const handleNavigateToApplications = useCallback(() => {
+    navigate('/applications');
+  }, [navigate]);
+
+  // Navigate to reports
+  const handleNavigateToReports = useCallback(() => {
+    navigate('/reports');
+  }, [navigate]);
+
+  // Navigate to grievances
+  const handleNavigateToGrievances = useCallback(() => {
+    navigate('/grievances');
+  }, [navigate]);
+
+  // Handle opening report modal
+  const handleOpenReportModal = useCallback(() => {
+    setReportModalVisible(true);
+  }, []);
+
+  // Handle opening grievance modal
+  const handleOpenGrievanceModal = useCallback(() => {
+    setGrievanceModalVisible(true);
+  }, []);
+
   // Show error state
   if (error) {
     return (
@@ -135,6 +163,19 @@ const StudentDashboard = () => {
   return (
     <Spin spinning={isLoading} tip="Loading dashboard...">
         <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+          {/* Subtle Revalidation Indicator */}
+          {isRevalidating && !isLoading && (
+            <div
+              className="fixed top-0 left-0 right-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-center gap-2 text-blue-700 text-sm"
+              style={{
+                animation: 'slideDown 0.3s ease-out',
+              }}
+            >
+              <SyncOutlined spin />
+              <span>Updating dashboard data...</span>
+            </div>
+          )}
+
           {/* Header Section */}
           <DashboardHeader
             studentName={profile?.name}
@@ -142,6 +183,7 @@ const StudentDashboard = () => {
             mentorName={mentor?.name}
             onRefresh={refresh}
             loading={isLoading}
+            isRevalidating={isRevalidating}
           />
 
           {/* Statistics Grid */}
@@ -154,11 +196,9 @@ const StudentDashboard = () => {
             {/* Active Internship Card */}
             <Col xs={24} lg={16}>
               <ActiveInternshipCard
-                internships={activeInternships}
-                selectedInternship={selectedInternship || activeInternships[0]}
-                onInternshipChange={handleInternshipChange}
+                internship={selectedInternship || activeInternships[0]}
                 onViewDetails={handleViewInternship}
-                loading={isLoading}
+                loading={loadingStates?.applications}
               />
             </Col>
 
@@ -169,7 +209,7 @@ const StudentDashboard = () => {
                 loading={isLoading}
                 onView={handleViewApplication}
                 onWithdraw={handleWithdraw}
-                onViewAll={() => navigate('/applications')}
+                onViewAll={handleNavigateToApplications}
               />
             </Col>
           </Row>
@@ -181,10 +221,8 @@ const StudentDashboard = () => {
               <MonthlyReportsCard
                 reports={monthlyReports}
                 loading={isLoading}
-                onSubmitReport={(reportId) => {
-                  setReportModalVisible(true);
-                }}
-                onViewAll={() => navigate('/reports')}
+                onSubmitReport={handleOpenReportModal}
+                onViewAll={handleNavigateToReports}
               />
             </Col>
 
@@ -193,8 +231,8 @@ const StudentDashboard = () => {
               <GrievancesCard
                 grievances={grievances}
                 loading={isLoading}
-                onCreateNew={() => setGrievanceModalVisible(true)}
-                onViewAll={() => navigate('/grievances')}
+                onCreateNew={handleOpenGrievanceModal}
+                onViewAll={handleNavigateToGrievances}
               />
             </Col>
           </Row>
@@ -203,4 +241,6 @@ const StudentDashboard = () => {
   );
 };
 
-export default StudentDashboard;
+StudentDashboard.displayName = 'StudentDashboard';
+
+export default memo(StudentDashboard);

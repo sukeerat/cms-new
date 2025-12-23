@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, Typography, Tag, Button, Avatar, Progress, Space, Tooltip, Divider } from 'antd';
+import React, { memo } from 'react';
+import { Card, Typography, Tag, Button, Avatar, Progress, Space, Tooltip, Divider, Spin } from 'antd';
 import {
   BankOutlined,
   CalendarOutlined,
@@ -10,6 +10,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -21,7 +22,22 @@ const ActiveInternshipCard = ({
   onUploadReport,
   monthlyReportStatus,
   canUploadReport,
+  loading = false,
 }) => {
+  // Show loading state while data is being fetched
+  if (loading) {
+    return (
+      <Card className="h-full border border-border rounded-xl">
+        <div className="text-center py-8">
+          <Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} />
+          <Title level={5} className="mt-4 text-text-tertiary">
+            Loading internship...
+          </Title>
+        </div>
+      </Card>
+    );
+  }
+
   if (!internship) {
     return (
       <Card className="h-full border border-border rounded-xl">
@@ -194,4 +210,6 @@ const ActiveInternshipCard = ({
   );
 };
 
-export default ActiveInternshipCard;
+ActiveInternshipCard.displayName = 'ActiveInternshipCard';
+
+export default memo(ActiveInternshipCard);

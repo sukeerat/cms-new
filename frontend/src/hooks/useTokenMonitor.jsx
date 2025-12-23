@@ -58,7 +58,7 @@ export const useTokenMonitor = (options = {}) => {
     return `${minutes}m ${seconds}s`;
   }, []);
 
-  // Logout function
+  // Logout function - comprehensive cleanup and hard redirect
   const logout = useCallback(async (reason = LogoutReason.MANUAL) => {
     try {
       // Call logout API to invalidate token on server
@@ -69,14 +69,24 @@ export const useTokenMonitor = (options = {}) => {
       console.error('Logout API error:', error);
     }
 
-    // Clear tokens
+    // Clear all auth tokens
     tokenStorage.clear();
+
+    // Clear all localStorage items related to auth/session
     localStorage.removeItem('loginResponse');
     localStorage.removeItem('persist:root');
+    localStorage.removeItem('user_data');
+    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('auth_token');
 
-    // Navigate to login
-    navigate('/login', { replace: true });
-  }, [navigate]);
+    // Clear sessionStorage
+    sessionStorage.clear();
+
+    // Hard redirect to login - this fully resets React state and cache
+    window.location.href = '/login';
+  }, []);
 
   // Refresh token
   const refreshToken = useCallback(async () => {

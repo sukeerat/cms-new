@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Button, Space, Tag, Avatar, Input, Select, Card, Modal, message } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { fetchStudents, deleteStudent, fetchDepartments } from '../store/principalSlice';
+import { fetchStudents, deleteStudent, fetchDepartments, optimisticallyDeleteStudent, rollbackStudentOperation } from '../store/principalSlice';
 import DataTable from '../../../components/tables/DataTable';
 import { EyeOutlined, EditOutlined, UserOutlined, SearchOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getStatusColor } from '../../../utils/format';
+import { generateTxnId, snapshotManager, optimisticToast } from '../../../store/optimisticMiddleware';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -44,12 +45,40 @@ const StudentList = () => {
       okText: 'Delete',
       okType: 'danger',
       onOk: async () => {
+        const txnId = generateTxnId();
+
+        // Save snapshot of current state
+        const currentStudentsList = list;
+        snapshotManager.save(txnId, 'principal', { students: { list: currentStudentsList } });
+
+        // Show loading toast
+        optimisticToast.loading(txnId, 'Deleting student...');
+
+        // Optimistically remove from UI
+        dispatch(optimisticallyDeleteStudent(record.id));
+
         try {
+          // Perform actual deletion
           await dispatch(deleteStudent(record.id)).unwrap();
-          message.success('Student deleted successfully');
+
+          // Show success toast
+          optimisticToast.success(txnId, 'Student deleted successfully');
+
+          // Clean up snapshot
+          snapshotManager.delete(txnId);
+
+          // Refresh the list to ensure consistency
           dispatch(fetchStudents({ ...filters, forceRefresh: true }));
         } catch (error) {
-          message.error(error || 'Failed to delete student');
+          // Show error toast
+          optimisticToast.error(txnId, error || 'Failed to delete student');
+
+          // Rollback the optimistic update
+          const snapshot = snapshotManager.get(txnId);
+          if (snapshot) {
+            dispatch(rollbackStudentOperation(snapshot.state.students));
+            snapshotManager.delete(txnId);
+          }
         }
       },
     });

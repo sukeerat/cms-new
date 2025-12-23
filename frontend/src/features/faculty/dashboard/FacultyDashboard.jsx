@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { Row, Col, Spin, Alert, Modal, Form, Input, Select, DatePicker, message, FloatButton } from 'antd';
+import { SyncOutlined, CameraOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
-import { CameraOutlined } from '@ant-design/icons';
 
 import { useFacultyDashboard } from '../hooks/useFacultyDashboard';
 import {
@@ -27,9 +27,10 @@ const FacultyDashboard = () => {
   const navigate = useNavigate();
   const [visitForm] = Form.useForm();
 
-  // Use custom hook for dashboard data
+  // Use custom hook for dashboard data with SWR
   const {
     isLoading,
+    isRevalidating, // NEW: SWR revalidation state
     dashboard,
     students,
     visitLogs,
@@ -205,12 +206,26 @@ const FacultyDashboard = () => {
     <>
       <Spin spinning={isLoading} tip="Loading dashboard...">
         <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+          {/* Subtle Revalidation Indicator */}
+          {isRevalidating && !isLoading && (
+            <div
+              className="fixed top-0 left-0 right-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-center gap-2 text-blue-700 text-sm"
+              style={{
+                animation: 'slideDown 0.3s ease-out',
+              }}
+            >
+              <SyncOutlined spin />
+              <span>Updating dashboard data...</span>
+            </div>
+          )}
+
           {/* Header Section */}
           <DashboardHeader
             facultyName={mentor?.name}
             stats={stats}
             onRefresh={refresh}
             loading={isLoading}
+            isRevalidating={isRevalidating}
           />
 
           {/* Statistics Grid */}

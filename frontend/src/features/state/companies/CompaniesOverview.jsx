@@ -456,7 +456,7 @@ const CompaniesOverview = () => {
       </Card>
 
       {/* Error Alert */}
-      {error && <Alert type="error" message={error} showIcon closable />}
+      {error && <Alert type="error" title={error} showIcon closable />}
 
       {/* Companies Table */}
       <Card>
@@ -519,7 +519,7 @@ const CompaniesOverview = () => {
           <div className="py-12">
             <Alert
               type="error"
-              message="Failed to load company details"
+              title="Failed to load company details"
               description={detailsError}
               action={
                 <Button

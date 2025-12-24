@@ -3,7 +3,6 @@ import {
   FileTextOutlined,
   TeamOutlined,
   BankOutlined,
-  UserAddOutlined,
   DatabaseOutlined,
   ShopOutlined,
   LaptopOutlined,
@@ -32,13 +31,14 @@ import {
   LineChartOutlined,
   SafetyOutlined,
   SwapOutlined,
-  FileAddOutlined,
   UploadOutlined,
   SettingOutlined,
   CarOutlined,
   CustomerServiceOutlined,
   QuestionCircleOutlined,
   MessageOutlined,
+  HistoryOutlined,
+  CloudUploadOutlined,
 } from '@ant-design/icons';
 import React from 'react';
 
@@ -64,9 +64,18 @@ export const menuConfig = {
     icon: <DeploymentUnitOutlined />,
     items: [
       { key: 'institutions-list', label: 'All Institutions', icon: <BankOutlined />, path: '/institutions' },
-      { key: 'institutions-new', label: 'Add Institution', icon: <UserAddOutlined />, path: '/institutions/new' },
-      { key: 'bulk-institute-upload', label: 'Bulk Upload', icon: <UploadOutlined />, path: '/institutions/bulk-upload' },
       { key: 'student-grievances', label: 'Grievances', icon: <AlertOutlined />, path: '/grievances' },
+    ],
+  },
+  STATE_BULK_OPERATIONS: {
+    key: 'state-bulk-operations',
+    title: 'Bulk Operations',
+    icon: <CloudUploadOutlined />,
+    items: [
+      { key: 'bulk-institute-upload', label: 'Bulk Institutions', icon: <BankOutlined />, path: '/institutions/bulk-upload' },
+      { key: 'bulk-staff-upload', label: 'Bulk Staff/Students', icon: <TeamOutlined />, path: '/bulk-upload' },
+      { key: 'bulk-internship-upload', label: 'Bulk Self Internships', icon: <LaptopOutlined />, path: '/bulk/self-internships' },
+      { key: 'bulk-job-history', label: 'Job History', icon: <HistoryOutlined />, path: '/bulk/job-history' },
     ],
   },
   STATE_USERS: {
@@ -75,9 +84,7 @@ export const menuConfig = {
     icon: <UsergroupAddOutlined />,
     items: [
       { key: 'principals-list', label: 'All Principals', icon: <TeamOutlined />, path: '/principals' },
-      { key: 'principals-new', label: 'Add Principal', icon: <UserAddOutlined />, path: '/principals/new' },
       { key: 'state-staff-list', label: 'All Staff', icon: <SolutionOutlined />, path: '/state-staff' },
-      { key: 'state-staff-new', label: 'Add Staff', icon: <UserAddOutlined />, path: '/state-staff/new' },
       { key: 'bulk-user-creation', label: 'Bulk Users', icon: <UsergroupAddOutlined />, path: '/users/bulk-create' },
       { key: 'credentials-reset', label: 'Reset Credentials', icon: <LockOutlined />, path: '/users/reset-credentials' },
     ],
@@ -93,8 +100,16 @@ export const menuConfig = {
     items: [
       { key: 'principal-dashboard', label: 'Dashboard', icon: <DashboardOutlined />, path: '/dashboard' },
       { key: 'staff-list', label: 'Staff List', icon: <TeamOutlined />, path: '/staff' },
-      { key: 'staff-new', label: 'Add Staff', icon: <UserAddOutlined />, path: '/staff/new' },
-      { key: 'bulk-staff-upload', label: 'Bulk Upload Staff', icon: <UploadOutlined />, path: '/bulk-upload' },
+    ],
+  },
+  BULK_OPERATIONS: {
+    key: 'bulk-operations',
+    title: 'Bulk Operations',
+    icon: <CloudUploadOutlined />,
+    items: [
+      { key: 'bulk-staff-upload', label: 'Bulk Upload Staff/Students', icon: <UploadOutlined />, path: '/bulk-upload' },
+      { key: 'bulk-internship-upload', label: 'Bulk Self Internships', icon: <UploadOutlined />, path: '/bulk/self-internships' },
+      { key: 'bulk-job-history', label: 'Job History', icon: <HistoryOutlined />, path: '/bulk/job-history' },
     ],
   },
   STUDENTS: {
@@ -103,7 +118,6 @@ export const menuConfig = {
     icon: <TeamOutlined />,
     items: [
       { key: 'students-list', label: 'All Students', icon: <TeamOutlined />, path: '/students' },
-      { key: 'student-create', label: 'Register Student', icon: <UserAddOutlined />, path: '/students/new' },
       { key: 'mentor-assignment', label: 'Mentor Assignment', icon: <SolutionOutlined />, path: '/mentors' },
     ],
   },
@@ -132,7 +146,7 @@ export const menuConfig = {
       { key: 'supervision-dashboard', label: 'Dashboard', icon: <DashboardOutlined />, path: '/dashboard' },
       { key: 'assigned-students', label: 'Assigned Students', icon: <TeamOutlined />, path: '/assigned-students' },
       { key: 'visit-logs', label: 'Visit Logs', icon: <FileDoneOutlined />, path: '/visit-logs' },
-      { key: 'visit-log-new', label: 'Log New Visit', icon: <FileAddOutlined />, path: '/visit-logs/new' },
+      { key: 'faculty-grievances', label: 'Grievances', icon: <AlertOutlined />, path: '/faculty-grievances' },
     ],
   },
 
@@ -224,6 +238,7 @@ export const getMenuSectionsForRole = (role) => {
     case 'STATE_DIRECTORATE':
       sections.push(menuConfig.STATE_OVERVIEW);
       sections.push(menuConfig.STATE_OPERATIONS);
+      sections.push(menuConfig.STATE_BULK_OPERATIONS);
       sections.push(menuConfig.STATE_USERS);
       break;
 
@@ -231,6 +246,7 @@ export const getMenuSectionsForRole = (role) => {
       sections.push(menuConfig.PRINCIPAL);
       sections.push(menuConfig.STUDENTS);
       sections.push(menuConfig.PRINCIPAL_INTERNSHIP);
+      sections.push(menuConfig.BULK_OPERATIONS);
       break;
 
     case 'FACULTY':

@@ -20,6 +20,7 @@ import {
   Tooltip,
   Flex,
   Typography,
+  Alert,
 } from 'antd';
 import {
   UserAddOutlined,
@@ -562,7 +563,7 @@ const MentorAssignment = () => {
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Mentors</Text>}
               value={stats?.mentors?.total || 0}
               prefix={<TeamOutlined className="text-primary" />}
-              valueStyle={{ color: 'var(--ant-primary-color)', fontWeight: 'bold' }}
+              styles={{ content: { color: 'var(--ant-primary-color)', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
@@ -573,7 +574,7 @@ const MentorAssignment = () => {
               value={stats?.mentors?.assigned || 0}
               suffix={<span className="text-xs text-text-tertiary font-normal">/ {stats?.mentors?.total || 0}</span>}
               prefix={<CheckCircleOutlined className="text-success" />}
-              valueStyle={{ color: 'var(--ant-success-color)', fontWeight: 'bold' }}
+              styles={{ content: { color: 'var(--ant-success-color)', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
@@ -584,7 +585,7 @@ const MentorAssignment = () => {
               value={stats?.students?.withMentor || 0}
               suffix={<span className="text-xs text-text-tertiary font-normal">/ {stats?.students?.total || 0}</span>}
               prefix={<UserOutlined className="text-success" />}
-              valueStyle={{ color: 'var(--ant-success-color)', fontWeight: 'bold' }}
+              styles={{ content: { color: 'var(--ant-success-color)', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
@@ -594,7 +595,7 @@ const MentorAssignment = () => {
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Unassigned Students</Text>}
               value={stats?.students?.withoutMentor || 0}
               prefix={<CloseCircleOutlined className="text-error" />}
-              valueStyle={{ color: stats?.students?.withoutMentor > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontWeight: 'bold' }}
+              styles={{ content: { color: stats?.students?.withoutMentor > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
@@ -886,7 +887,7 @@ const MentorAssignment = () => {
 
             {newMentorId && newMentorId !== editingStudent.currentMentorId && (
               <Alert
-                message="Mentor Reassignment"
+                title="Mentor Reassignment"
                 description={`This will reassign the student from ${editingStudent.currentMentorName} to the selected mentor.`}
                 type="info"
                 showIcon

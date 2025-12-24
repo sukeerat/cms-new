@@ -1,16 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSelector } from 'react-redux';
+import { io } from 'socket.io-client';
 import { apiClient } from '../services/api';
 import { API_ENDPOINTS } from '../utils/constants';
 import toast from 'react-hot-toast';
 
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export const useNotifications = () => {
-  const dispatch = useDispatch();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const socketRef = useRef(null);
 
-  // Fetch notifications
+  // Get auth token from Redux store
+  const { token } = useSelector((state) => state.auth);
+
+  // Fetch notifications via HTTP (initial load and fallback)
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
@@ -24,6 +31,99 @@ export const useNotifications = () => {
     }
   }, []);
 
+  // Initialize WebSocket connection
+  useEffect(() => {
+    if (!token) {
+      // No token, disconnect if connected
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setIsConnected(false);
+      }
+      return;
+    }
+
+    // Create socket connection with JWT authentication
+    const socket = io(`${SOCKET_URL}/notifications`, {
+      auth: { token },
+      query: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
+
+    socketRef.current = socket;
+
+    // Connection events
+    socket.on('connect', () => {
+      console.log('Notification WebSocket connected');
+      setIsConnected(true);
+    });
+
+    socket.on('connected', (data) => {
+      console.log('Notification service connected:', data);
+      // Fetch initial notifications after connection
+      fetchNotifications();
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Notification WebSocket disconnected:', reason);
+      setIsConnected(false);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Notification WebSocket connection error:', error.message);
+      setIsConnected(false);
+    });
+
+    socket.on('error', (error) => {
+      console.error('Notification WebSocket error:', error);
+    });
+
+    // Notification events
+    socket.on('notification', (notification) => {
+      console.log('New notification received:', notification);
+      setNotifications((prev) => [notification, ...prev]);
+
+      // Show toast for new notification
+      toast(notification.title, {
+        icon: 'info',
+        duration: 4000,
+      });
+    });
+
+    socket.on('unreadCount', (data) => {
+      setUnreadCount(data.count);
+    });
+
+    socket.on('markAsReadAck', (data) => {
+      console.log('Mark as read acknowledged:', data.notificationId);
+    });
+
+    // Cleanup on unmount or token change
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+      setIsConnected(false);
+    };
+  }, [token, fetchNotifications]);
+
+  // Handle visibility change - reconnect when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && socketRef.current && !socketRef.current.connected) {
+        socketRef.current.connect();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId) => {
     try {
@@ -34,6 +134,11 @@ export const useNotifications = () => {
         )
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
+
+      // Also notify via WebSocket for acknowledgment
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('markAsRead', { notificationId });
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -78,41 +183,11 @@ export const useNotifications = () => {
     }
   }, []);
 
-  // Initial fetch
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  // Poll for new notifications every 60 seconds
-  useEffect(() => {
-    let interval;
-
-    const startPolling = () => {
-      interval = setInterval(fetchNotifications, 60000);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        clearInterval(interval);
-      } else {
-        fetchNotifications();
-        startPolling();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    if (!document.hidden) startPolling();
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [fetchNotifications]);
-
   return {
     notifications,
     unreadCount,
     loading,
+    isConnected,
     fetchNotifications,
     markAsRead,
     markAllAsRead,

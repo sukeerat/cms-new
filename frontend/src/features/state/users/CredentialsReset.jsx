@@ -424,7 +424,7 @@ const CredentialsReset = () => {
         }
         variant="borderless"
       >
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
           <Alert
             title="Password Reset Guidelines"
             description={
@@ -565,7 +565,7 @@ const CredentialsReset = () => {
         confirmLoading={resetting}
       >
         {currentUser && (
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <Space orientation="vertical" style={{ width: '100%' }}>
             <Paragraph>
               Are you sure you want to reset the password for:
             </Paragraph>
@@ -618,7 +618,7 @@ const CredentialsReset = () => {
         confirmLoading={resetting}
         width={600}
       >
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space orientation="vertical" style={{ width: '100%' }}>
           <Alert
             title={`You are about to reset passwords for ${selectedUsers.length} user(s)`}
             type="warning"
@@ -695,7 +695,7 @@ const CredentialsReset = () => {
         width={700}
       >
         {resetResults && (
-          <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Space orientation="vertical" style={{ width: '100%' }} size="large">
             <div style={{ display: 'flex', gap: 16 }}>
               <Card size="small" style={{ flex: 1 }}>
                 <div style={{ textAlign: 'center' }}>

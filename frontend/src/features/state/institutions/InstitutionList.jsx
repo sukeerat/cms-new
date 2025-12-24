@@ -5,15 +5,30 @@ import { fetchInstitutions } from '../store/stateSlice';
 import DataTable from '../../../components/tables/DataTable';
 import { EyeOutlined, EditOutlined } from '@ant-design/icons';
 import { getStatusColor } from '../../../utils/format';
-import { useNavigate } from 'react-router-dom';
+import InstitutionModal from './InstitutionModal';
 
 const InstitutionList = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { list, loading, pagination } = useSelector((state) => state.state.institutions);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingInstitutionId, setEditingInstitutionId] = useState(null);
+
+  const handleOpenModal = (institutionId = null) => {
+    setEditingInstitutionId(institutionId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingInstitutionId(null);
+  };
+
+  const handleModalSuccess = () => {
+    dispatch(fetchInstitutions({ page, limit: pageSize, forceRefresh: true }));
+  };
 
   useEffect(() => {
     dispatch(fetchInstitutions({ page, limit: pageSize }));
@@ -74,21 +89,21 @@ const InstitutionList = () => {
           <Button
             type="link"
             icon={<EyeOutlined />}
-            onClick={() => navigate(`/institutions/${record.id}/edit`)}
+            onClick={() => handleOpenModal(record.id)}
           >
             View
           </Button>
           <Button
             type="link"
             icon={<EditOutlined />}
-            onClick={() => navigate(`/institutions/${record.id}/edit`)}
+            onClick={() => handleOpenModal(record.id)}
           >
             Edit
           </Button>
         </Space>
       ),
     },
-  ], [navigate]);
+  ], []);
 
   const tablePagination = {
     current: page,
@@ -100,7 +115,7 @@ const InstitutionList = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-text-primary">Institutions</h1>
-        <Button type="primary" onClick={() => navigate('/institutions/new')}>Add Institution</Button>
+        <Button type="primary" onClick={() => handleOpenModal()}>Add Institution</Button>
       </div>
 
       <DataTable
@@ -119,6 +134,13 @@ const InstitutionList = () => {
           setPage(nextPage);
         }}
         rowKey="id"
+      />
+
+      <InstitutionModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        institutionId={editingInstitutionId}
+        onSuccess={handleModalSuccess}
       />
     </div>
   );

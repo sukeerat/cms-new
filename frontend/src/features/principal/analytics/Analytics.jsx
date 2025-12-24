@@ -529,7 +529,7 @@ const Analytics = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Applications</Text>}
                 value={internshipStats?.totalApplications || 0}
                 prefix={<FileTextOutlined className="text-primary mr-2" />}
-                valueStyle={{ color: token.colorPrimary, fontWeight: 'bold' }}
+                styles={{ content: { color: token.colorPrimary, fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -539,7 +539,7 @@ const Analytics = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Companies Partnered</Text>}
                 value={companyData.length || 0}
                 prefix={<BankOutlined className="text-success mr-2" />}
-                valueStyle={{ color: token.colorSuccess, fontWeight: 'bold' }}
+                styles={{ content: { color: token.colorSuccess, fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -549,7 +549,7 @@ const Analytics = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Industry Sectors</Text>}
                 value={industryData.length || 0}
                 prefix={<FundOutlined className="text-warning mr-2" />}
-                valueStyle={{ color: token.colorWarning, fontWeight: 'bold' }}
+                styles={{ content: { color: token.colorWarning, fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -860,7 +860,7 @@ const Analytics = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Mentors</Text>}
                 value={mentorCoverage?.totalMentors || 0}
                 prefix={<TeamOutlined className="text-primary mr-2" />}
-                valueStyle={{ color: token.colorPrimary, fontWeight: 'bold' }}
+                styles={{ content: { color: token.colorPrimary, fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -870,7 +870,7 @@ const Analytics = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Students Assigned</Text>}
                 value={mentorCoverage?.studentsWithMentors || mentorCoverage?.assignedStudents || 0}
                 prefix={<UserOutlined className="text-success mr-2" />}
-                valueStyle={{ color: token.colorSuccess, fontWeight: 'bold' }}
+                styles={{ content: { color: token.colorSuccess, fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -881,7 +881,7 @@ const Analytics = () => {
                 value={mentorCoverage?.coveragePercentage || 0}
                 suffix="%"
                 prefix={<SafetyCertificateOutlined className="text-warning mr-2" />}
-                valueStyle={{ color: token.colorWarning, fontWeight: 'bold' }}
+                styles={{ content: { color: token.colorWarning, fontWeight: 'bold' } }}
               />
             </Card>
           </Col>

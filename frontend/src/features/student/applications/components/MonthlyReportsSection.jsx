@@ -249,7 +249,7 @@ const MonthlyReportsSection = ({
         {/* Auto-approval notice */}
         <Alert
           className="mt-4"
-          message="Reports are auto-approved upon submission"
+          title="Reports are auto-approved upon submission"
           type="info"
           showIcon
           icon={<CheckCircleOutlined />}
@@ -380,7 +380,7 @@ const MonthlyReportsSection = ({
       >
         <div className="space-y-4">
           <Alert
-            message="Auto-Approval"
+            title="Auto-Approval"
             description="Your report will be automatically approved upon submission."
             type="success"
             showIcon

@@ -233,7 +233,7 @@ const ManageInternships = () => {
         icon: <EyeOutlined />,
         onClick: () =>
           navigate(
-            `/industry/internships?tab=applicants&internshipId=${record.id}`
+            `/applications&internshipId=${record.id}`
           ),
       },
       {
@@ -332,7 +332,7 @@ const ManageInternships = () => {
         />
         <Button
           type="primary"
-          onClick={() => navigate("/industry/profile")}
+          onClick={() => navigate("/company/profile")}
           icon={<UserOutlined />}
         >
           Complete Profile
@@ -347,7 +347,7 @@ const ManageInternships = () => {
         {/* Stale data indicator */}
         {isStale && (
           <Alert
-            message="Data update recommended"
+            title="Data update recommended"
             description="Your internship data might be outdated. Click refresh to sync latest changes."
             type="warning"
             showIcon
@@ -382,7 +382,7 @@ const ManageInternships = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link to="/industry/post-internship">
+            <Link to="/postings">
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -680,7 +680,7 @@ const ManageInternships = () => {
                               type="primary"
                               size="large"
                               icon={<EyeOutlined />}
-                              onClick={() => navigate(`/industry/internships?tab=applicants&internshipId=${selectedInternship.id}`)}
+                              onClick={() => navigate(`/applications&internshipId=${selectedInternship.id}`)}
                               className="h-12 rounded-xl px-10 font-bold bg-primary border-0 shadow-lg shadow-primary/20"
                             >
                               Go to Applicants Hub

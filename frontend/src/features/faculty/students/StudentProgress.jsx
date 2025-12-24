@@ -1172,7 +1172,7 @@ const StudentProgressPage = () => {
         >
           {editInternshipModal.internship && (
             <Alert
-              message={
+              title={
                 <div>
                   <strong>
                     {editInternshipModal.internship.internship?.title ||

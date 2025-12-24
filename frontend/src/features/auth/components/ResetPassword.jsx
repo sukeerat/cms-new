@@ -287,7 +287,7 @@ const ResetPassword = () => {
 
         {/* Alert */}
         <Alert
-          message={<span className="font-semibold">Security Tip</span>}
+          title={<span className="font-semibold">Security Tip</span>}
           description="Use at least 8 characters with a mix of uppercase, lowercase, numbers, and symbols."
           type="info"
           showIcon

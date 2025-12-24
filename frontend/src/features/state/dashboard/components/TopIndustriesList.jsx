@@ -1,21 +1,28 @@
 import React from 'react';
-import { Card, List, Avatar, Typography, Tag, Progress, Empty, Tooltip, Badge } from 'antd';
+import { Card, List, Avatar, Typography, Tag, Empty, Tooltip } from 'antd';
 import {
   ShopOutlined,
   TeamOutlined,
-  StarFilled,
+  BankOutlined,
+  DollarOutlined,
   RightOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 
 const { Text } = Typography;
 
-const IndustryItem = ({ item, rank }) => {
+const CompanyItem = ({ item, rank }) => {
   const getRankClass = (rank) => {
     if (rank === 0) return 'bg-yellow-400';
     if (rank === 1) return 'bg-gray-400';
     if (rank === 2) return 'bg-amber-600';
     return 'bg-gray-500';
+  };
+
+  // Format stipend for display
+  const formatStipend = (amount) => {
+    if (!amount) return null;
+    if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)}k`;
+    return `₹${amount}`;
   };
 
   return (
@@ -29,32 +36,48 @@ const IndustryItem = ({ item, rank }) => {
         <Avatar
           icon={<ShopOutlined />}
           className="bg-primary shrink-0"
-          src={item.logo}
           size="small"
-        />
+        >
+          {item.name?.charAt(0)?.toUpperCase()}
+        </Avatar>
         <div className="flex-1 min-w-0">
           <Tooltip title={item.name}>
             <Text strong className="block truncate text-text-primary text-sm">{item.name}</Text>
           </Tooltip>
-          <div className="flex items-center gap-2">
-            <TeamOutlined className="text-text-tertiary text-xs" />
-            <Text className="text-xs text-text-tertiary">
-              {item.internsHired || 0} interns
-            </Text>
-            {item.rating && (
-              <>
-                <span className="text-border">|</span>
-                <StarFilled className="text-warning text-xs" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Tooltip title="Interns hired">
+              <span className="flex items-center gap-1">
+                <TeamOutlined className="text-text-tertiary text-xs" />
                 <Text className="text-xs text-text-tertiary">
-                  {item.rating}
+                  {item.internsHired || 0}
                 </Text>
-              </>
+              </span>
+            </Tooltip>
+            {item.institutionsCount > 1 && (
+              <Tooltip title="From different institutions">
+                <span className="flex items-center gap-1">
+                  <BankOutlined className="text-text-tertiary text-xs" />
+                  <Text className="text-xs text-text-tertiary">
+                    {item.institutionsCount}
+                  </Text>
+                </span>
+              </Tooltip>
+            )}
+            {item.avgStipend > 0 && (
+              <Tooltip title="Average stipend">
+                <span className="flex items-center gap-1">
+                  <DollarOutlined className="text-text-tertiary text-xs" />
+                  <Text className="text-xs text-text-tertiary">
+                    {formatStipend(item.avgStipend)}
+                  </Text>
+                </span>
+              </Tooltip>
             )}
           </div>
         </div>
         <div className="text-right shrink-0">
-          <Tag color={item.activePostings > 0 ? 'green' : 'default'} className="m-0 rounded-md border-0 text-[10px] font-bold">
-            {item.activePostings || 0} ACTIVE
+          <Tag color="blue" className="m-0 rounded-md border-0 text-[10px] font-bold">
+            {item.internsHired || 0} INTERNS
           </Tag>
         </div>
       </div>
@@ -63,8 +86,6 @@ const IndustryItem = ({ item, rank }) => {
 };
 
 const TopIndustriesList = ({ industries = [], loading, onViewAll }) => {
-  const navigate = useNavigate();
-
   return (
     <Card
       title={
@@ -72,7 +93,7 @@ const TopIndustriesList = ({ industries = [], loading, onViewAll }) => {
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <ShopOutlined className="text-primary text-lg" />
           </div>
-          <span className="font-bold text-text-primary text-lg">Top Partners</span>
+          <span className="font-bold text-text-primary text-lg">Top Companies</span>
         </div>
       }
       extra={
@@ -90,14 +111,14 @@ const TopIndustriesList = ({ industries = [], loading, onViewAll }) => {
         <List
           dataSource={industries.slice(0, 5)}
           renderItem={(item, index) => (
-            <IndustryItem item={item} rank={index} />
+            <CompanyItem item={item} rank={index} />
           )}
           split={false}
         />
       ) : (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={<span className="text-text-tertiary">No industry partners yet</span>}
+          description={<span className="text-text-tertiary">No companies with self-identified interns yet</span>}
           className="py-8"
         />
       )}

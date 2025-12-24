@@ -282,7 +282,7 @@ export default function FacultyGrievances() {
             type="info"
             className="mt-3"
             showIcon
-            message={`Can escalate to ${ESCALATION_LEVELS[nextLevel]?.label || nextLevel}`}
+            title={`Can escalate to ${ESCALATION_LEVELS[nextLevel]?.label || nextLevel}`}
           />
         )}
         {!canEscalate && currentLevel === "STATE_DIRECTORATE" && (
@@ -290,7 +290,7 @@ export default function FacultyGrievances() {
             type="warning"
             className="mt-3"
             showIcon
-            message="At highest escalation level"
+            title="At highest escalation level"
           />
         )}
       </Card>
@@ -323,7 +323,7 @@ export default function FacultyGrievances() {
       dataIndex: ["student", "user", "name"],
       key: "student",
       render: (name, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text>{name || record.student?.name || "N/A"}</Text>
           <Text type="secondary" className="text-xs">
             {record.student?.rollNumber}
@@ -518,7 +518,7 @@ export default function FacultyGrievances() {
         {/* Alert for pending */}
         {stats.pending > 0 && (
           <Alert
-            message={`You have ${stats.pending} pending grievance${stats.pending > 1 ? "s" : ""} requiring attention`}
+            title={`You have ${stats.pending} pending grievance${stats.pending > 1 ? "s" : ""} requiring attention`}
             type="warning"
             showIcon
             closable
@@ -607,7 +607,7 @@ export default function FacultyGrievances() {
             <div className="space-y-4">
               {/* Status Banner */}
               <Alert
-                message={`Status: ${selectedGrievance.status?.replace(/_/g, " ")}`}
+                title={`Status: ${selectedGrievance.status?.replace(/_/g, " ")}`}
                 type={
                   selectedGrievance.status === "RESOLVED" || selectedGrievance.status === "CLOSED"
                     ? "success"
@@ -622,7 +622,7 @@ export default function FacultyGrievances() {
               {/* Not Assigned Warning */}
               {selectedGrievance.assignedToId !== userId && (
                 <Alert
-                  message="View Only"
+                  title="View Only"
                   description={
                     <span>
                       This grievance is assigned to{" "}
@@ -756,7 +756,7 @@ export default function FacultyGrievances() {
           <Form form={respondForm} layout="vertical" onFinish={handleRespond}>
             {selectedGrievance && (
               <Alert
-                message={selectedGrievance.title}
+                title={selectedGrievance.title}
                 type="info"
                 className="mb-4"
               />
@@ -796,7 +796,7 @@ export default function FacultyGrievances() {
           <Form form={escalateForm} layout="vertical" onFinish={handleEscalate}>
             {selectedGrievance && (
               <Alert
-                message={`Escalating: ${selectedGrievance.title}`}
+                title={`Escalating: ${selectedGrievance.title}`}
                 description={`Current level: ${ESCALATION_LEVELS[selectedGrievance.escalationLevel]?.label || selectedGrievance.escalationLevel}`}
                 type="warning"
                 className="mb-4"

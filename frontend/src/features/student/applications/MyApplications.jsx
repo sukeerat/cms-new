@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card, Tabs, Empty, Spin, Button, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -29,6 +29,25 @@ const MyApplications = () => {
   const applications = useSelector(selectPlatformApplications);
   const selfIdentifiedApplications = useSelector(selectSelfIdentifiedApplications);
   const lastFetched = useSelector(selectApplicationsLastFetched);
+
+  // Memoize derived data - counts and status flags
+  const derivedData = useMemo(() => {
+    const platformCount = applications?.length || 0;
+    const selfIdentifiedCount = selfIdentifiedApplications?.length || 0;
+    const totalCount = platformCount + selfIdentifiedCount;
+    const hasPlatformApplications = platformCount > 0;
+    const hasSelfIdentifiedApplications = selfIdentifiedCount > 0;
+    const hasAnyApplications = totalCount > 0;
+
+    return {
+      platformCount,
+      selfIdentifiedCount,
+      totalCount,
+      hasPlatformApplications,
+      hasSelfIdentifiedApplications,
+      hasAnyApplications,
+    };
+  }, [applications, selfIdentifiedApplications]);
 
   // Fetch applications on mount if not cached
   useEffect(() => {
@@ -133,8 +152,8 @@ const MyApplications = () => {
         {/* Tabs */}
         <Tabs activeKey={activeTab} onChange={setActiveTab}>
           {/* Platform Applications */}
-          <TabPane tab={`Platform Internships (${applications.length})`} key="1">
-            {applications.length > 0 ? (
+          <TabPane tab={`Platform Internships (${derivedData.platformCount})`} key="1">
+            {derivedData.hasPlatformApplications ? (
               <Card className="rounded-2xl">
                 <ApplicationsTable
                   applications={applications}
@@ -170,8 +189,8 @@ const MyApplications = () => {
           </TabPane>
 
           {/* Self-Identified Applications */}
-          <TabPane tab={`Self-Identified (${selfIdentifiedApplications.length})`} key="2">
-            {selfIdentifiedApplications.length > 0 ? (
+          <TabPane tab={`Self-Identified (${derivedData.selfIdentifiedCount})`} key="2">
+            {derivedData.hasSelfIdentifiedApplications ? (
               <Card className="rounded-2xl">
                 <ApplicationsTable
                   applications={selfIdentifiedApplications}
@@ -196,7 +215,7 @@ const MyApplications = () => {
                 >
                   <Button
                     type="primary"
-                    onClick={() => navigate('/internships/self-identified')}
+                    onClick={() => navigate('/internships')}
                     className="bg-purple-600"
                   >
                     Submit Self-Identified Internship

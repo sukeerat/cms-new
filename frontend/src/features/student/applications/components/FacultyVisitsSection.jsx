@@ -142,7 +142,7 @@ const FacultyVisitsSection = ({
         {/* Info notice */}
         <Alert
           className="mt-4"
-          message="Faculty visits are logged by your assigned mentor"
+          title="Faculty visits are logged by your assigned mentor"
           type="info"
           showIcon
           icon={<TeamOutlined />}

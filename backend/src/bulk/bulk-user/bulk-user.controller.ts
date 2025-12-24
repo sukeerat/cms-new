@@ -9,9 +9,10 @@ import {
   BadRequestException,
   Res,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
 import { BulkUserService } from './bulk-user.service';
 import { JwtAuthGuard } from '../../core/auth/guards/jwt-auth.guard';
@@ -19,19 +20,25 @@ import { RolesGuard } from '../../core/auth/guards/roles.guard';
 import { Roles } from '../../core/auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { BulkUserResultDto } from './dto/bulk-user.dto';
+import { BulkQueueService } from '../shared/bulk-queue.service';
 
 @ApiTags('Bulk Operations - Users')
 @Controller('bulk/users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BulkUserController {
-  constructor(private readonly bulkUserService: BulkUserService) {}
+  constructor(
+    private readonly bulkUserService: BulkUserService,
+    private readonly bulkQueueService: BulkQueueService,
+  ) {}
 
   @Post('upload')
-  @Roles(Role.PRINCIPAL, Role.SYSTEM_ADMIN)
+  @Roles(Role.PRINCIPAL, Role.SYSTEM_ADMIN, Role.STATE_DIRECTORATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Bulk upload users (staff/faculty) from CSV/Excel file' })
   @ApiConsumes('multipart/form-data')
+  @ApiQuery({ name: 'async', type: Boolean, required: false, description: 'Process asynchronously via queue (recommended for large files)' })
+  @ApiQuery({ name: 'institutionId', type: String, required: false, description: 'Institution ID (required for STATE_DIRECTORATE)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -46,14 +53,16 @@ export class BulkUserController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Bulk upload results',
+    description: 'Bulk upload results or job queued response',
     type: BulkUserResultDto,
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid file or data' })
   async bulkUploadUsers(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: any,
-  ): Promise<BulkUserResultDto> {
+    @Query('async') async?: string,
+    @Query('institutionId') queryInstitutionId?: string,
+  ) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
@@ -76,10 +85,20 @@ export class BulkUserController {
     }
 
     const user = req.user;
-    const institutionId = user.institutionId;
+    let institutionId: string;
 
-    if (!institutionId) {
-      throw new BadRequestException('Institution ID not found for the user');
+    // STATE_DIRECTORATE must provide institutionId in query
+    if (user.role === Role.STATE_DIRECTORATE) {
+      if (!queryInstitutionId) {
+        throw new BadRequestException('Institution ID is required for State Directorate');
+      }
+      institutionId = queryInstitutionId;
+    } else {
+      // PRINCIPAL uses their own institution
+      institutionId = user.institutionId;
+      if (!institutionId) {
+        throw new BadRequestException('Institution ID not found for the user');
+      }
     }
 
     // Parse file
@@ -93,17 +112,37 @@ export class BulkUserController {
       throw new BadRequestException('Maximum 500 users can be uploaded at once');
     }
 
-    // Process bulk upload
+    // Check if async processing is requested (default to async for large files)
+    const useAsync = async === 'true' || async === '1' || users.length > 50;
+
+    if (useAsync) {
+      // Queue the job for background processing
+      const result = await this.bulkQueueService.queueUserUpload(
+        users,
+        institutionId,
+        user.sub,
+        file.originalname,
+        file.size,
+      );
+
+      return {
+        ...result,
+        message: `Bulk upload of ${users.length} users queued for processing. You can track progress in the Job History.`,
+      };
+    }
+
+    // Process synchronously for smaller files
     const result = await this.bulkUserService.bulkUploadUsers(users, institutionId, user.sub);
 
     return result;
   }
 
   @Post('validate')
-  @Roles(Role.PRINCIPAL, Role.SYSTEM_ADMIN)
+  @Roles(Role.PRINCIPAL, Role.SYSTEM_ADMIN, Role.STATE_DIRECTORATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Validate user data from CSV/Excel file without creating records' })
   @ApiConsumes('multipart/form-data')
+  @ApiQuery({ name: 'institutionId', type: String, required: false, description: 'Institution ID (required for STATE_DIRECTORATE)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -120,16 +159,28 @@ export class BulkUserController {
     status: HttpStatus.OK,
     description: 'Validation results',
   })
-  async validateUsers(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+  async validateUsers(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+    @Query('institutionId') queryInstitutionId?: string,
+  ) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
 
     const user = req.user;
-    const institutionId = user.institutionId;
+    let institutionId: string;
 
-    if (!institutionId) {
-      throw new BadRequestException('Institution ID not found for the user');
+    if (user.role === Role.STATE_DIRECTORATE) {
+      if (!queryInstitutionId) {
+        throw new BadRequestException('Institution ID is required for State Directorate');
+      }
+      institutionId = queryInstitutionId;
+    } else {
+      institutionId = user.institutionId;
+      if (!institutionId) {
+        throw new BadRequestException('Institution ID not found for the user');
+      }
     }
 
     // Parse file
@@ -142,7 +193,7 @@ export class BulkUserController {
   }
 
   @Get('template')
-  @Roles(Role.PRINCIPAL, Role.SYSTEM_ADMIN)
+  @Roles(Role.PRINCIPAL, Role.SYSTEM_ADMIN, Role.STATE_DIRECTORATE)
   @ApiOperation({ summary: 'Download template Excel file for bulk user upload' })
   @ApiResponse({
     status: HttpStatus.OK,

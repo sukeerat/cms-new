@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { Card, Upload, Button, message, Steps, Table, Alert, Space, Select, Divider } from 'antd';
-import { UploadOutlined, DownloadOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { bulkUploadStudents, bulkUploadStaff, downloadTemplate } from '../store/principalSlice';
+import { UploadOutlined, DownloadOutlined, CheckCircleOutlined, CloseCircleOutlined, BankOutlined } from '@ant-design/icons';
+import { bulkService } from '../../../services/bulk.service';
+import { stateService } from '../../../services/state.service';
 import * as XLSX from 'xlsx';
 
 const { Step } = Steps;
 const { Dragger } = Upload;
 
 const BulkUpload = () => {
-  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
+  const isStateDirectorate = user?.role === 'STATE_DIRECTORATE';
+
   const [currentStep, setCurrentStep] = useState(0);
   const [uploadType, setUploadType] = useState('students');
   const [fileData, setFileData] = useState([]);
@@ -17,9 +20,41 @@ const BulkUpload = () => {
   const [validationResults, setValidationResults] = useState({ valid: [], invalid: [] });
   const [uploading, setUploading] = useState(false);
 
+  // Institution selector state for STATE_DIRECTORATE
+  const [institutions, setInstitutions] = useState([]);
+  const [selectedInstitution, setSelectedInstitution] = useState(null);
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+
+  // Fetch institutions for STATE_DIRECTORATE
+  useEffect(() => {
+    if (isStateDirectorate) {
+      fetchInstitutions();
+    }
+  }, [isStateDirectorate]);
+
+  const fetchInstitutions = async () => {
+    setLoadingInstitutions(true);
+    try {
+      const response = await stateService.getInstitutions({ limit: 1000 });
+      setInstitutions(response.data || response.institutions || []);
+    } catch (error) {
+      message.error('Failed to fetch institutions');
+    } finally {
+      setLoadingInstitutions(false);
+    }
+  };
+
   const handleDownloadTemplate = async () => {
     try {
-      await dispatch(downloadTemplate(uploadType)).unwrap();
+      const blob = uploadType === 'students'
+        ? await bulkService.downloadStudentTemplate()
+        : await bulkService.downloadUserTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bulk-${uploadType}-upload-template.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
       message.success('Template downloaded successfully');
     } catch (error) {
       message.error('Failed to download template');
@@ -146,16 +181,26 @@ const BulkUpload = () => {
       return;
     }
 
+    // STATE_DIRECTORATE must select an institution
+    if (isStateDirectorate && !selectedInstitution) {
+      message.error('Please select an institution first');
+      return;
+    }
+
     setUploading(true);
     try {
-      const action = uploadType === 'students' ? bulkUploadStudents : bulkUploadStaff;
-      // Send the original file - backend will parse and process
-      await dispatch(action(originalFile)).unwrap();
+      const institutionId = isStateDirectorate ? selectedInstitution : null;
+      const uploadFn = uploadType === 'students'
+        ? bulkService.uploadStudents
+        : bulkService.uploadUsers;
+
+      // Send the original file with institutionId for STATE_DIRECTORATE
+      await uploadFn(originalFile, null, true, institutionId);
 
       message.success(`Successfully uploaded ${validationResults.valid.length} ${uploadType}`);
       setCurrentStep(2);
     } catch (error) {
-      message.error(error?.message || 'Failed to upload data');
+      message.error(error?.response?.data?.message || error?.message || 'Failed to upload data');
     } finally {
       setUploading(false);
     }
@@ -209,7 +254,24 @@ const BulkUpload = () => {
 
         {currentStep === 0 && (
           <div>
-            <Space className="mb-4" size="middle">
+            <Space className="mb-4" size="middle" wrap>
+              {/* Institution selector for STATE_DIRECTORATE */}
+              {isStateDirectorate && (
+                <Select
+                  placeholder="Select Institution"
+                  value={selectedInstitution}
+                  onChange={setSelectedInstitution}
+                  loading={loadingInstitutions}
+                  style={{ width: 300 }}
+                  showSearch
+                  optionFilterProp="label"
+                  suffixIcon={<BankOutlined />}
+                  options={institutions.map((inst) => ({
+                    value: inst.id,
+                    label: inst.name,
+                  }))}
+                />
+              )}
               <Select
                 value={uploadType}
                 onChange={(value) => {
@@ -226,6 +288,17 @@ const BulkUpload = () => {
                 Download Template
               </Button>
             </Space>
+
+            {/* Warning for STATE_DIRECTORATE if no institution selected */}
+            {isStateDirectorate && !selectedInstitution && (
+              <Alert
+                title="Select an Institution"
+                description="As a State Directorate user, you must select an institution before uploading data."
+                type="warning"
+                showIcon
+                className="mb-4"
+              />
+            )}
 
             <Alert
               title="Instructions"
@@ -247,11 +320,16 @@ const BulkUpload = () => {
               beforeUpload={handleFileUpload}
               maxCount={1}
               showUploadList={false}
+              disabled={isStateDirectorate && !selectedInstitution}
             >
               <p className="ant-upload-drag-icon">
-                <UploadOutlined style={{ fontSize: 48 }} />
+                <UploadOutlined style={{ fontSize: 48, opacity: isStateDirectorate && !selectedInstitution ? 0.5 : 1 }} />
               </p>
-              <p className="ant-upload-text">Click or drag file to this area to upload</p>
+              <p className="ant-upload-text">
+                {isStateDirectorate && !selectedInstitution
+                  ? 'Please select an institution first'
+                  : 'Click or drag file to this area to upload'}
+              </p>
               <p className="ant-upload-hint">
                 Support for a single Excel file upload. File size should not exceed 10MB.
               </p>

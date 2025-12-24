@@ -54,7 +54,7 @@ const ApplicationDetailsView = ({
               title="Reports Approved"
               value={`${monthlyReportsProgress?.approved || 0}/${monthlyReportsProgress?.total || 0}`}
               prefix={<FileTextOutlined />}
-              valueStyle={{ color: monthlyReportsProgress?.percentage === 100 ? '#52c41a' : undefined }}
+              styles={{ content: { color: monthlyReportsProgress?.percentage === 100 ? '#52c41a' : undefined } }}
             />
           </Card>
         </Col>
@@ -64,7 +64,7 @@ const ApplicationDetailsView = ({
               title="Faculty Visits"
               value={`${facultyVisitsProgress?.completed || 0}/${facultyVisitsProgress?.total || 0}`}
               prefix={<TeamOutlined />}
-              valueStyle={{ color: facultyVisitsProgress?.percentage === 100 ? '#52c41a' : undefined }}
+              styles={{ content: { color: facultyVisitsProgress?.percentage === 100 ? '#52c41a' : undefined } }}
             />
           </Card>
         </Col>
@@ -75,7 +75,7 @@ const ApplicationDetailsView = ({
               value={monthlyReportsProgress?.percentage || 0}
               suffix="%"
               prefix={<CalendarOutlined />}
-              valueStyle={{ color: monthlyReportsProgress?.percentage === 100 ? '#52c41a' : '#1890ff' }}
+              styles={{ content: { color: monthlyReportsProgress?.percentage === 100 ? '#52c41a' : '#1890ff' } }}
             />
           </Card>
         </Col>

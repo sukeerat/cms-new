@@ -67,6 +67,8 @@ const initialState = {
     studentsKey: null,
     visitLogs: null,
     visitLogsKey: null,
+    visitLogsById: {}, // Cache per visit log ID
+    studentProgressById: {}, // Cache per student ID
     monthlyReports: null,
     monthlyReportsKey: null,
     joiningLetters: null,
@@ -105,12 +107,12 @@ export const fetchFacultyDashboard = createAsyncThunk(
 // Profile
 export const fetchProfile = createAsyncThunk(
   'faculty/fetchProfile',
-  async (_, { getState, rejectWithValue }) => {
+  async (params, { getState, rejectWithValue }) => {
     try {
       const state = getState();
       const lastFetched = state.faculty.lastFetched.profile;
 
-      if (lastFetched && (Date.now() - lastFetched) < CACHE_DURATION) {
+      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
         return { cached: true };
       }
 
@@ -162,10 +164,21 @@ export const fetchAssignedStudents = createAsyncThunk(
 
 export const fetchStudentProgress = createAsyncThunk(
   'faculty/fetchStudentProgress',
-  async (studentId, { rejectWithValue }) => {
+  async (params, { getState, rejectWithValue }) => {
     try {
+      // Support both simple studentId and object with forceRefresh
+      const studentId = typeof params === 'object' ? params.studentId : params;
+      const forceRefresh = typeof params === 'object' ? params.forceRefresh : false;
+
+      const state = getState();
+      const lastFetched = state.faculty.lastFetched.studentProgressById[studentId];
+
+      if (lastFetched && !forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+        return { cached: true, studentId };
+      }
+
       const response = await facultyService.getStudentProgress(studentId);
-      return response;
+      return { ...response, _studentId: studentId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch student progress');
     }
@@ -209,10 +222,21 @@ export const fetchVisitLogs = createAsyncThunk(
 
 export const fetchVisitLogById = createAsyncThunk(
   'faculty/fetchVisitLogById',
-  async (id, { rejectWithValue }) => {
+  async (params, { getState, rejectWithValue }) => {
     try {
+      // Support both simple id and object with forceRefresh
+      const id = typeof params === 'object' ? params.id : params;
+      const forceRefresh = typeof params === 'object' ? params.forceRefresh : false;
+
+      const state = getState();
+      const lastFetched = state.faculty.lastFetched.visitLogsById[id];
+
+      if (lastFetched && !forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+        return { cached: true, id };
+      }
+
       const response = await facultyService.getVisitLogById(id);
-      return response;
+      return { ...response, _visitLogId: id };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch visit log');
     }
@@ -562,6 +586,8 @@ const facultySlice = createSlice({
         studentsKey: null,
         visitLogs: null,
         visitLogsKey: null,
+        visitLogsById: {}, // Reset ID-based cache
+        studentProgressById: {}, // Reset ID-based cache
         monthlyReports: null,
         monthlyReportsKey: null,
         joiningLetters: null,
@@ -678,6 +704,13 @@ const facultySlice = createSlice({
         state.students.error = action.payload;
       })
 
+      // Student Progress (ID-based caching)
+      .addCase(fetchStudentProgress.fulfilled, (state, action) => {
+        if (!action.payload.cached && action.payload._studentId) {
+          state.lastFetched.studentProgressById[action.payload._studentId] = Date.now();
+        }
+      })
+
       // Visit Logs
       .addCase(fetchVisitLogs.pending, (state) => {
         state.visitLogs.loading = true;
@@ -704,7 +737,13 @@ const facultySlice = createSlice({
       })
       .addCase(fetchVisitLogById.fulfilled, (state, action) => {
         state.visitLogs.loading = false;
-        state.visitLogs.current = action.payload;
+        if (!action.payload.cached) {
+          state.visitLogs.current = action.payload;
+          // Update ID-based cache timestamp
+          if (action.payload._visitLogId) {
+            state.lastFetched.visitLogsById[action.payload._visitLogId] = Date.now();
+          }
+        }
       })
       .addCase(fetchVisitLogById.rejected, (state, action) => {
         state.visitLogs.loading = false;
@@ -719,6 +758,7 @@ const facultySlice = createSlice({
         state.visitLogs.list = [action.payload, ...state.visitLogs.list];
         state.visitLogs.total += 1;
         state.lastFetched.visitLogs = null; // Invalidate cache
+        state.lastFetched.visitLogsKey = null;
       })
       .addCase(createVisitLog.rejected, (state, action) => {
         state.visitLogs.loading = false;
@@ -734,6 +774,13 @@ const facultySlice = createSlice({
         if (index !== -1) {
           state.visitLogs.list[index] = action.payload;
         }
+        // Invalidate ID-based cache for this visit log
+        if (action.payload.id) {
+          delete state.lastFetched.visitLogsById[action.payload.id];
+        }
+        // Invalidate list cache
+        state.lastFetched.visitLogs = null;
+        state.lastFetched.visitLogsKey = null;
       })
       .addCase(updateVisitLog.rejected, (state, action) => {
         state.visitLogs.loading = false;
@@ -747,6 +794,13 @@ const facultySlice = createSlice({
         state.visitLogs.loading = false;
         state.visitLogs.list = state.visitLogs.list.filter(log => log.id !== action.payload.id);
         state.visitLogs.total -= 1;
+        // Invalidate ID-based cache for this visit log
+        if (action.payload.id) {
+          delete state.lastFetched.visitLogsById[action.payload.id];
+        }
+        // Invalidate list cache
+        state.lastFetched.visitLogs = null;
+        state.lastFetched.visitLogsKey = null;
       })
       .addCase(deleteVisitLog.rejected, (state, action) => {
         state.visitLogs.loading = false;
@@ -783,6 +837,7 @@ const facultySlice = createSlice({
           state.monthlyReports.list[index] = action.payload;
         }
         state.lastFetched.monthlyReports = null; // Invalidate cache
+        state.lastFetched.monthlyReportsKey = null;
       })
       .addCase(reviewMonthlyReport.rejected, (state, action) => {
         state.monthlyReports.loading = false;
@@ -930,6 +985,8 @@ const facultySlice = createSlice({
         state.joiningLetters.loading = false;
         state.joiningLetters.list = state.joiningLetters.list.filter(l => l.id !== action.payload.id);
         state.joiningLetters.total -= 1;
+        state.lastFetched.joiningLetters = null; // Invalidate cache after mutation
+        state.lastFetched.joiningLettersKey = null;
       })
       .addCase(deleteJoiningLetter.rejected, (state, action) => {
         state.joiningLetters.loading = false;
@@ -967,6 +1024,7 @@ const facultySlice = createSlice({
           state.monthlyReports.list[index] = action.payload.data;
         }
         state.lastFetched.monthlyReports = null;
+        state.lastFetched.monthlyReportsKey = null;
       })
       .addCase(approveMonthlyReport.rejected, (state, action) => {
         state.monthlyReports.loading = false;
@@ -982,6 +1040,7 @@ const facultySlice = createSlice({
           state.monthlyReports.list[index] = action.payload.data;
         }
         state.lastFetched.monthlyReports = null;
+        state.lastFetched.monthlyReportsKey = null;
       })
       .addCase(rejectMonthlyReport.rejected, (state, action) => {
         state.monthlyReports.loading = false;
@@ -994,6 +1053,8 @@ const facultySlice = createSlice({
         state.monthlyReports.loading = false;
         state.monthlyReports.list = state.monthlyReports.list.filter(r => r.id !== action.payload.id);
         state.monthlyReports.total -= 1;
+        state.lastFetched.monthlyReports = null; // Invalidate cache after mutation
+        state.lastFetched.monthlyReportsKey = null;
       })
       .addCase(deleteMonthlyReport.rejected, (state, action) => {
         state.monthlyReports.loading = false;

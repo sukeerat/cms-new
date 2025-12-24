@@ -482,7 +482,7 @@ const FacultyProgress = () => {
             <Avatar size={64} icon={<UserOutlined />} className="bg-primary text-white shrink-0" />
             <div>
               <Title level={4} className="!mb-1 !text-text-primary">{selectedFaculty.name}</Title>
-              <Space direction="vertical" size={2}>
+              <Space orientation="vertical" size={2}>
                 {selectedFaculty.employeeId && (
                   <Text className="text-sm text-text-secondary flex items-center gap-2">
                     <UserOutlined className="text-text-tertiary" />
@@ -512,7 +512,7 @@ const FacultyProgress = () => {
                 <div className="text-center p-3 bg-primary/5 rounded-xl">
                   <Statistic
                     value={stats.totalStudents || 0}
-                    valueStyle={{ color: 'var(--ant-primary-color)', fontSize: 24, fontWeight: 'bold' }}
+                    styles={{ content: { color: 'var(--ant-primary-color)', fontSize: 24, fontWeight: 'bold' } }}
                   />
                   <Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Students</Text>
                 </div>
@@ -521,7 +521,7 @@ const FacultyProgress = () => {
                 <div className="text-center p-3 bg-success/5 rounded-xl">
                   <Statistic
                     value={stats.totalVisits || 0}
-                    valueStyle={{ color: 'var(--ant-success-color)', fontSize: 24, fontWeight: 'bold' }}
+                    styles={{ content: { color: 'var(--ant-success-color)', fontSize: 24, fontWeight: 'bold' } }}
                   />
                   <Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Visits</Text>
                 </div>
@@ -530,7 +530,7 @@ const FacultyProgress = () => {
                 <div className="text-center p-3 bg-background-tertiary rounded-xl">
                   <Statistic
                     value={stats.visitsLastMonth || 0}
-                    valueStyle={{ color: 'var(--ant-text-color-secondary)', fontSize: 24, fontWeight: 'bold' }}
+                    styles={{ content: { color: 'var(--ant-text-color-secondary)', fontSize: 24, fontWeight: 'bold' } }}
                   />
                   <Text className="text-[10px] uppercase font-bold text-text-tertiary">Last Month</Text>
                 </div>
@@ -539,7 +539,7 @@ const FacultyProgress = () => {
                 <div className="text-center p-3 bg-secondary/5 rounded-xl">
                   <Statistic
                     value={stats.visitsThisMonth || 0}
-                    valueStyle={{ color: 'var(--ant-secondary-color, #722ed1)', fontSize: 24, fontWeight: 'bold' }}
+                    styles={{ content: { color: 'var(--ant-secondary-color, #722ed1)', fontSize: 24, fontWeight: 'bold' } }}
                   />
                   <Text className="text-[10px] uppercase font-bold text-text-tertiary">This Month</Text>
                 </div>
@@ -548,7 +548,7 @@ const FacultyProgress = () => {
                 <div className="text-center p-3 bg-warning/5 rounded-xl">
                   <Statistic
                     value={stats.scheduledNextMonth || 0}
-                    valueStyle={{ color: 'var(--ant-warning-color)', fontSize: 24, fontWeight: 'bold' }}
+                    styles={{ content: { color: 'var(--ant-warning-color)', fontSize: 24, fontWeight: 'bold' } }}
                   />
                   <Text className="text-[10px] uppercase font-bold text-text-tertiary">Scheduled</Text>
                 </div>
@@ -557,7 +557,7 @@ const FacultyProgress = () => {
                 <div className="text-center p-3 bg-error/5 rounded-xl">
                   <Statistic
                     value={stats.missedVisits || 0}
-                    valueStyle={{ color: stats.missedVisits > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontSize: 24, fontWeight: 'bold' }}
+                    styles={{ content: { color: stats.missedVisits > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontSize: 24, fontWeight: 'bold' } }}
                   />
                   <Text className="text-[10px] uppercase font-bold text-text-tertiary">Missed</Text>
                 </div>

@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Space, Tag, Avatar, Input, Select, Card, Modal, message } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import { fetchStaff, deleteStaff, fetchDepartments } from '../store/principalSlice';
 import DataTable from '../../../components/tables/DataTable';
 import { EyeOutlined, EditOutlined, UserOutlined, SearchOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getStatusColor } from '../../../utils/format';
+import StaffModal from './StaffModal';
 
 const { Search } = Input;
 const { Option } = Select;
 
 const StaffList = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { list, loading, pagination } = useSelector((state) => state.principal.staff);
   const departments = useSelector((state) => state.principal.departments.list);
   const [filters, setFilters] = useState({
@@ -23,6 +22,22 @@ const StaffList = () => {
     page: 1,
     limit: 10,
   });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState(null);
+
+  const handleOpenModal = (staffId = null) => {
+    setEditingStaffId(staffId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingStaffId(null);
+  };
+
+  const handleModalSuccess = () => {
+    dispatch(fetchStaff({ ...filters, forceRefresh: true }));
+  };
 
   useEffect(() => {
     dispatch(fetchStaff(filters));
@@ -30,11 +45,11 @@ const StaffList = () => {
   }, [dispatch, filters]);
 
   const handleView = (record) => {
-    navigate(`/staff/${record.id}`);
+    handleOpenModal(record.id);
   };
 
   const handleEdit = (record) => {
-    navigate(`/staff/${record.id}/edit`);
+    handleOpenModal(record.id);
   };
 
   const handleDelete = (record) => {
@@ -132,10 +147,10 @@ const StaffList = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-text-primary">Staff Members</h1>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          onClick={() => navigate('/staff/new')}
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenModal()}
           className="rounded-lg shadow-md shadow-primary/20"
         >
           Add Staff
@@ -201,6 +216,13 @@ const StaffList = () => {
           }}
         />
       </div>
+
+      <StaffModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        staffId={editingStaffId}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };

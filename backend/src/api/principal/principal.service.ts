@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
 import { LruCacheService } from '../../core/cache/lru-cache.service';
-import { Prisma, ApplicationStatus, Role } from '@prisma/client';
+import { Prisma, ApplicationStatus, Role, GrievanceStatus, MonthlyReportStatus } from '@prisma/client';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
@@ -50,6 +50,7 @@ export class PrincipalService {
           ongoingInternships,
           completedInternships,
           totalBatches,
+          activeBatches,
           pendingMonthlyReports,
           pendingGrievances,
         ] = await Promise.all([
@@ -80,6 +81,7 @@ export class PrincipalService {
               status: ApplicationStatus.COMPLETED,
             }
           }),
+          this.prisma.batch.count({ where: { institutionId } }),
           this.prisma.batch.count({ where: { institutionId, isActive: true } }),
           this.prisma.monthlyReport.count({
             where: {
@@ -126,7 +128,10 @@ export class PrincipalService {
             monthlyReports: pendingMonthlyReports,
             grievances: pendingGrievances,
           },
-          batches: totalBatches,
+          batches: {
+            total: totalBatches,
+            active: activeBatches,
+          },
         };
       },
       { ttl: 300, tags: ['principal', `institution:${institutionId}`] },
@@ -356,7 +361,25 @@ export class PrincipalService {
             take: 1,
           },
           internshipApplications: {
-            orderBy: { createdAt: 'desc' },
+            where: {
+              // Prioritize self-identified approved/ongoing internships
+              OR: [
+                {
+                  isSelfIdentified: true,
+                  status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] },
+                },
+                {
+                  isSelfIdentified: true,
+                  internshipStatus: 'ONGOING',
+                },
+                // Fallback to any application
+                {},
+              ],
+            },
+            orderBy: [
+              { isSelfIdentified: 'desc' }, // Self-identified first
+              { createdAt: 'desc' },
+            ],
             take: 1,
             select: {
               id: true,
@@ -435,11 +458,26 @@ export class PrincipalService {
 
       // Calculate expected reports based on internship duration
       let totalExpectedReports = 6; // Default
-      if (application?.internship) {
-        const duration = application.internship.duration || '';
+      if (application) {
+        // For self-identified internships, use internshipDuration field
+        const duration = (application as any).isSelfIdentified
+          ? ((application as any).internshipDuration || '')
+          : (application.internship?.duration || '');
         const monthsMatch = duration.match(/(\d+)\s*month/i);
         if (monthsMatch) {
           totalExpectedReports = parseInt(monthsMatch[1], 10);
+        }
+
+        // Also calculate based on start/end dates if available
+        const startDate = (application as any).startDate || application.joiningDate;
+        const endDate = (application as any).endDate || application.completionDate;
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          const monthsDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30));
+          if (monthsDiff > 0) {
+            totalExpectedReports = monthsDiff;
+          }
         }
       }
 
@@ -456,34 +494,46 @@ export class PrincipalService {
       // Determine internship status
       let internshipStatus = 'Not Started';
       if (application) {
-        switch (application.status) {
-          case 'COMPLETED':
-            internshipStatus = 'Completed';
-            break;
-          case 'JOINED':
-            // Check if delayed based on reports
-            const currentMonth = new Date().getMonth() + 1;
-            const currentYear = new Date().getFullYear();
-            const expectedSubmitted = reports.filter((r) => {
-              const reportDate = new Date(r.reportYear, r.reportMonth - 1);
-              return reportDate <= new Date();
-            }).length;
-            internshipStatus = submittedReports < expectedSubmitted ? 'Delayed' : 'In Progress';
-            break;
-          case 'SELECTED':
-            internshipStatus = 'In Progress';
-            break;
-          case 'APPLIED':
-          case 'UNDER_REVIEW':
-          case 'SHORTLISTED':
-            internshipStatus = 'Pending';
-            break;
-          case 'REJECTED':
-          case 'WITHDRAWN':
-            internshipStatus = 'Not Started';
-            break;
-          default:
-            internshipStatus = 'Not Started';
+        // First check internshipStatus field (ONGOING, COMPLETED) for self-identified internships
+        if (application.internshipStatus === 'COMPLETED') {
+          internshipStatus = 'Completed';
+        } else if (application.internshipStatus === 'ONGOING') {
+          // Check if delayed based on expected reports
+          const expectedSubmitted = reports.filter((r) => {
+            const reportDate = new Date(r.reportYear, r.reportMonth - 1);
+            return reportDate <= new Date();
+          }).length;
+          internshipStatus = submittedReports < expectedSubmitted ? 'Delayed' : 'In Progress';
+        } else {
+          // Fall back to application status
+          switch (application.status) {
+            case 'COMPLETED':
+              internshipStatus = 'Completed';
+              break;
+            case 'APPROVED':
+            case 'JOINED':
+              // For APPROVED/JOINED status, check if delayed based on reports
+              const expectedSubmittedReports = reports.filter((r) => {
+                const reportDate = new Date(r.reportYear, r.reportMonth - 1);
+                return reportDate <= new Date();
+              }).length;
+              internshipStatus = submittedReports < expectedSubmittedReports ? 'Delayed' : 'In Progress';
+              break;
+            case 'SELECTED':
+              internshipStatus = 'In Progress';
+              break;
+            case 'APPLIED':
+            case 'UNDER_REVIEW':
+            case 'SHORTLISTED':
+              internshipStatus = 'Pending';
+              break;
+            case 'REJECTED':
+            case 'WITHDRAWN':
+              internshipStatus = 'Not Started';
+              break;
+            default:
+              internshipStatus = 'Not Started';
+          }
         }
       }
 
@@ -620,8 +670,10 @@ export class PrincipalService {
       if (joiningLetterStatus === 'uploaded') {
         filteredData = filteredData.filter((s) => s.application?.hasJoiningLetter);
       } else if (joiningLetterStatus === 'pending') {
+        // Show students with APPROVED or JOINED status who haven't uploaded joining letter
         filteredData = filteredData.filter(
-          (s) => s.application && !s.application.hasJoiningLetter && s.application.status === 'JOINED'
+          (s) => s.application && !s.application.hasJoiningLetter &&
+                 (s.application.status === 'APPROVED' || s.application.status === 'JOINED')
         );
       }
     }
@@ -645,6 +697,61 @@ export class PrincipalService {
       orderBy: { name: 'asc' },
     });
 
+    // Calculate status counts for the entire dataset (not just current page)
+    // These are approximate based on database status, not computed internshipStatus
+    const [inProgressCount, completedCount, pendingCount] = await Promise.all([
+      // In Progress: APPROVED, JOINED, or SELECTED status OR internshipStatus is ONGOING
+      this.prisma.student.count({
+        where: {
+          ...where,
+          internshipApplications: {
+            some: {
+              isSelfIdentified: true,
+              OR: [
+                { status: { in: ['APPROVED', 'JOINED', 'SELECTED'] } },
+                { internshipStatus: 'ONGOING' },
+              ],
+            },
+          },
+        },
+      }),
+      // Completed: COMPLETED status or internshipStatus is COMPLETED
+      this.prisma.student.count({
+        where: {
+          ...where,
+          internshipApplications: {
+            some: {
+              isSelfIdentified: true,
+              OR: [
+                { status: 'COMPLETED' },
+                { internshipStatus: 'COMPLETED' },
+              ],
+            },
+          },
+        },
+      }),
+      // Pending: APPLIED, UNDER_REVIEW, SHORTLISTED status
+      this.prisma.student.count({
+        where: {
+          ...where,
+          internshipApplications: {
+            some: {
+              isSelfIdentified: true,
+              status: { in: ['APPLIED', 'UNDER_REVIEW', 'SHORTLISTED'] },
+            },
+          },
+        },
+      }),
+    ]);
+
+    // Not started = total - (inProgress + completed + pending)
+    const notStartedCount = Math.max(0, total - inProgressCount - completedCount - pendingCount);
+
+    // Count delayed from computed progressData (accurate calculation based on report submissions)
+    const delayedCount = progressData.filter((s) => s.internshipStatus === 'Delayed').length;
+    // Adjust inProgress count to exclude delayed students (they overlap in DB queries)
+    const adjustedInProgressCount = Math.max(0, inProgressCount - delayedCount);
+
     return {
       students: filteredData,
       pagination: {
@@ -652,6 +759,14 @@ export class PrincipalService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+      },
+      statusCounts: {
+        total,
+        inProgress: adjustedInProgressCount,
+        completed: completedCount,
+        pending: pendingCount,
+        notStarted: notStartedCount,
+        delayed: delayedCount,
       },
       mentors: mentors.map((m) => ({
         id: m.id,
@@ -1297,7 +1412,7 @@ export class PrincipalService {
     const mentors = await this.prisma.user.findMany({
       where: {
         institutionId: principal.institutionId,
-        role: Role.FACULTY_SUPERVISOR,
+        role: { in: [Role.FACULTY_SUPERVISOR, Role.TEACHER] },
         active: true,
       },
       include: {
@@ -1384,12 +1499,12 @@ export class PrincipalService {
       throw new NotFoundException('One or more students not found');
     }
 
-    // Verify mentor belongs to institution
+    // Verify mentor belongs to institution (can be FACULTY_SUPERVISOR or TEACHER)
     const mentor = await this.prisma.user.findFirst({
       where: {
         id: assignMentorDto.mentorId,
         institutionId: principal.institutionId,
-        role: Role.FACULTY_SUPERVISOR,
+        role: { in: [Role.FACULTY_SUPERVISOR, Role.TEACHER] },
       },
     });
 
@@ -2286,6 +2401,7 @@ export class PrincipalService {
     });
 
     // Convert to sorted arrays
+    const totalUniqueCompanies = companyMap.size;
     const byCompany = Array.from(companyMap.entries())
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.count - a.count)
@@ -2300,6 +2416,7 @@ export class PrincipalService {
       ...counts,
       activeRate: total > 0 ? Math.round(((counts.approved + counts.selected + counts.joined) / total) * 100) : 0,
       completionRate: total > 0 ? Math.round((counts.completed / total) * 100) : 0,
+      totalUniqueCompanies,
       byCompany,
       byIndustry,
     };
@@ -2385,11 +2502,11 @@ export class PrincipalService {
       allAssignments,
       totalStudents,
     ] = await Promise.all([
-      // Count all faculty supervisors
+      // Count all faculty supervisors and teachers (potential mentors)
       this.prisma.user.count({
         where: {
           institutionId,
-          role: Role.FACULTY_SUPERVISOR,
+          role: { in: [Role.FACULTY_SUPERVISOR, Role.TEACHER] },
           active: true,
         },
       }),
@@ -2578,7 +2695,7 @@ export class PrincipalService {
     const mentors = await this.prisma.user.findMany({
       where: {
         institutionId,
-        role: Role.FACULTY_SUPERVISOR,
+        role: { in: [Role.FACULTY_SUPERVISOR, Role.TEACHER] },
         active: true,
       },
       select: {
@@ -3017,10 +3134,18 @@ export class PrincipalService {
           internshipStatus: 'ONGOING',
         },
       }),
-      // Students with active mentor assignments
+      // Students with active mentor assignments (only those with ongoing internships)
       this.prisma.mentorAssignment.count({
         where: {
-          student: { institutionId },
+          student: {
+            institutionId,
+            internshipApplications: {
+              some: {
+                isSelfIdentified: true,
+                internshipStatus: 'ONGOING',
+              },
+            },
+          },
           isActive: true,
         },
       }),
@@ -3111,7 +3236,11 @@ export class PrincipalService {
         }),
         this.prisma.facultyVisitLog.count({
           where: {
-            application: { student: { institutionId } },
+            application: {
+              student: { institutionId },
+              isSelfIdentified: true,
+              internshipStatus: 'ONGOING',
+            },
             visitDate: { gte: startOfMonth, lte: endOfMonth },
           },
         }),
@@ -3191,46 +3320,92 @@ export class PrincipalService {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [urgentGrievances, overdueReports, missingVisits, unassignedStudents] = await Promise.all([
-      // Urgent grievances (pending for > 7 days)
-      this.prisma.grievance.findMany({
-        where: {
-          student: { institutionId },
-          status: { in: ['PENDING', 'UNDER_REVIEW'] },
-          submittedDate: { lte: sevenDaysAgo },
+    // Define where clauses for reuse in both count and findMany
+    const urgentGrievancesWhere: Prisma.GrievanceWhereInput = {
+      student: { institutionId },
+      status: { in: [GrievanceStatus.PENDING, GrievanceStatus.UNDER_REVIEW] },
+      submittedDate: { lte: sevenDaysAgo },
+    };
+
+    const overdueReportsWhere: Prisma.StudentWhereInput = {
+      institutionId,
+      isActive: true,
+      internshipApplications: {
+        some: {
+          isSelfIdentified: true,
+          internshipStatus: 'ONGOING',
         },
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          submittedDate: true,
+      },
+      monthlyReports: {
+        none: {
+          reportMonth: currentMonth,
+          reportYear: currentYear,
+          status: { in: [MonthlyReportStatus.SUBMITTED, MonthlyReportStatus.APPROVED] },
+        },
+      },
+    };
+
+    const missingVisitsWhere: Prisma.StudentWhereInput = {
+      institutionId,
+      isActive: true,
+      internshipApplications: {
+        some: {
+          isSelfIdentified: true,
+          internshipStatus: 'ONGOING',
+          facultyVisitLogs: {
+            none: {
+              visitDate: { gte: thirtyDaysAgo },
+            },
+          },
+        },
+      },
+    };
+
+    const unassignedStudentsWhere: Prisma.StudentWhereInput = {
+      institutionId,
+      isActive: true,
+      internshipApplications: {
+        some: {
+          isSelfIdentified: true,
+          internshipStatus: 'ONGOING',
+        },
+      },
+      mentorAssignments: {
+        none: { isActive: true },
+      },
+    };
+
+    // Run counts and findMany in parallel
+    const [
+      urgentGrievancesCount,
+      overdueReportsCount,
+      missingVisitsCount,
+      unassignedStudentsCount,
+      urgentGrievances,
+      overdueReports,
+      missingVisits,
+      unassignedStudents,
+    ] = await Promise.all([
+      // Actual counts (not limited)
+      this.prisma.grievance.count({ where: urgentGrievancesWhere }),
+      now.getDate() > 5 ? this.prisma.student.count({ where: overdueReportsWhere }) : 0,
+      this.prisma.student.count({ where: missingVisitsWhere }),
+      this.prisma.student.count({ where: unassignedStudentsWhere }),
+
+      // Details (limited to 50 for display in modal tables)
+      this.prisma.grievance.findMany({
+        where: urgentGrievancesWhere,
+        include: {
           student: {
             select: { id: true, name: true, rollNumber: true },
           },
         },
         orderBy: { submittedDate: 'asc' },
-        take: 10,
+        take: 50,
       }),
 
-      // Overdue reports (current month, overdue by > 5 days)
       now.getDate() > 5 ? this.prisma.student.findMany({
-        where: {
-          institutionId,
-          isActive: true,
-          internshipApplications: {
-            some: {
-              isSelfIdentified: true,
-              internshipStatus: 'ONGOING',
-            },
-          },
-          monthlyReports: {
-            none: {
-              reportMonth: currentMonth,
-              reportYear: currentYear,
-              status: { in: ['SUBMITTED', 'APPROVED'] },
-            },
-          },
-        },
+        where: overdueReportsWhere,
         select: {
           id: true,
           name: true,
@@ -3243,26 +3418,11 @@ export class PrincipalService {
             },
           },
         },
-        take: 10,
+        take: 50,
       }) : [],
 
-      // Missing faculty visits (students with no visit in > 30 days)
       this.prisma.student.findMany({
-        where: {
-          institutionId,
-          isActive: true,
-          internshipApplications: {
-            some: {
-              isSelfIdentified: true,
-              internshipStatus: 'ONGOING',
-              facultyVisitLogs: {
-                none: {
-                  visitDate: { gte: thirtyDaysAgo },
-                },
-              },
-            },
-          },
-        },
+        where: missingVisitsWhere,
         select: {
           id: true,
           name: true,
@@ -3279,24 +3439,11 @@ export class PrincipalService {
             },
           },
         },
-        take: 10,
+        take: 50,
       }),
 
-      // Unassigned students (with internships but no mentor)
       this.prisma.student.findMany({
-        where: {
-          institutionId,
-          isActive: true,
-          internshipApplications: {
-            some: {
-              isSelfIdentified: true,
-              internshipStatus: 'ONGOING',
-            },
-          },
-          mentorAssignments: {
-            none: { isActive: true },
-          },
-        },
+        where: unassignedStudentsWhere,
         select: {
           id: true,
           name: true,
@@ -3304,17 +3451,17 @@ export class PrincipalService {
           batch: { select: { id: true, name: true } },
           branch: { select: { id: true, name: true } },
         },
-        take: 10,
+        take: 50,
       }),
     ]);
 
     return {
       summary: {
-        urgentGrievancesCount: urgentGrievances.length,
-        overdueReportsCount: overdueReports.length,
-        missingVisitsCount: missingVisits.length,
-        unassignedStudentsCount: unassignedStudents.length,
-        totalAlerts: urgentGrievances.length + overdueReports.length + missingVisits.length + unassignedStudents.length,
+        urgentGrievancesCount,
+        overdueReportsCount,
+        missingVisitsCount,
+        unassignedStudentsCount,
+        totalAlerts: urgentGrievancesCount + overdueReportsCount + missingVisitsCount + unassignedStudentsCount,
       },
       alerts: {
         urgentGrievances: urgentGrievances.map(g => ({

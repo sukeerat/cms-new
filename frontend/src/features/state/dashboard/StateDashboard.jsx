@@ -51,8 +51,8 @@ import {
   TopPerformers,
   JoiningLetterTracker,
   TopIndustriesList,
+  CriticalAlertsModal,
 } from './components';
-import { PlacementTrendChart } from '../../../components/charts';
 import stateService from '../../../services/state.service';
 import { downloadBlob } from '../../../utils/downloadUtils';
 
@@ -75,17 +75,11 @@ const getCurrentUser = () => {
   return null;
 };
 
-// Calculate compliance score for sorting (moved outside component for efficiency)
+// Get compliance score from stats (use backend-calculated score for consistency)
 const calculateComplianceScore = (stats) => {
   if (!stats) return 0;
-  const { studentsWithInternships, assigned, facultyVisits, reportsSubmitted } = stats;
-  if (studentsWithInternships === 0) return 100;
-
-  const assignmentScore = (assigned / studentsWithInternships) * 100;
-  const visitScore = facultyVisits > 0 ? Math.min((facultyVisits / studentsWithInternships) * 100, 100) : 0;
-  const reportScore = (reportsSubmitted / studentsWithInternships) * 100;
-
-  return Math.round((assignmentScore + visitScore + reportScore) / 3);
+  // Use backend-calculated complianceScore for consistency with Institution Overview
+  return stats.complianceScore ?? 0;
 };
 
 const StateDashboard = () => {
@@ -118,6 +112,8 @@ const StateDashboard = () => {
   const [userName, setUserName] = useState('Administrator');
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [alertsModalOpen, setAlertsModalOpen] = useState(false);
+  const [selectedAlertTab, setSelectedAlertTab] = useState('lowCompliance');
 
   // Derived performers from institutions as fallback (memoized)
   const topPerformers = useMemo(() => {
@@ -136,14 +132,6 @@ const StateDashboard = () => {
       .slice(0, 5);
   }, [bottomPerformersData, institutionsWithStats]);
 
-  // Prepare trend data for chart (memoized)
-  const trendData = useMemo(() => {
-    return monthlyAnalytics?.trend?.map(item => ({
-      month: item.month,
-      applications: item.applications || 0,
-      approved: item.approved || item.placements || Math.floor((item.applications || 0) * 0.6),
-    })) || [];
-  }, [monthlyAnalytics]);
 
   // Derive action items list from backend structure (memoized)
   const actionItemsList = useMemo(() => {
@@ -254,6 +242,12 @@ const StateDashboard = () => {
     [dispatch]
   );
 
+  // Handler to open alerts modal with specific tab
+  const handleOpenAlertsModal = useCallback((tab = 'lowCompliance') => {
+    setSelectedAlertTab(tab);
+    setAlertsModalOpen(true);
+  }, []);
+
   if (loading && !stats) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-background-secondary gap-4">
@@ -286,14 +280,22 @@ const StateDashboard = () => {
         <Col xs={24} lg={12}>
           <Card
             title={
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 w-full">
                 <div className="w-8 h-8 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
                   <WarningOutlined className="text-error text-lg" />
                 </div>
                 <span className="font-bold text-text-primary text-lg">Critical Alerts</span>
                 {criticalAlerts?.summary?.totalAlerts > 0 && (
-                  <Badge count={criticalAlerts.summary.totalAlerts} className="ml-auto" />
+                  <Badge count={criticalAlerts.summary.totalAlerts} />
                 )}
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => handleOpenAlertsModal('lowCompliance')}
+                  className="ml-auto text-primary font-medium"
+                >
+                  View All
+                </Button>
               </div>
             }
             className="shadow-sm border-border rounded-2xl h-full bg-surface"
@@ -303,51 +305,73 @@ const StateDashboard = () => {
             {criticalAlerts ? (
               <div className="space-y-4">
                 {criticalAlerts.alerts?.lowComplianceInstitutions?.length > 0 && (
-                  <Alert
-                    type="error"
-                    showIcon
-                    icon={<ExclamationCircleOutlined />}
-                    message={<span className="font-bold">Low Compliance Institutions ({criticalAlerts.alerts?.lowComplianceInstitutions.length})</span>}
-                    description={
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {criticalAlerts.alerts?.lowComplianceInstitutions.slice(0, 3).map((inst, idx) => (
-                          <Tag key={idx} color="red" className="m-0 px-2 py-0.5 rounded-md border-0 font-medium">
-                            {inst.institutionName} ({inst.complianceScore}%)
-                          </Tag>
-                        ))}
-                        {criticalAlerts.alerts?.lowComplianceInstitutions.length > 3 && (
-                          <Tag className="m-0 px-2 py-0.5 rounded-md border-0 bg-background-tertiary text-text-secondary">+{criticalAlerts.alerts?.lowComplianceInstitutions.length - 3} more</Tag>
-                        )}
-                      </div>
-                    }
-                    className="rounded-xl border-error/20 bg-error/5"
-                  />
+                  <div
+                    onClick={() => handleOpenAlertsModal('lowCompliance')}
+                    className="cursor-pointer transition-all hover:scale-[1.01]"
+                  >
+                    <Alert
+                      type="error"
+                      showIcon
+                      icon={<ExclamationCircleOutlined />}
+                      message={
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold">Low Compliance Institutions ({criticalAlerts.alerts?.lowComplianceInstitutions.length})</span>
+                          <Button type="link" size="small" className="text-error p-0 h-auto">View Details →</Button>
+                        </div>
+                      }
+                      description={
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {criticalAlerts.alerts?.lowComplianceInstitutions.slice(0, 3).map((inst, idx) => (
+                            <Tag key={idx} color="red" className="m-0 px-2 py-0.5 rounded-md border-0 font-medium">
+                              {inst.institutionName} ({inst.complianceScore}%)
+                            </Tag>
+                          ))}
+                          {criticalAlerts.alerts?.lowComplianceInstitutions.length > 3 && (
+                            <Tag className="m-0 px-2 py-0.5 rounded-md border-0 bg-background-tertiary text-text-secondary">+{criticalAlerts.alerts?.lowComplianceInstitutions.length - 3} more</Tag>
+                          )}
+                        </div>
+                      }
+                      className="rounded-xl border-error/20 bg-error/5"
+                    />
+                  </div>
                 )}
                 {criticalAlerts.summary?.studentsWithoutMentorsCount > 0 && (
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-warning/5 border border-warning/20">
+                  <div
+                    onClick={() => handleOpenAlertsModal('studentsWithoutMentors')}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-warning/5 border border-warning/20 cursor-pointer transition-all hover:scale-[1.01] hover:border-warning/40"
+                  >
                     <TeamOutlined className="text-warning text-lg mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                       <Text strong className="text-text-primary block">Students Without Mentors</Text>
                       <Text className="text-text-secondary text-sm">{criticalAlerts.summary?.studentsWithoutMentorsCount} students in active internships need mentors</Text>
                     </div>
+                    <Button type="link" size="small" className="text-warning p-0 h-auto shrink-0">View →</Button>
                   </div>
                 )}
                 {criticalAlerts.summary?.missingReportsCount > 0 && (
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-warning/5 border border-warning/20">
+                  <div
+                    onClick={() => handleOpenAlertsModal('missingReports')}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-warning/5 border border-warning/20 cursor-pointer transition-all hover:scale-[1.01] hover:border-warning/40"
+                  >
                     <FileTextOutlined className="text-warning text-lg mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                       <Text strong className="text-text-primary block">Missing Reports</Text>
                       <Text className="text-text-secondary text-sm">{criticalAlerts.summary?.missingReportsCount} overdue weekly/monthly reports</Text>
                     </div>
+                    <Button type="link" size="small" className="text-warning p-0 h-auto shrink-0">View →</Button>
                   </div>
                 )}
                 {criticalAlerts.summary?.visitGapsCount > 0 && (
-                  <div className="flex items-start gap-3 p-3 rounded-xl bg-info/5 border border-info/20">
+                  <div
+                    onClick={() => handleOpenAlertsModal('visitGaps')}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-info/5 border border-info/20 cursor-pointer transition-all hover:scale-[1.01] hover:border-info/40"
+                  >
                     <EyeOutlined className="text-info text-lg mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                       <Text strong className="text-text-primary block">Faculty Visit Gaps</Text>
-                      <Text className="text-text-secondary text-sm">{criticalAlerts.summary?.visitGapsCount} students haven't had a visit in 30+ days</Text>
+                      <Text className="text-text-secondary text-sm">{criticalAlerts.summary?.visitGapsCount} institutions haven't had a visit in 30+ days</Text>
                     </div>
+                    <Button type="link" size="small" className="text-info p-0 h-auto shrink-0">View →</Button>
                   </div>
                 )}
                 {!criticalAlerts.summary.totalAlerts && (
@@ -505,50 +529,10 @@ const StateDashboard = () => {
         />
       </div>
 
-      {/* Two Column Layout - Performance and Trends */}
-      <Row gutter={[24, 24]} className="mb-6">
-        {/* Performance Metrics */}
-        <Col xs={24} lg={12}>
-          <PerformanceMetrics stats={stats} />
-        </Col>
-
-        {/* Trend Chart */}
-        <Col xs={24} lg={12}>
-          <Card
-            title={
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
-                  <TeamOutlined className="text-purple-500 text-lg" />
-                </div>
-                <span className="font-bold text-text-primary text-lg">Application Trends</span>
-              </div>
-            }
-            className="shadow-sm border-border rounded-2xl h-full bg-surface"
-            loading={analyticsLoading}
-            styles={{ header: { borderBottom: '1px solid var(--color-border)', padding: '20px 24px' }, body: { padding: '24px' } }}
-          >
-            {trendData.length > 0 ? (
-              <div className="p-2">
-                <PlacementTrendChart
-                  data={trendData}
-                  height={280}
-                  showArea={true}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <div className="w-16 h-16 rounded-full bg-background-tertiary flex items-center justify-center mb-4">
-                  <TeamOutlined className="text-2xl text-text-tertiary" />
-                </div>
-                <Text className="text-text-secondary font-medium block">No trend data available</Text>
-                <Text className="text-text-tertiary text-xs">
-                  Data will appear as applications are processed
-                </Text>
-              </div>
-            )}
-          </Card>
-        </Col>
-      </Row>
+      {/* Performance Metrics */}
+      <div className="mb-6">
+        <PerformanceMetrics stats={stats} />
+      </div>
 
       {/* Top Performers and Industry Partners */}
       <Row gutter={[24, 24]} className="mb-6">
@@ -633,6 +617,14 @@ const StateDashboard = () => {
           </Row>
         </Card>
       )}
+
+      {/* Critical Alerts Modal */}
+      <CriticalAlertsModal
+        open={alertsModalOpen}
+        onClose={() => setAlertsModalOpen(false)}
+        alerts={criticalAlerts}
+        defaultTab={selectedAlertTab}
+      />
     </div>
   );
 };

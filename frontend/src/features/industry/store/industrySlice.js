@@ -300,6 +300,15 @@ const industrySlice = createSlice({
         state.postings.list = action.payload.list;
       }
     },
+    clearIndustryError: (state) => {
+      state.profile.error = null;
+      state.dashboard.error = null;
+      state.postings.error = null;
+      state.applications.error = null;
+    },
+    setIndustryProfile: (state, action) => {
+      state.profile.data = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -344,7 +353,7 @@ const industrySlice = createSlice({
       .addCase(createPosting.fulfilled, (state, action) => {
         state.postings.loading = false;
         state.postings.list = [action.payload, ...state.postings.list];
-        state.lastFetched.postings = Date.now();
+        state.lastFetched.postings = null; // Invalidate cache after mutation
       })
       .addCase(createPosting.rejected, (state, action) => {
         state.postings.loading = false;
@@ -360,7 +369,7 @@ const industrySlice = createSlice({
         if (index !== -1) {
           state.postings.list[index] = action.payload;
         }
-        state.lastFetched.postings = Date.now();
+        state.lastFetched.postings = null; // Invalidate cache after mutation
       })
       .addCase(updatePosting.rejected, (state, action) => {
         state.postings.loading = false;
@@ -373,7 +382,7 @@ const industrySlice = createSlice({
       .addCase(deletePosting.fulfilled, (state, action) => {
         state.postings.loading = false;
         state.postings.list = state.postings.list.filter(p => p.id !== action.payload.id);
-        state.lastFetched.postings = Date.now();
+        state.lastFetched.postings = null; // Invalidate cache after mutation
       })
       .addCase(deletePosting.rejected, (state, action) => {
         state.postings.loading = false;
@@ -393,6 +402,8 @@ const industrySlice = createSlice({
             _isOptimistic: false
           };
         }
+        state.lastFetched.postings = null; // Invalidate cache after mutation
+        state.lastFetched.postingsKey = null;
       })
       .addCase(togglePostingStatus.rejected, (state, action) => {
         state.postings.loading = false;
@@ -426,6 +437,7 @@ const industrySlice = createSlice({
         if (index !== -1) {
           state.applications.list[index] = action.payload;
         }
+        state.lastFetched.applications = null; // Invalidate cache after mutation
       })
       .addCase(updateApplicationStatus.rejected, (state, action) => {
         state.applications.loading = false;
@@ -441,6 +453,7 @@ const industrySlice = createSlice({
         if (index !== -1) {
           state.applications.list[index] = action.payload;
         }
+        state.lastFetched.applications = null; // Invalidate cache after mutation
       })
       .addCase(shortlistApplication.rejected, (state, action) => {
         state.applications.loading = false;
@@ -456,6 +469,7 @@ const industrySlice = createSlice({
         if (index !== -1) {
           state.applications.list[index] = action.payload;
         }
+        state.lastFetched.applications = null; // Invalidate cache after mutation
       })
       .addCase(selectApplication.rejected, (state, action) => {
         state.applications.loading = false;
@@ -471,6 +485,7 @@ const industrySlice = createSlice({
         if (index !== -1) {
           state.applications.list[index] = action.payload;
         }
+        state.lastFetched.applications = null; // Invalidate cache after mutation
       })
       .addCase(rejectApplication.rejected, (state, action) => {
         state.applications.loading = false;
@@ -514,6 +529,14 @@ export const {
   rollbackApplicationOperation,
   optimisticallyTogglePostingStatus,
   rollbackPostingStatus,
+  clearIndustryError,
+  setIndustryProfile,
 } = industrySlice.actions;
+
+// Selectors
+export const selectIndustry = (state) => state.industry;
+export const selectIndustryProfile = (state) => state.industry.profile.data;
+export const selectIndustryLoading = (state) => state.industry.profile.loading;
+export const selectIndustryError = (state) => state.industry.profile.error;
 
 export default industrySlice.reducer;

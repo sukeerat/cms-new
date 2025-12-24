@@ -95,7 +95,7 @@ const SidebarMenu = ({ sections, collapsed, onMobileClose, isMobile }) => {
         `}
       >
         {!collapsed ? (
-          <Link to="/support/technical-query" onClick={handleLinkClick}>
+          <Link to="/my-queries" onClick={handleLinkClick}>
             <Button
               type="default"
               block
@@ -116,8 +116,8 @@ const SidebarMenu = ({ sections, collapsed, onMobileClose, isMobile }) => {
           </Link>
         ) : (
           <div className="flex justify-center">
-            <Tooltip title="Report Technical Issue" placement="right">
-              <Link to="/support/technical-query" onClick={handleLinkClick}>
+            <Tooltip title="Report Issue" placement="right">
+              <Link to="/my-queries" onClick={handleLinkClick}>
                 <Button
                   type="default"
                   shape="circle"

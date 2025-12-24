@@ -38,7 +38,6 @@ import { toast } from "react-hot-toast";
 import { useDispatch, useSelector } from "react-redux";
 import {
   clearIndustryError,
-  fetchIndustryAsync,
   selectIndustry,
   selectIndustryError,
   selectIndustryLoading,
@@ -164,7 +163,7 @@ const IndustryProfile = () => {
           : "Profile created successfully!";
         toast.success(message);
 
-        navigate("/industry/dashboard");
+        navigate("/dashboard");
       }
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -236,7 +235,7 @@ const IndustryProfile = () => {
         <div className="min-h-screen flex items-center justify-center p-4 bg-background-secondary">
           <div className="text-center max-w-md">
             <Alert
-              message="Error Loading Profile"
+              title="Error Loading Profile"
               description={error}
               type="error"
               showIcon
@@ -263,7 +262,7 @@ const IndustryProfile = () => {
           {/* Stale Data Alert */}
           {isStale && (
             <Alert
-              message="Data may be outdated"
+              title="Data may be outdated"
               description="Your profile data might not reflect the latest changes. Click refresh to update."
               type="warning"
               showIcon
@@ -331,7 +330,7 @@ const IndustryProfile = () => {
                         "0%": "#60a5fa",
                         "100%": "#34d399",
                       }}
-                      trailColor="rgba(255,255,255,0.2)"
+                      railColor="rgba(255,255,255,0.2)"
                       strokeWidth={8}
                     />
                   </div>
@@ -344,7 +343,7 @@ const IndustryProfile = () => {
           <div className="mb-8 space-y-4">
             {profile?.isApproved === false && (
               <Alert
-                message="Profile Under Review"
+                title="Profile Under Review"
                 description="Your profile is currently being reviewed by the institution. You'll be notified once approved."
                 type="warning"
                 showIcon
@@ -354,7 +353,7 @@ const IndustryProfile = () => {
 
             {profile?.isApproved === true && (
               <Alert
-                message="Profile Approved"
+                title="Profile Approved"
                 description="Your company profile has been approved. You can now post internships."
                 type="success"
                 showIcon
@@ -363,7 +362,7 @@ const IndustryProfile = () => {
                   <Button
                     size="small"
                     type="primary"
-                    onClick={() => navigate("/industry/internships")}
+                    onClick={() => navigate("/postings")}
                     className="bg-success hover:bg-success-600 border-0 rounded-lg font-medium"
                   >
                     Post Internship
@@ -401,7 +400,7 @@ const IndustryProfile = () => {
                     "0%": "#3b82f6",
                     "100%": "#10b981",
                   }}
-                  trailColor="rgba(var(--color-border), 0.2)"
+                  railColor="rgba(var(--color-border), 0.2)"
                   strokeWidth={8}
                   showInfo={false}
                   className="!m-0"

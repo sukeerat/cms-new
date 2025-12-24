@@ -621,7 +621,7 @@ const CreateIndustryProfile = () => {
               action={
                 <Button
                   size="small"
-                  onClick={() => navigate("/industry/dashboard")}
+                  onClick={() => navigate("/dashboard")}
                 >
                   Go to Dashboard
                 </Button>

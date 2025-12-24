@@ -1,44 +1,477 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationService } from './notification.service';
-import { FcmService } from './fcm.service';
+import { PrismaService } from '../../core/database/prisma.service';
+import { MailService } from '../mail/mail.service';
+import { ConfigService } from '@nestjs/config';
+import { ApplicationStatus } from '@prisma/client';
 
 @Injectable()
 export class NotificationSchedulerService {
   private readonly logger = new Logger(NotificationSchedulerService.name);
+  private readonly appUrl: string;
 
   constructor(
     private notificationService: NotificationService,
-    private fcmService: FcmService,
-  ) {}
+    private prisma: PrismaService,
+    private mailService: MailService,
+    private configService: ConfigService,
+  ) {
+    this.appUrl = this.configService.get('APP_URL', 'http://localhost:3000');
+  }
 
+  // ============ FACULTY VISIT REMINDERS ============
   /**
-   * Daily reminder at 9 AM
+   * Remind faculty 7 days before visit is due
+   * Runs every day at 9 AM
    */
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
-  async sendDailyReminders(): Promise<void> {
-    this.logger.log('Sending daily reminders');
+  async sendFacultyVisitReminders(): Promise<void> {
+    this.logger.log('Checking for pending faculty visits...');
     try {
-      // Implement your daily reminder logic here
-      // Example: Send reminders to users who haven't submitted reports
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+      // Find faculty supervisors with mentor assignments
+      const facultyWithAssignments = await this.prisma.mentorAssignment.findMany({
+        where: {
+          isActive: true,
+          mentor: {
+            active: true,
+            role: 'FACULTY_SUPERVISOR',
+          },
+        },
+        include: {
+          mentor: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      // Group by mentor
+      const mentorMap = new Map<string, { mentor: { id: string; name: string; email: string }; studentCount: number }>();
+
+      for (const assignment of facultyWithAssignments) {
+        // Check if student has active internship without recent visit
+        const hasActiveInternship = await this.prisma.internshipApplication.findFirst({
+          where: {
+            studentId: assignment.studentId,
+            status: { in: [ApplicationStatus.JOINED, ApplicationStatus.SELECTED, ApplicationStatus.APPROVED] },
+            internship: {
+              endDate: { gte: new Date() },
+            },
+            facultyVisitLogs: {
+              none: {
+                visitDate: { gte: oneMonthAgo },
+              },
+            },
+          },
+        });
+
+        if (hasActiveInternship && assignment.mentor) {
+          const existing = mentorMap.get(assignment.mentorId);
+          if (existing) {
+            existing.studentCount++;
+          } else {
+            mentorMap.set(assignment.mentorId, {
+              mentor: assignment.mentor,
+              studentCount: 1,
+            });
+          }
+        }
+      }
+
+      // Send notifications to faculty
+      for (const [, data] of mentorMap) {
+        await this.notificationService.create(
+          data.mentor.id,
+          'FACULTY_VISIT_REMINDER',
+          'Pending Faculty Visits',
+          `You have ${data.studentCount} student(s) pending faculty visits. Please schedule visits soon.`,
+          { studentCount: data.studentCount },
+        );
+
+        await this.mailService.queueMail({
+          to: data.mentor.email,
+          subject: 'Reminder: Pending Faculty Visits',
+          template: 'faculty-visit-reminder',
+          context: {
+            name: data.mentor.name,
+            studentCount: data.studentCount,
+            dashboardUrl: `${this.appUrl}/faculty/visits`,
+          },
+        });
+      }
+
+      this.logger.log(`Faculty visit reminders sent to ${mentorMap.size} faculty members`);
     } catch (error) {
-      this.logger.error('Failed to send daily reminders', error.stack);
+      this.logger.error('Failed to send faculty visit reminders', error.stack);
+    }
+  }
+
+  // ============ STUDENT MONTHLY REPORT REMINDERS ============
+  /**
+   * Weekly reminder on Mondays for pending monthly reports
+   * Runs every Monday at 9 AM
+   */
+  @Cron('0 9 * * 1') // Monday 9 AM
+  async sendMonthlyReportReminder(): Promise<void> {
+    this.logger.log('Sending weekly monthly report reminders...');
+    try {
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      // Find students with active internships
+      const studentsWithActiveInternships = await this.prisma.internshipApplication.findMany({
+        where: {
+          status: { in: [ApplicationStatus.JOINED, ApplicationStatus.SELECTED, ApplicationStatus.APPROVED] },
+          internship: {
+            endDate: { gte: new Date() },
+          },
+        },
+        include: {
+          student: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  active: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      for (const app of studentsWithActiveInternships) {
+        if (!app.student?.user?.active) continue;
+
+        // Check if report already submitted
+        const existingReport = await this.prisma.monthlyReport.findFirst({
+          where: {
+            studentId: app.studentId,
+            reportMonth: currentMonth,
+            reportYear: currentYear,
+            status: { in: ['SUBMITTED', 'APPROVED'] },
+          },
+        });
+
+        if (!existingReport) {
+          const userId = app.student.user.id;
+          const userEmail = app.student.user.email || app.student.email;
+          const userName = app.student.user.name || app.student.name;
+
+          await this.notificationService.create(
+            userId,
+            'MONTHLY_REPORT_REMINDER',
+            'Monthly Report Reminder',
+            `Please submit your monthly internship report for ${this.getMonthName(currentMonth)} ${currentYear}.`,
+            { month: currentMonth, year: currentYear },
+          );
+
+          if (userEmail) {
+            await this.mailService.queueMail({
+              to: userEmail,
+              subject: 'Reminder: Submit Your Monthly Internship Report',
+              template: 'monthly-report-reminder',
+              context: {
+                name: userName,
+                month: this.getMonthName(currentMonth),
+                year: currentYear,
+                reportUrl: `${this.appUrl}/student/reports`,
+              },
+            });
+          }
+        }
+      }
+
+      this.logger.log('Monthly report reminders sent successfully');
+    } catch (error) {
+      this.logger.error('Failed to send monthly report reminders', error.stack);
     }
   }
 
   /**
-   * Weekly summary every Monday at 10 AM
+   * Final reminder on 25th of each month for pending reports
+   * Runs on 25th of every month at 9 AM
    */
-  @Cron(CronExpression.MONDAY_TO_FRIDAY_AT_10AM)
-  async sendWeeklySummary(): Promise<void> {
-    this.logger.log('Sending weekly summary');
+  @Cron('0 9 25 * *') // 25th at 9 AM
+  async sendMonthlyReportFinalReminder(): Promise<void> {
+    this.logger.log('Sending final monthly report reminders...');
     try {
-      // Implement your weekly summary logic here
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      // Find students with active internships
+      const studentsWithActiveInternships = await this.prisma.internshipApplication.findMany({
+        where: {
+          status: { in: [ApplicationStatus.JOINED, ApplicationStatus.SELECTED, ApplicationStatus.APPROVED] },
+          internship: {
+            endDate: { gte: new Date() },
+          },
+        },
+        include: {
+          student: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  active: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      for (const app of studentsWithActiveInternships) {
+        if (!app.student?.user?.active) continue;
+
+        // Check if report already submitted
+        const existingReport = await this.prisma.monthlyReport.findFirst({
+          where: {
+            studentId: app.studentId,
+            reportMonth: currentMonth,
+            reportYear: currentYear,
+            status: { in: ['SUBMITTED', 'APPROVED'] },
+          },
+        });
+
+        if (!existingReport) {
+          const userId = app.student.user.id;
+          const userEmail = app.student.user.email || app.student.email;
+          const userName = app.student.user.name || app.student.name;
+
+          await this.notificationService.create(
+            userId,
+            'MONTHLY_REPORT_URGENT',
+            'URGENT: Monthly Report Due Soon!',
+            `Your monthly report for ${this.getMonthName(currentMonth)} ${currentYear} is due by end of month. Submit now!`,
+            { month: currentMonth, year: currentYear, urgent: true },
+          );
+
+          if (userEmail) {
+            await this.mailService.queueMail({
+              to: userEmail,
+              subject: 'URGENT: Monthly Report Deadline Approaching!',
+              template: 'monthly-report-urgent',
+              context: {
+                name: userName,
+                month: this.getMonthName(currentMonth),
+                year: currentYear,
+                daysLeft: 30 - 25,
+                reportUrl: `${this.appUrl}/student/reports`,
+              },
+            });
+          }
+        }
+      }
+
+      this.logger.log('Urgent report reminders sent successfully');
+    } catch (error) {
+      this.logger.error('Failed to send urgent report reminders', error.stack);
+    }
+  }
+
+  // ============ INTERNSHIP DEADLINE REMINDERS ============
+  /**
+   * Send internship deadline reminders 3 days before
+   * Runs every day at 8 AM
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  async sendInternshipDeadlineReminders(): Promise<void> {
+    this.logger.log('Checking for internship deadlines...');
+    try {
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Find internships with deadline in next 3 days
+      const upcomingDeadlines = await this.prisma.internship.findMany({
+        where: {
+          status: 'ACTIVE',
+          applicationDeadline: {
+            gte: today,
+            lte: threeDaysFromNow,
+          },
+        },
+        include: {
+          industry: {
+            select: { companyName: true },
+          },
+        },
+      });
+
+      for (const internship of upcomingDeadlines) {
+        // Find students who haven't applied and are eligible
+        const eligibleStudents = await this.prisma.student.findMany({
+          where: {
+            isActive: true,
+            branchName: { in: internship.eligibleBranches },
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                active: true,
+              },
+            },
+            internshipApplications: {
+              where: {
+                internshipId: internship.id,
+              },
+              select: { id: true },
+            },
+          },
+        });
+
+        const daysUntilDeadline = Math.ceil(
+          (internship.applicationDeadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        for (const student of eligibleStudents) {
+          // Skip if already applied
+          if (student.internshipApplications.length > 0) continue;
+          if (!student.user?.active) continue;
+
+          const userId = student.user.id;
+          const userEmail = student.user.email || student.email;
+          const userName = student.user.name || student.name;
+
+          await this.notificationService.create(
+            userId,
+            'INTERNSHIP_DEADLINE',
+            `Internship Deadline: ${daysUntilDeadline} days left!`,
+            `Application deadline for "${internship.title}" at ${internship.industry?.companyName || 'Company'} is approaching!`,
+            { internshipId: internship.id, daysLeft: daysUntilDeadline },
+          );
+
+          if (userEmail) {
+            await this.mailService.queueMail({
+              to: userEmail,
+              subject: `Internship Deadline Alert: ${internship.title}`,
+              template: 'internship-deadline',
+              context: {
+                name: userName,
+                internshipTitle: internship.title,
+                companyName: internship.industry?.companyName || 'Company',
+                daysLeft: daysUntilDeadline,
+                deadline: internship.applicationDeadline.toLocaleDateString(),
+                applyUrl: `${this.appUrl}/student/internships/${internship.id}`,
+              },
+            });
+          }
+        }
+
+        this.logger.log(`Deadline reminders sent for internship: ${internship.title}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to send internship deadline reminders', error.stack);
+    }
+  }
+
+  // ============ WEEKLY SUMMARY ============
+  /**
+   * Weekly summary every Monday at 10 AM (in-app only)
+   */
+  @Cron('0 10 * * 1') // Monday 10 AM
+  async sendWeeklySummary(): Promise<void> {
+    this.logger.log('Generating weekly summary...');
+    try {
+      const lastWeek = new Date();
+      lastWeek.setDate(lastWeek.getDate() - 7);
+
+      // Get stats for the week
+      const [totalApplications, totalReports, newPlacements] = await Promise.all([
+        this.prisma.internshipApplication.count({
+          where: { createdAt: { gte: lastWeek } },
+        }),
+        this.prisma.monthlyReport.count({
+          where: { submittedAt: { gte: lastWeek } },
+        }),
+        this.prisma.internshipApplication.count({
+          where: {
+            status: { in: [ApplicationStatus.JOINED, ApplicationStatus.SELECTED] },
+            updatedAt: { gte: lastWeek },
+          },
+        }),
+      ]);
+
+      // Send to principals
+      const principals = await this.prisma.user.findMany({
+        where: { role: 'PRINCIPAL', active: true },
+        select: { id: true, institutionId: true },
+      });
+
+      for (const principal of principals) {
+        // Get institution-specific stats
+        const instApplications = await this.prisma.internshipApplication.count({
+          where: {
+            createdAt: { gte: lastWeek },
+            student: { institutionId: principal.institutionId },
+          },
+        });
+
+        const instReports = await this.prisma.monthlyReport.count({
+          where: {
+            submittedAt: { gte: lastWeek },
+            student: { institutionId: principal.institutionId },
+          },
+        });
+
+        await this.notificationService.create(
+          principal.id,
+          'WEEKLY_SUMMARY',
+          'Weekly Institution Summary',
+          `This week: ${instApplications} new applications, ${instReports} reports submitted.`,
+          {
+            newApplications: instApplications,
+            submittedReports: instReports,
+            weekEnding: new Date().toISOString(),
+          },
+        );
+      }
+
+      // Send state-level summary to STATE_DIRECTORATE users
+      const stateUsers = await this.prisma.user.findMany({
+        where: { role: 'STATE_DIRECTORATE', active: true },
+        select: { id: true },
+      });
+
+      for (const user of stateUsers) {
+        await this.notificationService.create(
+          user.id,
+          'WEEKLY_SUMMARY',
+          'State-Level Weekly Summary',
+          `This week across all institutions: ${totalApplications} applications, ${totalReports} reports, ${newPlacements} new placements.`,
+          {
+            totalApplications,
+            totalReports,
+            newPlacements,
+            weekEnding: new Date().toISOString(),
+          },
+        );
+      }
+
+      this.logger.log('Weekly summaries sent successfully');
     } catch (error) {
       this.logger.error('Failed to send weekly summary', error.stack);
     }
   }
 
+  // ============ UTILITY METHODS ============
   /**
    * Schedule a notification for a specific user
    */
@@ -55,19 +488,11 @@ export class NotificationSchedulerService {
 
       if (delay > 0) {
         setTimeout(async () => {
-          await this.notificationService.create(
-            userId,
-            type,
-            title,
-            body,
-            data,
-          );
+          await this.notificationService.create(userId, type, title, body, data);
           this.logger.log(`Scheduled notification sent to user ${userId}`);
         }, delay);
 
-        this.logger.log(
-          `Notification scheduled for user ${userId} at ${scheduledAt}`,
-        );
+        this.logger.log(`Notification scheduled for user ${userId} at ${scheduledAt}`);
       } else {
         this.logger.warn('Scheduled time is in the past, sending immediately');
         await this.notificationService.create(userId, type, title, body, data);
@@ -99,5 +524,16 @@ export class NotificationSchedulerService {
       this.logger.error('Failed to send bulk notifications', error.stack);
       throw error;
     }
+  }
+
+  /**
+   * Get month name from month number
+   */
+  private getMonthName(month: number): string {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1] || 'Unknown';
   }
 }

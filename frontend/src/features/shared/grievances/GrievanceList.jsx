@@ -581,7 +581,7 @@ const GrievanceList = () => {
             </Space>
           }
           placement="right"
-          width={720}
+          size="large"
           open={detailDrawerVisible}
           onClose={() => {
             setDetailDrawerVisible(false);
@@ -883,7 +883,6 @@ const GrievanceList = () => {
             setSelectedGrievance(null);
           }}
           footer={null}
-          width={600}
         >
           {selectedGrievance && (
             <>

@@ -5,6 +5,9 @@ import { tokenStorage } from '../../../utils/tokenManager';
 const extractToken = (resp) => resp?.access_token || resp?.accessToken || resp?.token || null;
 const extractRefreshToken = (resp) => resp?.refresh_token || resp?.refreshToken || null;
 
+// Cache duration constant
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Initial state
 const initialState = {
   user: null,
@@ -12,6 +15,9 @@ const initialState = {
   isAuthenticated: false,
   loading: false,
   error: null,
+  lastFetched: {
+    user: null,
+  },
 };
 
 // Async thunks
@@ -64,8 +70,16 @@ export const refreshToken = createAsyncThunk(
 
 export const getCurrentUser = createAsyncThunk(
   'auth/getCurrentUser',
-  async (_, { rejectWithValue }) => {
+  async (params, { getState, rejectWithValue }) => {
     try {
+      const state = getState();
+      const lastFetched = state.auth.lastFetched.user;
+
+      // Check cache unless forced refresh
+      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+        return { cached: true };
+      }
+
       const response = await authService.getProfile();
       return response;
     } catch (error) {
@@ -74,17 +88,8 @@ export const getCurrentUser = createAsyncThunk(
   }
 );
 
-export const fetchProfile = createAsyncThunk(
-  'auth/fetchProfile',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await authService.getProfile();
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch profile');
-    }
-  }
-);
+// Alias for backward compatibility - uses same thunk to avoid duplicate API calls
+export const fetchProfile = getCurrentUser;
 
 // Auth slice
 const authSlice = createSlice({
@@ -96,6 +101,7 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       state.error = null;
+      state.lastFetched.user = null; // Clear cache on logout
       // Clear all tokens via centralized manager
       tokenStorage.clear();
     },
@@ -144,28 +150,19 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
       })
-      // Get Current User
+      // Get Current User (also handles fetchProfile as it's an alias)
       .addCase(getCurrentUser.pending, (state) => {
         state.loading = true;
       })
       .addCase(getCurrentUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.user || action.payload;
-        state.isAuthenticated = true;
+        if (!action.payload?.cached) {
+          state.user = action.payload.user || action.payload;
+          state.isAuthenticated = true;
+          state.lastFetched.user = Date.now();
+        }
       })
       .addCase(getCurrentUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-      // Fetch Profile
-      .addCase(fetchProfile.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(fetchProfile.fulfilled, (state, action) => {
-        state.loading = false;
-        state.user = action.payload.user || action.payload;
-      })
-      .addCase(fetchProfile.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

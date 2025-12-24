@@ -28,36 +28,9 @@ function ChangePassword() {
   const { token } = theme.useToken();
   const styles = useThemeStyles();
 
-  // Navigate based on role after password change
-  const navigateByRole = (loginResp) => {
-    let resp = loginResp;
-    if (typeof resp === "string") {
-      try {
-        resp = JSON.parse(resp);
-      } catch (e) {
-        resp = {};
-      }
-    }
-
-    const roleRaw =
-      resp?.user?.role ||
-      resp?.role ||
-      (Array.isArray(resp?.roles) && resp.roles[0]) ||
-      (Array.isArray(resp?.user?.roles) && resp.user.roles[0]);
-
-    const role = (roleRaw || "").toString().toUpperCase();
-
-    if (role === "TEACHER" || role === "FACULTY_SUPERVISOR") {
-      navigate("/faculty/supervision");
-    } else if (role === "PRINCIPAL") {
-      navigate("/principal/analytics");
-    } else if (role === "STUDENT") {
-      navigate("/internships/dashboard");
-    } else if (role === "STATE_DIRECTORATE") {
-      navigate("/state/dashboard");
-    } else {
-      navigate("/main");
-    }
+  // Navigate to dashboard after password change - DashboardRouter handles role-based routing
+  const navigateByRole = () => {
+    navigate("/dashboard");
   };
 
   const onFinish = async (values) => {
@@ -82,8 +55,8 @@ function ChangePassword() {
         // Navigate to appropriate dashboard
         navigateByRole(parsedResponse);
       } else {
-        // Fallback to main page
-        navigate("/main");
+        // Fallback to dashboard
+        navigate("/dashboard");
       }
     } catch (error) {
       console.error("Password change error:", error);
@@ -144,7 +117,7 @@ function ChangePassword() {
         {/* Form Card */}
         <Card className="rounded-xl shadow-soft-lg border border-border bg-surface">
           <Alert
-            message={<span className="font-semibold">Security Notice</span>}
+            title={<span className="font-semibold">Security Notice</span>}
             description="You are using a default password. Please create a strong, unique password to secure your account."
             type="warning"
             showIcon

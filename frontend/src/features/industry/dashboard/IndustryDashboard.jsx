@@ -112,7 +112,7 @@ const IndustryDashboard = () => {
           {/* Stale data indicator */}
           {isStale && (
             <Alert
-              message="Data update required"
+              title="Data update required"
               description="Your dashboard data might be outdated. Click refresh to sync."
               type="warning"
               showIcon
@@ -139,7 +139,7 @@ const IndustryDashboard = () => {
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
-                  onClick={() => navigate("/industry/post-internship")}
+                  onClick={() => navigate("/postings")}
                   key="post"
                   className="h-10 rounded-xl font-bold bg-primary border-0 shadow-lg shadow-primary/20"
                 >
@@ -191,7 +191,7 @@ const IndustryDashboard = () => {
                   </div>
                 }
                 extra={
-                  <Link to="/industry/internships?tab=applicants">
+                  <Link to="/applications">
                     <Button
                       type="text"
                       icon={<EyeOutlined />}
@@ -279,7 +279,7 @@ const IndustryDashboard = () => {
                   </div>
                 }
                 extra={
-                  <Link to="/industry/internships?tab=manage">
+                  <Link to="/postings">
                     <Button
                       type="text"
                       icon={<SettingOutlined />}
@@ -323,7 +323,7 @@ const IndustryDashboard = () => {
                                 percent={Math.min(Math.round((item.applications / item.positions) * 100), 100)}
                                 size="small"
                                 strokeColor={token.colorSuccess}
-                                trailColor="rgba(var(--color-border), 0.1)"
+                                railColor="rgba(var(--color-border), 0.1)"
                                 showInfo={false}
                                 className="!m-0"
                               />
@@ -343,7 +343,7 @@ const IndustryDashboard = () => {
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
-                      onClick={() => navigate("/industry/post-internship")}
+                      onClick={() => navigate("/postings")}
                       className="rounded-xl font-bold bg-primary border-0"
                     >
                       Post First Internship

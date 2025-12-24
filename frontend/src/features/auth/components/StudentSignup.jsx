@@ -48,7 +48,7 @@ const StudentSignup = () => {
       const { confirmPassword, ...signupData } = values;
       const res = await API.post("/auth/student-signup", signupData);
       toast.success("Account created successfully! Please login with your roll number.");
-      navigate("/student/login");
+      navigate("/student-login");
     } catch (err) {
       toast.error(
         err?.response?.data?.message || "Signup failed. Please try again."
@@ -266,7 +266,7 @@ const StudentSignup = () => {
             <p className="text-text-secondary text-sm">
               Ready to get started?{" "}
               <Link
-                to="/student/login"
+                to="/student-login"
                 className="text-primary hover:text-primary-600 font-bold no-underline"
               >
                 Login with Roll Number

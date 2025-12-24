@@ -37,13 +37,10 @@ import StudentLogin from '../../features/auth/components/StudentLogin';
 // State
 import StateDashboard from '../../features/state/dashboard/StateDashboard';
 import InstitutionList from '../../features/state/institutions/InstitutionList';
-import InstitutionForm from '../../features/state/institutions/InstitutionForm';
 import InstitutionBulkUpload from '../../features/state/institutions/BulkUpload';
 import { InstitutionOverview } from '../../features/state/overview';
 import PrincipalList from '../../features/state/principals/PrincipalList';
-import PrincipalForm from '../../features/state/principals/PrincipalForm';
 import StateStaffList from '../../features/state/staff/StaffList';
-import StateStaffForm from '../../features/state/staff/StaffForm';
 import ReportBuilder from '../../features/state/reports/ReportBuilder';
 import ReportBuilderDashboard from '../../features/state/reports/ReportBuilderDashboard';
 import AuditLogs from '../../features/state/audit/AuditLogs';
@@ -62,10 +59,8 @@ import { HelpCenter, MyQueries, SupportDashboard } from '../../features/help-sup
 // Principal
 import PrincipalDashboard from '../../features/principal/dashboard/PrincipalDashboard';
 import StudentList from '../../features/principal/students/StudentList';
-import StudentForm from '../../features/principal/students/StudentForm';
 import StudentProgress from '../../features/principal/students/StudentProgress';
 import StaffList from '../../features/principal/staff/StaffList';
-import StaffForm from '../../features/principal/staff/StaffForm';
 import MentorAssignment from '../../features/principal/mentors/MentorAssignment';
 import BulkUpload from '../../features/principal/bulk/BulkUpload';
 import Analytics from '../../features/principal/analytics/Analytics';
@@ -73,11 +68,12 @@ import FacultyReports from '../../features/principal/reports/FacultyReports';
 import FacultyProgress from '../../features/principal/faculty/FacultyProgress';
 import Grievances from '../../features/principal/grievances/Grievances';
 import SelfIdentifiedInternships from '../../features/principal/internships/SelfIdentifiedInternships';
+import BulkSelfInternshipUpload from '../../features/principal/bulk/BulkSelfInternshipUpload';
+import BulkJobHistory from '../../features/common/bulk/BulkJobHistory';
 
 // Faculty
 import FacultyDashboard from '../../features/faculty/dashboard/FacultyDashboard';
 import VisitLogList from '../../features/faculty/visits/VisitLogList';
-import VisitLogForm from '../../features/faculty/visits/VisitLogForm';
 import AssignedStudentsList from '../../features/faculty/students/AssignedStudentsList';
 import SelfIdentifiedApproval from '../../features/faculty/approvals/SelfIdentifiedApproval';
 import MonthlyReportsPage from '../../features/faculty/reports/MonthlyReportsPage';
@@ -87,7 +83,6 @@ import FacultyGrievances from '../../features/faculty/grievances/FacultyGrievanc
 // Student
 import StudentDashboard from '../../features/student/dashboard/StudentDashboard';
 import StudentProfile from '../../features/student/profile/StudentProfile';
-import StudentProfileEdit from '../../features/student/profile/StudentProfileEdit';
 import MonthlyReportForm from '../../features/student/reports/MonthlyReportForm';
 import StudentReportSubmit from '../../features/student/reports/StudentReportSubmit';
 import InternshipList from '../../features/student/internships/InternshipList';
@@ -98,6 +93,7 @@ import MyApplications from '../../features/student/applications/MyApplications';
 import IndustryDashboard from '../../features/industry/dashboard/IndustryDashboard';
 import InternshipPostingList from '../../features/industry/postings/InternshipPostingList';
 import ApplicationsList from '../../features/industry/applications/ApplicationsList';
+import IndustryProfile from '../../features/industry/profile/IndustryProfile';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -177,22 +173,6 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="institutions/new"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
-              <InstitutionForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="institutions/:id/edit"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
-              <InstitutionForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="institutions-overview"
           element={
             <ProtectedRoute allowedRoles={[ROLES.STATE]}>
@@ -213,22 +193,6 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={[ROLES.STATE]}>
               <PrincipalList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="principals/new"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
-              <PrincipalForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="principals/:id/edit"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
-              <PrincipalForm />
             </ProtectedRoute>
           }
         />
@@ -281,22 +245,6 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="state-staff/new"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
-              <StateStaffForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="state-staff/:id/edit"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.STATE]}>
-              <StateStaffForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="users/bulk-create"
           element={
             <ProtectedRoute allowedRoles={[ROLES.STATE]}>
@@ -323,58 +271,10 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="students/new"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <StudentForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="students/:id/edit"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <StudentForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="students/:id"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <StudentForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="staff"
           element={
             <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
               <StaffList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="staff/new"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <StaffForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="staff/:id/edit"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <StaffForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="staff/:id"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <StaffForm />
             </ProtectedRoute>
           }
         />
@@ -389,7 +289,7 @@ const AppRoutes = () => {
         <Route
           path="bulk-upload"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
+            <ProtectedRoute allowedRoles={[ROLES.STATE, ROLES.PRINCIPAL]}>
               <BulkUpload />
             </ProtectedRoute>
           }
@@ -434,6 +334,22 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="bulk/self-internships"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STATE, ROLES.PRINCIPAL]}>
+              <BulkSelfInternshipUpload />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="bulk/job-history"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STATE, ROLES.PRINCIPAL]}>
+              <BulkJobHistory />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Faculty Routes */}
         <Route
@@ -441,22 +357,6 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={ROLES.FACULTY}>
               <VisitLogList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="visit-logs/new"
-          element={
-            <ProtectedRoute allowedRoles={ROLES.FACULTY}>
-              <VisitLogForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="visit-logs/:id/edit"
-          element={
-            <ProtectedRoute allowedRoles={ROLES.FACULTY}>
-              <VisitLogForm />
             </ProtectedRoute>
           }
         />
@@ -507,14 +407,6 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
               <StudentProfile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="profile/edit"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
-              <StudentProfileEdit />
             </ProtectedRoute>
           }
         />
@@ -589,6 +481,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={ROLES.INDUSTRY}>
               <ApplicationsList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="company/profile"
+          element={
+            <ProtectedRoute allowedRoles={ROLES.INDUSTRY}>
+              <IndustryProfile />
             </ProtectedRoute>
           }
         />

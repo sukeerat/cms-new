@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
 import { LruCacheService } from '../../core/cache/lru-cache.service';
-import { Prisma, ApplicationStatus, InternshipStatus, Role } from '@prisma/client';
+import { Prisma, ApplicationStatus, InternshipStatus, Role, MonthlyReportStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 // Import domain services for business logic reuse
@@ -396,19 +396,21 @@ export class StateService {
     const [
       studentCounts,
       internshipCounts,
+      approvedInternshipCounts,
+      joiningLetterCounts,
       assignmentCounts,
       visitCounts,
       reportCounts,
       facultyCounts,
     ] = await Promise.all([
-      // 1. Total students per institution
+      // 1. Total students per institution (no isActive filter - matches getInstitutionOverview)
       this.prisma.student.groupBy({
         by: ['institutionId'],
-        where: { institutionId: { in: institutionIds }, isActive: true },
+        where: { institutionId: { in: institutionIds } },
         _count: true,
       }),
 
-      // 2. Students with active self-identified internships per institution
+      // 2. Students with active self-identified internships per institution (ONGOING)
       this.prisma.internshipApplication.groupBy({
         by: ['studentId'],
         where: {
@@ -434,31 +436,63 @@ export class StateService {
         return instCounts;
       }),
 
-      // 3. Active mentor assignments per institution
-      this.prisma.mentorAssignment.groupBy({
-        by: ['studentId'],
+      // 3. Self-identified approved internships per institution (count applications, not unique students - matches getInstitutionOverview)
+      this.prisma.internshipApplication.findMany({
         where: {
           student: { institutionId: { in: institutionIds } },
-          isActive: true,
+          isSelfIdentified: true,
+          status: ApplicationStatus.APPROVED,
         },
-        _count: true,
-      }).then(async (results) => {
-        const studentIds = results.map(r => r.studentId);
-        if (studentIds.length === 0) return new Map<string, number>();
-
-        const students = await this.prisma.student.findMany({
-          where: { id: { in: studentIds } },
-          select: { id: true, institutionId: true },
-        });
-
+        select: {
+          student: { select: { institutionId: true } },
+        },
+      }).then((results) => {
         const instCounts = new Map<string, number>();
-        for (const student of students) {
-          instCounts.set(student.institutionId, (instCounts.get(student.institutionId) || 0) + 1);
+        for (const app of results) {
+          const instId = app.student.institutionId;
+          instCounts.set(instId, (instCounts.get(instId) || 0) + 1);
         }
         return instCounts;
       }),
 
-      // 4. Faculty visits this month per institution
+      // 4. Joining letters submitted per institution (count applications, not unique students - matches getInstitutionOverview)
+      this.prisma.internshipApplication.findMany({
+        where: {
+          student: { institutionId: { in: institutionIds } },
+          isSelfIdentified: true,
+          joiningLetterUrl: { not: null },
+        },
+        select: {
+          student: { select: { institutionId: true } },
+        },
+      }).then((results) => {
+        const instCounts = new Map<string, number>();
+        for (const app of results) {
+          const instId = app.student.institutionId;
+          instCounts.set(instId, (instCounts.get(instId) || 0) + 1);
+        }
+        return instCounts;
+      }),
+
+      // 5. Active mentor assignments per institution (count assignments - matches getInstitutionOverview)
+      this.prisma.mentorAssignment.findMany({
+        where: {
+          student: { institutionId: { in: institutionIds } },
+          isActive: true,
+        },
+        select: {
+          student: { select: { institutionId: true } },
+        },
+      }).then((results) => {
+        const instCounts = new Map<string, number>();
+        for (const assignment of results) {
+          const instId = assignment.student.institutionId;
+          instCounts.set(instId, (instCounts.get(instId) || 0) + 1);
+        }
+        return instCounts;
+      }),
+
+      // 6. Faculty visits this month per institution
       this.prisma.facultyVisitLog.findMany({
         where: {
           visitDate: { gte: startOfMonth, lte: endOfMonth },
@@ -476,33 +510,27 @@ export class StateService {
         return instCounts;
       }),
 
-      // 5. Monthly reports submitted this month per institution
-      this.prisma.monthlyReport.groupBy({
-        by: ['studentId'],
+      // 7. Monthly reports submitted this month per institution (count reports, not unique students - matches getInstitutionOverview)
+      this.prisma.monthlyReport.findMany({
         where: {
           student: { institutionId: { in: institutionIds } },
           reportMonth: currentMonth,
           reportYear: currentYear,
           status: { in: ['SUBMITTED', 'APPROVED'] },
         },
-        _count: true,
-      }).then(async (results) => {
-        const studentIds = results.map(r => r.studentId);
-        if (studentIds.length === 0) return new Map<string, number>();
-
-        const students = await this.prisma.student.findMany({
-          where: { id: { in: studentIds } },
-          select: { id: true, institutionId: true },
-        });
-
+        select: {
+          student: { select: { institutionId: true } },
+        },
+      }).then((results) => {
         const instCounts = new Map<string, number>();
-        for (const student of students) {
-          instCounts.set(student.institutionId, (instCounts.get(student.institutionId) || 0) + 1);
+        for (const report of results) {
+          const instId = report.student.institutionId;
+          instCounts.set(instId, (instCounts.get(instId) || 0) + 1);
         }
         return instCounts;
       }),
 
-      // 6. Total faculty per institution
+      // 8. Total faculty per institution
       this.prisma.user.groupBy({
         by: ['institutionId'],
         where: {
@@ -522,6 +550,8 @@ export class StateService {
     const institutionsWithStats = institutions.map((inst) => {
       const totalStudents = studentCountMap.get(inst.id) || 0;
       const studentsWithInternships = internshipCounts.get(inst.id) || 0;
+      const selfIdentifiedApproved = approvedInternshipCounts.get(inst.id) || 0;
+      const joiningLettersSubmitted = joiningLetterCounts.get(inst.id) || 0;
       const activeAssignments = assignmentCounts.get(inst.id) || 0;
       const facultyVisitsThisMonth = visitCounts.get(inst.id) || 0;
       const reportsSubmittedThisMonth = reportCounts.get(inst.id) || 0;
@@ -533,17 +563,26 @@ export class StateService {
       // Calculate missing reports (students with internships who haven't submitted)
       const missingReports = Math.max(0, studentsWithInternships - reportsSubmittedThisMonth);
 
+      // Calculate compliance score (same formula as getInstitutionOverview)
+      const mentorAssignmentRate = totalStudents > 0 ? (activeAssignments / totalStudents) * 100 : 0;
+      const joiningLetterRate = selfIdentifiedApproved > 0 ? (joiningLettersSubmitted / selfIdentifiedApproved) * 100 : 0;
+      const monthlyReportRate = selfIdentifiedApproved > 0 ? (reportsSubmittedThisMonth / selfIdentifiedApproved) * 100 : 0;
+      const complianceScore = Math.round((mentorAssignmentRate + joiningLetterRate + monthlyReportRate) / 3);
+
       return {
         ...inst,
         stats: {
           totalStudents,
           studentsWithInternships,
+          selfIdentifiedApproved,
+          joiningLettersSubmitted,
           assigned: activeAssignments,
           unassigned: unassignedStudents,
           facultyVisits: facultyVisitsThisMonth,
           reportsSubmitted: reportsSubmittedThisMonth,
           reportsMissing: missingReports,
           totalFaculty,
+          complianceScore,
         },
       };
     });
@@ -2816,7 +2855,7 @@ export class StateService {
 
   /**
    * Get top performing institutions
-   * Uses domain service for institution performance
+   * Uses same compliance formula as getInstitutionsWithStats for consistency
    */
   async getTopPerformers(params: { limit?: number; month?: number; year?: number }) {
     const { limit = 5, month, year } = params;
@@ -2825,95 +2864,98 @@ export class StateService {
     const now = new Date();
     const currentMonth = month ?? now.getMonth() + 1;
     const currentYear = year ?? now.getFullYear();
-    const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
-    const endOfMonth = new Date(currentYear, currentMonth, 0);
 
-    // Use domain service for base performance data
-    const institutionPerformance = await this.stateReportService.getInstitutionPerformance();
+    // Get all institutions
+    const institutions = await this.prisma.institution.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, code: true, city: true },
+    });
 
-    // Get comprehensive stats for each institution
+    // Get comprehensive stats for each institution using SAME queries as getInstitutionsWithStats
     const performanceWithStats = await Promise.all(
-      institutionPerformance.slice(0, limit * 2).map(async (inst: any) => {
-        const dateFilter: any = {};
-        if (month && year) {
-          dateFilter.createdAt = { gte: startOfMonth, lte: endOfMonth };
-        }
-
-        // Get comprehensive stats for the institution
+      institutions.map(async (inst) => {
         const [
           totalStudents,
           studentsWithInternships,
+          selfIdentifiedApproved,
+          joiningLettersSubmitted,
           activeAssignments,
-          facultyVisitsThisMonth,
           reportsSubmittedThisMonth,
         ] = await Promise.all([
+          // Total students (no isActive filter - matches getInstitutionsWithStats)
           this.prisma.student.count({
-            where: { institutionId: inst.institutionId, isActive: true },
+            where: { institutionId: inst.id },
           }),
+          // Students with ongoing self-identified internships
           this.prisma.internshipApplication.count({
             where: {
-              student: { institutionId: inst.institutionId },
+              student: { institutionId: inst.id },
               isSelfIdentified: true,
               internshipStatus: 'ONGOING',
             },
           }),
+          // Approved self-identified applications (count applications, not unique students)
+          this.prisma.internshipApplication.findMany({
+            where: {
+              student: { institutionId: inst.id },
+              isSelfIdentified: true,
+              status: ApplicationStatus.APPROVED,
+            },
+            select: { id: true },
+          }).then(results => results.length),
+          // Joining letters submitted (count applications with joiningLetterUrl)
+          this.prisma.internshipApplication.findMany({
+            where: {
+              student: { institutionId: inst.id },
+              isSelfIdentified: true,
+              joiningLetterUrl: { not: null },
+            },
+            select: { id: true },
+          }).then(results => results.length),
+          // Active mentor assignments
           this.prisma.mentorAssignment.count({
             where: {
-              student: { institutionId: inst.institutionId },
+              student: { institutionId: inst.id },
               isActive: true,
             },
           }),
-          this.prisma.facultyVisitLog.count({
+          // Reports submitted this month
+          this.prisma.monthlyReport.findMany({
             where: {
-              application: { student: { institutionId: inst.institutionId } },
-              visitDate: { gte: startOfMonth, lte: endOfMonth },
-            },
-          }),
-          this.prisma.monthlyReport.count({
-            where: {
-              student: { institutionId: inst.institutionId },
+              student: { institutionId: inst.id },
               reportMonth: currentMonth,
               reportYear: currentYear,
-              status: { in: ['SUBMITTED', 'APPROVED'] },
+              status: { in: [MonthlyReportStatus.SUBMITTED, MonthlyReportStatus.APPROVED] },
             },
-          }),
+            select: { id: true },
+          }).then(results => results.length),
         ]);
 
-        const unassigned = Math.max(0, studentsWithInternships - activeAssignments);
-        const reportsMissing = Math.max(0, studentsWithInternships - reportsSubmittedThisMonth);
+        const unassigned = Math.max(0, totalStudents - activeAssignments);
 
-        // Calculate compliance score
-        let score = 100;
-        if (studentsWithInternships > 0) {
-          const assignmentScore = (activeAssignments / studentsWithInternships) * 100;
-          const visitScore = facultyVisitsThisMonth > 0
-            ? Math.min((facultyVisitsThisMonth / studentsWithInternships) * 100, 100)
-            : 0;
-          const reportScore = (reportsSubmittedThisMonth / studentsWithInternships) * 100;
-          score = Math.round((assignmentScore + visitScore + reportScore) / 3);
-        }
+        // Calculate compliance score - SAME formula as getInstitutionsWithStats
+        const mentorAssignmentRate = totalStudents > 0 ? (activeAssignments / totalStudents) * 100 : 0;
+        const joiningLetterRate = selfIdentifiedApproved > 0 ? (joiningLettersSubmitted / selfIdentifiedApproved) * 100 : 0;
+        const monthlyReportRate = selfIdentifiedApproved > 0 ? (reportsSubmittedThisMonth / selfIdentifiedApproved) * 100 : 0;
+        const complianceScore = Math.round((mentorAssignmentRate + joiningLetterRate + monthlyReportRate) / 3);
 
         return {
-          id: inst.institutionId,
-          name: inst.institutionName,
+          id: inst.id,
+          name: inst.name,
+          code: inst.code,
           city: inst.city,
-          // Stats object for frontend compatibility
           stats: {
             totalStudents,
             studentsWithInternships,
+            selfIdentifiedApproved,
+            joiningLettersSubmitted,
             assigned: activeAssignments,
             unassigned,
-            facultyVisits: facultyVisitsThisMonth,
             reportsSubmitted: reportsSubmittedThisMonth,
-            reportsMissing,
+            complianceScore,
           },
-          // Direct score for sorting and display
-          score,
-          // Keep these for backwards compatibility
-          placementRate: score,
-          approvalRate: score,
-          studentsCount: totalStudents,
-          internshipsCount: studentsWithInternships,
+          score: complianceScore,
+          placementRate: complianceScore,
         };
       }),
     );
@@ -2927,26 +2969,94 @@ export class StateService {
   }
 
   /**
-   * Get top industry partners
-   * Uses domain service for industry statistics
+   * Get top self-identified companies (partners)
+   * Aggregates company data from self-identified internship applications
    */
   async getTopIndustries(params: { limit?: number }) {
     const { limit = 10 } = params;
 
-    // Use domain service for top industries
-    const topIndustries = await this.stateReportService.getTopIndustries(limit);
+    // Get all approved self-identified applications with company info
+    const applications = await this.prisma.internshipApplication.findMany({
+      where: {
+        isSelfIdentified: true,
+        status: ApplicationStatus.APPROVED,
+        companyName: { not: null },
+      },
+      select: {
+        companyName: true,
+        companyAddress: true,
+        companyEmail: true,
+        jobProfile: true,
+        stipend: true,
+        student: {
+          select: {
+            institutionId: true,
+            Institution: { select: { name: true } },
+          },
+        },
+      },
+    });
 
-    // Transform to expected format
+    // Aggregate by company name (normalize to lowercase for grouping)
+    const companyMap = new Map<string, {
+      name: string;
+      address: string | null;
+      email: string | null;
+      internsCount: number;
+      institutions: Set<string>;
+      jobProfiles: Set<string>;
+      avgStipend: number;
+      totalStipend: number;
+    }>();
+
+    for (const app of applications) {
+      const companyKey = app.companyName?.toLowerCase().trim() || '';
+      if (!companyKey) continue;
+
+      if (!companyMap.has(companyKey)) {
+        companyMap.set(companyKey, {
+          name: app.companyName || '',
+          address: app.companyAddress,
+          email: app.companyEmail,
+          internsCount: 0,
+          institutions: new Set(),
+          jobProfiles: new Set(),
+          avgStipend: 0,
+          totalStipend: 0,
+        });
+      }
+
+      const company = companyMap.get(companyKey)!;
+      company.internsCount++;
+      if (app.student?.Institution?.name) {
+        company.institutions.add(app.student.Institution.name);
+      }
+      if (app.jobProfile) {
+        company.jobProfiles.add(app.jobProfile);
+      }
+      if (app.stipend) {
+        company.totalStipend += Number(app.stipend);
+      }
+    }
+
+    // Convert to array and calculate averages
+    const companies = Array.from(companyMap.values())
+      .map(company => ({
+        id: company.name.toLowerCase().replace(/\s+/g, '-'),
+        name: company.name,
+        address: company.address,
+        email: company.email,
+        internsHired: company.internsCount,
+        institutionsCount: company.institutions.size,
+        jobProfiles: Array.from(company.jobProfiles).slice(0, 3),
+        avgStipend: company.internsCount > 0 ? Math.round(company.totalStipend / company.internsCount) : 0,
+      }))
+      .sort((a, b) => b.internsHired - a.internsHired)
+      .slice(0, limit);
+
     return {
-      data: topIndustries.map((ind: any) => ({
-        id: ind.industryId,
-        name: ind.industryName,
-        internsHired: ind.acceptedApplications,
-        activePostings: ind.activePostings,
-        totalInternships: ind.totalPostings,
-        rating: ind.acceptanceRate > 50 ? Math.min(5, 3 + (ind.acceptanceRate / 25)) : null,
-      })),
-      total: topIndustries.length,
+      data: companies,
+      total: companyMap.size,
     };
   }
 
@@ -3474,29 +3584,18 @@ export class StateService {
           }),
         ]);
 
-        // Calculate low compliance institutions
+        // Calculate low compliance institutions (using pre-calculated complianceScore)
         const lowCompliance = institutionsWithStats.data
           .filter((inst: any) => {
-            const { stats } = inst;
-            if (stats.studentsWithInternships === 0) return false;
-
-            const mentorCoverage = (stats.assigned / stats.studentsWithInternships) * 100;
-            const visitScore = stats.facultyVisits > 0
-              ? Math.min((stats.facultyVisits / stats.studentsWithInternships) * 100, 100)
-              : 0;
-            const reportScore = (stats.reportsSubmitted / stats.studentsWithInternships) * 100;
-            const overallCompliance = (mentorCoverage + visitScore + reportScore) / 3;
-            return overallCompliance < 50;
+            // Only include institutions with students and compliance score < 50%
+            return inst.stats.totalStudents > 0 && inst.stats.complianceScore < 50;
           })
           .map((inst: any) => ({
             institutionId: inst.id,
             institutionName: inst.name,
             institutionCode: inst.code,
             city: inst.city,
-            complianceScore: Math.round(
-              ((inst.stats.assigned / inst.stats.studentsWithInternships) * 100 +
-                (inst.stats.facultyVisits > 0 ? Math.min((inst.stats.facultyVisits / inst.stats.studentsWithInternships) * 100, 100) : 0) +
-                (inst.stats.reportsSubmitted / inst.stats.studentsWithInternships) * 100) / 3),
+            complianceScore: inst.stats.complianceScore,
           }));
 
         // Calculate visit gaps efficiently - get last visit per institution in batch
@@ -3556,6 +3655,7 @@ export class StateService {
               studentId: s.id,
               studentName: s.name,
               rollNumber: s.rollNumber,
+              institutionId: s.Institution?.id,
               institutionName: s.Institution?.name,
               institutionCode: s.Institution?.code,
               daysSinceInternshipStarted: s.internshipApplications[0]
@@ -3566,6 +3666,7 @@ export class StateService {
               studentId: s.id,
               studentName: s.name,
               rollNumber: s.rollNumber,
+              institutionId: s.Institution?.id,
               institutionName: s.Institution?.name,
               institutionCode: s.Institution?.code,
               daysOverdue: now.getDate() - 5,

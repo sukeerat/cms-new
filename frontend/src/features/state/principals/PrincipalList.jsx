@@ -1,21 +1,21 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, Table, Button, Tag, Space, Modal, message, Input, Avatar, Dropdown, App } from 'antd';
+import { Card, Table, Button, Tag, Space, message, Input, Avatar, Dropdown, App } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UserOutlined, ReloadOutlined, MoreOutlined, KeyOutlined } from '@ant-design/icons';
 import { fetchPrincipals, deletePrincipal, resetPrincipalPassword } from '../store/stateSlice';
+import PrincipalModal from './PrincipalModal';
 
 const PrincipalList = () => {
   const { modal } = App.useApp();
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
   const { list: principals, loading, pagination } = useSelector((state) => state.state.principals);
   const [searchText, setSearchText] = useState('');
   const [tableParams, setTableParams] = useState({
     page: 1,
     limit: 10,
   });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingPrincipalId, setEditingPrincipalId] = useState(null);
 
   const loadPrincipals = useCallback((params = {}) => {
     dispatch(fetchPrincipals({
@@ -26,15 +26,22 @@ const PrincipalList = () => {
   }, [dispatch, tableParams.page, tableParams.limit]);
 
   useEffect(() => {
-    // Check if we're returning from an edit/create with a state flag
-    if (location.state?.refresh) {
-      loadPrincipals({ forceRefresh: true });
-      // Clear the state to prevent unnecessary refreshes
-      window.history.replaceState({}, document.title);
-    } else {
-      loadPrincipals();
-    }
+    loadPrincipals();
   }, []);
+
+  const handleOpenModal = (principalId = null) => {
+    setEditingPrincipalId(principalId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingPrincipalId(null);
+  };
+
+  const handleModalSuccess = () => {
+    loadPrincipals({ forceRefresh: true });
+  };
 
   const handleDelete = (id, name) => {
     modal.confirm({
@@ -171,7 +178,7 @@ const PrincipalList = () => {
         const handleMenuClick = ({ key }) => {
           switch (key) {
             case 'edit':
-              navigate(`/principals/${record.id}/edit`);
+              handleOpenModal(record.id);
               break;
             case 'reset-password':
               handleResetPassword(record.id, record.name, record.email);
@@ -237,7 +244,7 @@ const PrincipalList = () => {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate('/principals/new')}
+              onClick={() => handleOpenModal()}
             >
               Add Principal
             </Button>
@@ -273,6 +280,13 @@ const PrincipalList = () => {
           }}
         />
       </Card>
+
+      <PrincipalModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        principalId={editingPrincipalId}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };

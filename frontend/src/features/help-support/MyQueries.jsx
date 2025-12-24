@@ -378,7 +378,7 @@ const MyQueries = () => {
               </div>
             ) : 'Ticket Details'
           }
-          width={600}
+          size="default"
           open={drawerVisible}
           onClose={() => {
             setDrawerVisible(false);
@@ -512,7 +512,6 @@ const MyQueries = () => {
             ticketForm.resetFields();
           }}
           footer={null}
-          width={600}
           className="rounded-2xl overflow-hidden"
         >
           <Form

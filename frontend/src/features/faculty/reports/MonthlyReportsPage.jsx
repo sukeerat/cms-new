@@ -521,7 +521,7 @@ const MonthlyReportsPage = () => {
           </div>
         }
         placement="right"
-        width={600}
+        size="default"
         onClose={() => {
           setDetailDrawer(false);
           setSelectedReport(null);

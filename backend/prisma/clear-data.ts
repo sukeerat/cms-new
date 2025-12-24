@@ -102,9 +102,6 @@ async function clearAllData() {
     console.log('📋 Clearing notification settings...');
     await prisma.notificationSettings.deleteMany({});
     
-    console.log('📋 Clearing FCM tokens...');
-    await prisma.fCMToken.deleteMany({});
-    
     // =============================================
     // LEVEL 6: Reports & Logs
     // =============================================

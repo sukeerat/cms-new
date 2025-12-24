@@ -118,12 +118,12 @@ const StudentDashboard = () => {
 
   // Navigate to applications
   const handleNavigateToApplications = useCallback(() => {
-    navigate('/applications');
+    navigate('/my-applications');
   }, [navigate]);
 
   // Navigate to reports
   const handleNavigateToReports = useCallback(() => {
-    navigate('/reports');
+    navigate('/reports/submit');
   }, [navigate]);
 
   // Navigate to grievances

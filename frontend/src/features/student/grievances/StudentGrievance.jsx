@@ -432,7 +432,7 @@ export default function StudentGrievance() {
             type="info"
             className="mt-3"
             showIcon
-            message={`If not resolved, this grievance can be escalated to ${ESCALATION_LEVELS[nextLevel]?.label || nextLevel}`}
+            title={`If not resolved, this grievance can be escalated to ${ESCALATION_LEVELS[nextLevel]?.label || nextLevel}`}
           />
         )}
         {!canEscalate && (
@@ -440,7 +440,7 @@ export default function StudentGrievance() {
             type="warning"
             className="mt-3"
             showIcon
-            message="This grievance is at the highest escalation level"
+            title="This grievance is at the highest escalation level"
           />
         )}
       </Card>
@@ -520,7 +520,7 @@ export default function StudentGrievance() {
 
         {/* Info Alert */}
         <Alert
-          message="Grievance Support"
+          title="Grievance Support"
           description={
             <div>
               <p>Submit any concerns or issues you face during your internship. Your grievance will be:</p>
@@ -812,7 +812,7 @@ export default function StudentGrievance() {
             <div className="space-y-4">
               {/* Status Banner */}
               <Alert
-                message={
+                title={
                   <span className="font-semibold">
                     Status: {selectedGrievance.status?.replace(/_/g, " ")}
                   </span>

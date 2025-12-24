@@ -267,7 +267,7 @@ const GenerateReportDrawer = ({
             {/* Grouping */}
             {getGroupableColumns().length > 0 && (
               <Card size="small" className="mb-4">
-                <Space className="w-full" direction="vertical">
+                <Space className="w-full" orientation="vertical">
                   <Text strong>
                     <GroupOutlined className="mr-2" />
                     Group By
@@ -292,7 +292,7 @@ const GenerateReportDrawer = ({
             {/* Sorting */}
             {getSortableColumns().length > 0 && (
               <Card size="small" className="mb-4">
-                <Space className="w-full" direction="vertical">
+                <Space className="w-full" orientation="vertical">
                   <Text strong>
                     <SortAscendingOutlined className="mr-2" />
                     Sort By
@@ -411,7 +411,7 @@ const GenerateReportDrawer = ({
         </Space>
       }
       placement="right"
-      width={700}
+      size="large"
       open={visible}
       onClose={onClose}
       extra={

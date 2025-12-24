@@ -97,7 +97,7 @@ const Layouts = () => {
           closable
           onClose={() => setMobileOpen(false)}
           open={mobileOpen}
-          styles={{ wrapper: { width: 280 } }}
+          width={280}
           classNames={{
             body: 'p-0 bg-surface flex flex-col',
             header: 'bg-surface border-b border-border px-4 py-3',

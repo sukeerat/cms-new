@@ -29,7 +29,12 @@ import { getFacultyVisitStatus } from "../../../utils/visitUtils";
 
 const { Text } = Typography;
 
-const StudentsList = ({
+// Constant styles outside component
+const SELF_IDENTIFIED_STYLE = { borderLeftColor: "#722ed1" };
+const REGULAR_INTERNSHIP_STYLE = { borderLeftColor: "#1890ff" };
+const TRUNCATE_STYLE = { maxWidth: "120px" };
+
+const StudentsList = React.memo(({
   students,
   onLogVisit,
   onLogVisitForApplication,
@@ -109,9 +114,7 @@ const StudentsList = ({
                 <Card
                   key={app.id || index}
                   className="rounded border-l-4"
-                  style={{
-                    borderLeftColor: isSelfIdentified ? "#722ed1" : "#1890ff",
-                  }}
+                  style={isSelfIdentified ? SELF_IDENTIFIED_STYLE : REGULAR_INTERNSHIP_STYLE}
                 >
                   {/* Self-Identified Badge */}
                   {isSelfIdentified && (
@@ -245,7 +248,7 @@ const StudentsList = ({
                     {/* Show internship title for context */}
                     <div
                       className="text-xs text-text-tertiary truncate"
-                      style={{ maxWidth: "120px" }}
+                      style={TRUNCATE_STYLE}
                     >
                       {app.internship?.title || app.companyName || "N/A"}
                     </div>
@@ -467,6 +470,8 @@ const StudentsList = ({
       )}
     </div>
   );
-};
+});
+
+StudentsList.displayName = 'StudentsList';
 
 export default StudentsList;

@@ -344,7 +344,7 @@ const JoiningLetterPanel = () => {
               title={<span className="text-xs">Total Uploaded</span>}
               value={stats?.summary?.uploaded || 0}
               suffix={<span className="text-sm text-gray-500">/ {stats?.summary?.total || 0}</span>}
-              valueStyle={{ fontSize: '24px', color: '#1890ff' }}
+              styles={{ content: { fontSize: '24px', color: '#1890ff' } }}
             />
           </Card>
         </Col>
@@ -354,7 +354,7 @@ const JoiningLetterPanel = () => {
               title={<span className="text-xs">Pending Review</span>}
               value={stats?.summary?.pendingReview || 0}
               prefix={<ClockCircleOutlined />}
-              valueStyle={{ fontSize: '24px', color: '#faad14' }}
+              styles={{ content: { fontSize: '24px', color: '#faad14' } }}
             />
           </Card>
         </Col>
@@ -364,7 +364,7 @@ const JoiningLetterPanel = () => {
               title={<span className="text-xs">Verified</span>}
               value={stats?.summary?.verified || 0}
               prefix={<CheckCircleOutlined />}
-              valueStyle={{ fontSize: '24px', color: '#52c41a' }}
+              styles={{ content: { fontSize: '24px', color: '#52c41a' } }}
             />
           </Card>
         </Col>
@@ -374,7 +374,7 @@ const JoiningLetterPanel = () => {
               title={<span className="text-xs">Rejected</span>}
               value={stats?.summary?.rejected || 0}
               prefix={<CloseCircleOutlined />}
-              valueStyle={{ fontSize: '24px', color: '#ff4d4f' }}
+              styles={{ content: { fontSize: '24px', color: '#ff4d4f' } }}
             />
           </Card>
         </Col>

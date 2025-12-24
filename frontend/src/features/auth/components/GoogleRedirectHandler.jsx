@@ -27,8 +27,8 @@ const GoogleRedirectHandler = () => {
       localStorage.setItem("token", token);
       localStorage.setItem("loginResponse", JSON.stringify(loginResponse));
 
-      // Redirect to main dashboard
-      navigate("/main");
+      // Redirect to dashboard
+      navigate("/dashboard");
     } else {
       console.error("❌ Missing login parameters, redirecting to /login");
       navigate("/login");

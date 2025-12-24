@@ -14,24 +14,16 @@ import {
 
 const { Text, Title } = Typography;
 
-// Calculate compliance score from stats
+// Get compliance score from stats (use backend-calculated score for consistency)
 const calculateComplianceScore = (item) => {
   // If item already has a score or placementRate, use that
   if (item.score !== undefined) return item.score;
   if (item.placementRate !== undefined) return item.placementRate;
 
-  // Calculate from stats if available
+  // Use backend-calculated complianceScore for consistency with Institution Overview
   const stats = item.stats;
   if (!stats) return 0;
-
-  const { studentsWithInternships, assigned, facultyVisits, reportsSubmitted } = stats;
-  if (studentsWithInternships === 0) return 100;
-
-  const assignmentScore = (assigned / studentsWithInternships) * 100;
-  const visitScore = facultyVisits > 0 ? Math.min((facultyVisits / studentsWithInternships) * 100, 100) : 0;
-  const reportScore = (reportsSubmitted / studentsWithInternships) * 100;
-
-  return Math.round((assignmentScore + visitScore + reportScore) / 3);
+  return stats.complianceScore ?? 0;
 };
 
 const PerformerItem = ({ item, rank, type }) => {

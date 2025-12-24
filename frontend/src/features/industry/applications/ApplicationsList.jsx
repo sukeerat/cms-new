@@ -320,7 +320,7 @@ const ApplicationsList = () => {
       <Drawer
         title={<span className="text-text-primary font-semibold">Application Details</span>}
         placement="right"
-        width={600}
+        size="default"
         onClose={() => {
           setDetailDrawer(false);
           setSelectedApp(null);
@@ -416,7 +416,7 @@ const ApplicationsList = () => {
             {selectedApp.status === 'REJECTED' && selectedApp.rejectionReason && (
               <div>
                 <Divider plain className="!text-error uppercase text-[10px] tracking-widest font-bold">Rejection Reason</Divider>
-                <Alert message={selectedApp.rejectionReason} type="error" className="rounded-xl border-error/20" />
+                <Alert title={selectedApp.rejectionReason} type="error" className="rounded-xl border-error/20" />
               </div>
             )}
 

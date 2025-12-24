@@ -144,16 +144,30 @@ const StudentProgress = () => {
         setMentors(response.mentors);
       }
 
-      const studentList = response?.students || [];
-      const statusCounts = {
-        total: response?.pagination?.total || studentList.length,
-        inProgress: studentList.filter(s => s.internshipStatus === 'In Progress').length,
-        completed: studentList.filter(s => s.internshipStatus === 'Completed').length,
-        delayed: studentList.filter(s => s.internshipStatus === 'Delayed').length,
-        notStarted: studentList.filter(s => s.internshipStatus === 'Not Started').length,
-        pending: studentList.filter(s => s.internshipStatus === 'Pending').length,
-      };
-      setStats(statusCounts);
+      // Use statusCounts from backend if available (accurate counts across all data)
+      // Fall back to calculating from current page if not available
+      if (response?.statusCounts) {
+        setStats({
+          total: response.statusCounts.total,
+          inProgress: response.statusCounts.inProgress,
+          completed: response.statusCounts.completed,
+          delayed: response.statusCounts.delayed,
+          notStarted: response.statusCounts.notStarted,
+          pending: response.statusCounts.pending || 0,
+        });
+      } else {
+        // Legacy fallback - calculate from current page only
+        const studentList = response?.students || [];
+        const statusCounts = {
+          total: response?.pagination?.total || studentList.length,
+          inProgress: studentList.filter(s => s.internshipStatus === 'In Progress').length,
+          completed: studentList.filter(s => s.internshipStatus === 'Completed').length,
+          delayed: studentList.filter(s => s.internshipStatus === 'Delayed').length,
+          notStarted: studentList.filter(s => s.internshipStatus === 'Not Started').length,
+          pending: studentList.filter(s => s.internshipStatus === 'Pending').length,
+        };
+        setStats(statusCounts);
+      }
     } catch (error) {
       console.error('Failed to fetch student progress:', error);
       toast.error('Failed to load student progress');
@@ -552,7 +566,7 @@ const StudentProgress = () => {
           Uploaded
         </Tag>
       );
-    } else if (application.status === 'ACCEPTED' || application.status === 'JOINED') {
+    } else if (application.status === 'APPROVED' || application.status === 'JOINED') {
       return (
         <Tag icon={<WarningOutlined />} color="warning" className="rounded-full px-3">
           Pending Upload
@@ -905,7 +919,7 @@ const StudentProgress = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Active Interns</Text>}
                 value={summary.totalStudentsWithInternships}
                 prefix={<UserOutlined className="text-primary" />}
-                valueStyle={{ color: 'var(--ant-primary-color)', fontWeight: 'bold' }}
+                styles={{ content: { color: 'var(--ant-primary-color)', fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -915,7 +929,7 @@ const StudentProgress = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Expected Reports</Text>}
                 value={summary.totalExpectedReports}
                 prefix={<FileTextOutlined className="text-text-tertiary" />}
-                valueStyle={{ color: 'var(--ant-text-color-secondary)', fontWeight: 'bold' }}
+                styles={{ content: { color: 'var(--ant-text-color-secondary)', fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -925,7 +939,7 @@ const StudentProgress = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Submitted</Text>}
                 value={summary.totalSubmitted}
                 prefix={<CheckCircleOutlined className="text-success" />}
-                valueStyle={{ color: 'var(--ant-success-color)', fontWeight: 'bold' }}
+                styles={{ content: { color: 'var(--ant-success-color)', fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -935,7 +949,7 @@ const StudentProgress = () => {
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Pending/Missing</Text>}
                 value={summary.totalPending}
                 prefix={<WarningOutlined className="text-error" />}
-                valueStyle={{ color: summary.totalPending > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontWeight: 'bold' }}
+                styles={{ content: { color: summary.totalPending > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontWeight: 'bold' } }}
               />
             </Card>
           </Col>
@@ -943,7 +957,7 @@ const StudentProgress = () => {
 
         {summary.totalPending > 0 && (
           <Alert
-            message={`${summary.totalPending} report(s) pending or missing across ${summary.monthsWithPending} month(s)`}
+            title={`${summary.totalPending} report(s) pending or missing across ${summary.monthsWithPending} month(s)`}
             type="warning"
             showIcon
             icon={<WarningOutlined />}
@@ -1057,7 +1071,7 @@ const StudentProgress = () => {
                   title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Students</Text>}
                   value={stats.total}
                   prefix={<UserOutlined className="text-primary" />}
-                  valueStyle={{ color: 'var(--ant-primary-color)', fontWeight: 'bold' }}
+                  styles={{ content: { color: 'var(--ant-primary-color)', fontWeight: 'bold' } }}
                 />
               </Card>
             </Col>
@@ -1067,7 +1081,7 @@ const StudentProgress = () => {
                   title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">In Progress</Text>}
                   value={stats.inProgress}
                   prefix={<SyncOutlined className="text-primary" />}
-                  valueStyle={{ color: 'var(--ant-primary-color)', fontWeight: 'bold' }}
+                  styles={{ content: { color: 'var(--ant-primary-color)', fontWeight: 'bold' } }}
                 />
               </Card>
             </Col>
@@ -1077,7 +1091,7 @@ const StudentProgress = () => {
                   title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Completed</Text>}
                   value={stats.completed}
                   prefix={<CheckCircleOutlined className="text-success" />}
-                  valueStyle={{ color: 'var(--ant-success-color)', fontWeight: 'bold' }}
+                  styles={{ content: { color: 'var(--ant-success-color)', fontWeight: 'bold' } }}
                 />
               </Card>
             </Col>
@@ -1087,7 +1101,7 @@ const StudentProgress = () => {
                   title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Delayed</Text>}
                   value={stats.delayed}
                   prefix={<ClockCircleOutlined className="text-error" />}
-                  valueStyle={{ color: stats.delayed > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontWeight: 'bold' }}
+                  styles={{ content: { color: stats.delayed > 0 ? 'var(--ant-error-color)' : 'var(--ant-success-color)', fontWeight: 'bold' } }}
                 />
               </Card>
             </Col>

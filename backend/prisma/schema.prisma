@@ -49,8 +49,7 @@ model User {
   approvedReferrals   ReferralApplication[]   @relation("ReferralApprover")
   rejectedReferrals   ReferralApplication[]   @relation("ReferralRejector")
 
-  // Add these FCM relations
-  fcmTokens            FCMToken[]
+  // Notification relations
   notificationSettings NotificationSettings?
   Notification         Notification[]
 
@@ -315,21 +314,6 @@ enum FeeStatus {
   PARTIAL
   PENDING
   WAIVED
-}
-
-model FCMToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  token     String   @unique
-  userId    String   @db.ObjectId
-  deviceId  String? // Optional device identifier
-  platform  String? // iOS, Android, Web
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("fcm_tokens")
 }
 
 model Notification {
@@ -924,12 +908,14 @@ model MentorAssignment {
   updatedAt DateTime @updatedAt
   userId    String?  @db.ObjectId
 
-  @@unique([studentId, isActive]) // Only one active mentor per student
+  // Note: Uniqueness of active assignment per student is enforced in application code
+  // (by deactivating existing assignments before creating new ones)
   // Performance Indexes
   @@index([studentId])
   @@index([mentorId])
   @@index([isActive])
   @@index([mentorId, isActive])
+  @@index([studentId, isActive]) // For fast lookup of active assignment
   @@map("mentor_assignments")
 }
 
@@ -2309,6 +2295,81 @@ model FAQArticle {
   @@index([viewCount])
   @@index([category, isPublished])
   @@map("faq_articles")
+}
+
+// =============================================
+// BULK JOB TRACKING SYSTEM
+// =============================================
+
+// Track all bulk operations for history and reporting
+model BulkJob {
+  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Job identification
+  jobId     String        @unique // BullMQ job ID
+  type      BulkJobType
+  status    BulkJobStatus @default(QUEUED)
+
+  // File information
+  fileName      String
+  fileSize      Int
+  originalName  String?
+
+  // Progress tracking
+  totalRows     Int       @default(0)
+  processedRows Int       @default(0)
+  successCount  Int       @default(0)
+  failedCount   Int       @default(0)
+  progress      Int       @default(0) // 0-100 percentage
+
+  // Results (stored as JSON for flexibility)
+  errorReport   Json?     // Array of failed rows with reasons
+  successReport Json?     // Array of created records summary
+  warnings      Json?     // Array of warnings
+
+  // Timing
+  queuedAt      DateTime  @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+  processingTime Int?     // In milliseconds
+
+  // Error handling
+  errorMessage  String?   // Overall error message if job failed
+  retryCount    Int       @default(0)
+  maxRetries    Int       @default(3)
+
+  // Context
+  institutionId String    @db.ObjectId
+  createdById   String    @db.ObjectId
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Performance Indexes
+  @@index([institutionId])
+  @@index([createdById])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([institutionId, status])
+  @@index([institutionId, type])
+  @@index([createdById, status])
+  @@map("bulk_jobs")
+}
+
+enum BulkJobType {
+  STUDENTS
+  USERS
+  INSTITUTIONS
+  SELF_INTERNSHIPS
+}
+
+enum BulkJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 // =============================================

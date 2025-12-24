@@ -6,6 +6,7 @@ import AppRoutes from './app/routes/AppRoutes';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import SEO from './components/SEO';
 import { Toaster } from 'react-hot-toast';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const AppContent = React.memo(() => {
   const { darkMode } = useTheme();
@@ -16,22 +17,24 @@ const AppContent = React.memo(() => {
   return (
     <ConfigProvider theme={currentTheme}>
       <AntApp>
-        <SEO />
-        <div className="min-h-screen bg-background-secondary text-text-primary">
-          <AppRoutes />
-          <PWAInstallPrompt />
-          <Toaster 
-            position="top-right"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: 'rgb(var(--color-background))',
-                color: 'rgb(var(--color-text-primary))',
-                border: '1px solid rgb(var(--color-border))',
-              },
-            }}
-          />
-        </div>
+        <ErrorBoundary>
+          <SEO />
+          <div className="min-h-screen bg-background-secondary text-text-primary">
+            <AppRoutes />
+            <PWAInstallPrompt />
+            <Toaster 
+              position="top-right"
+              toastOptions={{
+                duration: 3000,
+                style: {
+                  background: 'rgb(var(--color-background))',
+                  color: 'rgb(var(--color-text-primary))',
+                  border: '1px solid rgb(var(--color-border))',
+                },
+              }}
+            />
+          </div>
+        </ErrorBoundary>
       </AntApp>
     </ConfigProvider>
   );

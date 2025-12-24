@@ -237,7 +237,7 @@ const ReportStatusMonitor = ({
           icon={<CheckCircleOutlined />}
           title="Report Generated Successfully!"
           subTitle={
-            <Space direction="vertical" className="mt-2">
+            <Space orientation="vertical" className="mt-2">
               <Text>
                 Your report is ready with{" "}
                 <Text strong>{status.totalRecords?.toLocaleString() || 0}</Text>{" "}

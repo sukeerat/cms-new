@@ -8,7 +8,7 @@ class ErrorBoundary extends Component {
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -17,7 +17,16 @@ class ErrorBoundary extends Component {
       error,
       errorInfo,
     });
+
+    // Log to error reporting service if available
+    if (window.errorLogger) {
+      window.errorLogger.logError(error, errorInfo);
+    }
   }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null });
+  };
 
   handleReset = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
@@ -31,9 +40,12 @@ class ErrorBoundary extends Component {
           <Result
             status="error"
             title="Something went wrong"
-            subTitle="We're sorry for the inconvenience. Please try refreshing the page."
+            subTitle={this.state.error?.message || "We're sorry for the inconvenience. Please try again."}
             extra={[
-              <Button type="primary" key="home" onClick={this.handleReset}>
+              <Button type="primary" key="retry" onClick={this.handleRetry}>
+                Try Again
+              </Button>,
+              <Button key="home" onClick={this.handleReset}>
                 Go Home
               </Button>,
               <Button key="reload" onClick={() => window.location.reload()}>

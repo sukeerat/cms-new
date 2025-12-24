@@ -25,7 +25,12 @@ import PropTypes from 'prop-types';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const QuickVisitModal = ({ visible, onClose, onSubmit, students, loading }) => {
+// Constant styles outside component
+const UPLOAD_BUTTON_STYLE = { marginTop: 8 };
+const SPACE_COMPACT_STYLE = { width: '100%' };
+const IMG_WINDOW_STYLE = { width: '100%' };
+
+const QuickVisitModal = React.memo(({ visible, onClose, onSubmit, students, loading }) => {
   const [form] = Form.useForm();
   const [visitType, setVisitType] = useState(null);
   const [capturing, setCapturing] = useState(false);
@@ -186,7 +191,7 @@ const QuickVisitModal = ({ visible, onClose, onSubmit, students, loading }) => {
   const uploadButton = (
     <div>
       <PlusOutlined />
-      <div style={{ marginTop: 8 }}>Upload Photo</div>
+      <div style={UPLOAD_BUTTON_STYLE}>Upload Photo</div>
     </div>
   );
 
@@ -270,7 +275,7 @@ const QuickVisitModal = ({ visible, onClose, onSubmit, students, loading }) => {
               },
             ]}
           >
-            <Space.Compact style={{ width: '100%' }}>
+            <Space.Compact style={SPACE_COMPACT_STYLE}>
               <Input
                 placeholder="Enter location or use GPS"
                 size="large"
@@ -292,7 +297,7 @@ const QuickVisitModal = ({ visible, onClose, onSubmit, students, loading }) => {
         {/* Show location info if captured */}
         {location && (
           <Alert
-            message="GPS Location Captured"
+            title="GPS Location Captured"
             description={
               <div className="text-xs">
                 <div>Latitude: {location.latitude.toFixed(6)}</div>
@@ -341,7 +346,7 @@ const QuickVisitModal = ({ visible, onClose, onSubmit, students, loading }) => {
 
         {/* Quick tip */}
         <Alert
-          message="Quick Tip"
+          title="Quick Tip"
           description="This form is designed for rapid visit logging during field visits. All fields are optimized for speed - log a visit in under 10 seconds!"
           type="info"
           showIcon
@@ -350,7 +355,9 @@ const QuickVisitModal = ({ visible, onClose, onSubmit, students, loading }) => {
       </Form>
     </Modal>
   );
-};
+});
+
+QuickVisitModal.displayName = 'QuickVisitModal';
 
 QuickVisitModal.propTypes = {
   visible: PropTypes.bool.isRequired,

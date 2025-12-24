@@ -1,15 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, Table, Button, Tag, Space, Modal, message, Input, Avatar, Dropdown, App, Select, Row, Col } from 'antd';
+import { Card, Table, Button, Tag, Space, message, Input, Avatar, Dropdown, App, Select, Row, Col } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UserOutlined, ReloadOutlined, MoreOutlined, KeyOutlined, FilterOutlined, ClearOutlined } from '@ant-design/icons';
 import { fetchStaff, deleteStaff, resetStaffPassword, fetchInstitutions } from '../store/stateSlice';
+import StaffModal from './StaffModal';
 
 const StaffList = () => {
   const { modal } = App.useApp();
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
   const { list: staff, loading, pagination } = useSelector((state) => state.state.staff);
   const { list: institutions } = useSelector((state) => state.state.institutions);
 
@@ -25,6 +23,8 @@ const StaffList = () => {
     limit: 10,
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState(null);
 
   const loadStaff = useCallback((params = {}) => {
     dispatch(fetchStaff({
@@ -42,15 +42,22 @@ const StaffList = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    // Check if we're returning from an edit/create with a state flag
-    if (location.state?.refresh) {
-      loadStaff({ forceRefresh: true });
-      // Clear the state to prevent unnecessary refreshes
-      window.history.replaceState({}, document.title);
-    } else {
-      loadStaff();
-    }
+    loadStaff();
   }, []);
+
+  const handleOpenModal = (staffId = null) => {
+    setEditingStaffId(staffId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingStaffId(null);
+  };
+
+  const handleModalSuccess = () => {
+    loadStaff({ forceRefresh: true });
+  };
 
   const handleDelete = (id, name) => {
     modal.confirm({
@@ -242,7 +249,7 @@ const StaffList = () => {
         const handleMenuClick = ({ key }) => {
           switch (key) {
             case 'edit':
-              navigate(`/state-staff/${record.id}/edit`);
+              handleOpenModal(record.id);
               break;
             case 'reset-password':
               handleResetPassword(record.id, record.name);
@@ -315,7 +322,7 @@ const StaffList = () => {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate('/state-staff/new')}
+              onClick={() => handleOpenModal()}
             >
               Add Staff
             </Button>
@@ -425,6 +432,13 @@ const StaffList = () => {
           }}
         />
       </Card>
+
+      <StaffModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        staffId={editingStaffId}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };

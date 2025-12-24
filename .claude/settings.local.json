@@ -39,7 +39,20 @@
       "Bash(npm run lint:*)",
       "Bash(node:*)",
       "Bash(rm:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(ls:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx ts-node:*)",
+      "Bash(tasklist:*)",
+      "Bash(npm run start:dev:*)",
+      "Bash(timeout /t 10 /nobreak)",
+      "Bash(npm uninstall:*)",
+      "Bash(taskkill /PID 20284 /F)",
+      "Bash(cmd //c \"taskkill /PID 20284 /F\")",
+      "Bash(cmd //c \"tasklist | findstr node\")",
+      "Bash(cmd //c \"cd /d \"\"D:\\\\Github\\\\New folder\\\\cms-new\\\\backend\"\" && rmdir /s /q node_modules\\\\.prisma\")",
+      "Bash(python:*)",
+      "Bash(done)"
     ]
   }
 }

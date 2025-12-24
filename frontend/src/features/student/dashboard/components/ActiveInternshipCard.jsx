@@ -103,7 +103,7 @@ const ActiveInternshipCard = ({
         </Tag>
       }
     >
-      <Space direction="vertical" className="w-full" size="middle">
+      <Space orientation="vertical" className="w-full" size="middle">
         {/* Duration Progress */}
         <div>
           <div className="flex justify-between mb-1">

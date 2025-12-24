@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Card, Table, Button, Tag, Space, Input, Select, Drawer, Descriptions, Avatar, Divider, Progress } from 'antd';
 import { SearchOutlined, UserOutlined, EyeOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
 import { fetchAssignedStudents } from '../store/facultySlice';
 
-const AssignedStudentsList = () => {
+// Constant styles outside component
+const SELECT_STYLE = { width: 200 };
+const INPUT_STYLE = { width: 300 };
+const PROGRESS_STYLE = { width: 100 };
+
+const AssignedStudentsList = React.memo(() => {
   const dispatch = useDispatch();
   const { list: assignedStudentsList, loading } = useSelector((state) => state.faculty.students);
   const [searchText, setSearchText] = useState('');
@@ -18,37 +23,46 @@ const AssignedStudentsList = () => {
   }, [dispatch]);
 
   // Extract student details from assignments and map branch to department
-  const students = assignedStudentsList?.map(assignment => {
-    const student = assignment.student;
-    const activeInternship = student.internshipApplications?.find(app => app.hasJoined && !app.completionDate);
-    const appliedCount = student.internshipApplications?.length || 0;
-    
-    return {
-      ...student,
-      department: student.branch,
-      assignmentId: assignment.id,
-      currentInternship: activeInternship,
-      appliedInternships: appliedCount,
-      phone: student.contact
-    };
-  }) || [];
+  const students = useMemo(() => {
+    return assignedStudentsList?.map(assignment => {
+      const student = assignment.student;
+      const activeInternship = student.internshipApplications?.find(app => app.hasJoined && !app.completionDate);
+      const appliedCount = student.internshipApplications?.length || 0;
 
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = !searchText ||
-      student.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      student.rollNumber?.toLowerCase().includes(searchText.toLowerCase()) ||
-      student.email?.toLowerCase().includes(searchText.toLowerCase());
+      return {
+        ...student,
+        department: student.branch,
+        assignmentId: assignment.id,
+        currentInternship: activeInternship,
+        appliedInternships: appliedCount,
+        phone: student.contact
+      };
+    }) || [];
+  }, [assignedStudentsList]);
 
-    const matchesDepartment = departmentFilter === 'all' || student.department?.id === departmentFilter;
-    const matchesBatch = batchFilter === 'all' || student.batch?.id === batchFilter;
+  const filteredStudents = useMemo(() => {
+    return students.filter(student => {
+      const matchesSearch = !searchText ||
+        student.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        student.rollNumber?.toLowerCase().includes(searchText.toLowerCase()) ||
+        student.email?.toLowerCase().includes(searchText.toLowerCase());
 
-    return matchesSearch && matchesDepartment && matchesBatch;
-  });
+      const matchesDepartment = departmentFilter === 'all' || student.department?.id === departmentFilter;
+      const matchesBatch = batchFilter === 'all' || student.batch?.id === batchFilter;
 
-  const departments = [...new Map(students.map(s => [s.department?.id, s.department])).values()].filter(Boolean);
-  const batches = [...new Map(students.map(s => [s.batch?.id, s.batch])).values()].filter(Boolean);
+      return matchesSearch && matchesDepartment && matchesBatch;
+    });
+  }, [students, searchText, departmentFilter, batchFilter]);
 
-  const getInternshipStatus = (student) => {
+  const departments = useMemo(() => {
+    return [...new Map(students.map(s => [s.department?.id, s.department])).values()].filter(Boolean);
+  }, [students]);
+
+  const batches = useMemo(() => {
+    return [...new Map(students.map(s => [s.batch?.id, s.batch])).values()].filter(Boolean);
+  }, [students]);
+
+  const getInternshipStatus = useCallback((student) => {
     if (student.currentInternship) {
       return <Tag color="green">Active Internship</Tag>;
     } else if (student.appliedInternships > 0) {
@@ -56,9 +70,9 @@ const AssignedStudentsList = () => {
     } else {
       return <Tag>No Applications</Tag>;
     }
-  };
+  }, []);
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Student',
       key: 'student',
@@ -120,7 +134,7 @@ const AssignedStudentsList = () => {
         </Button>
       ),
     },
-  ];
+  ], [getInternshipStatus, setSelectedStudent, setDetailDrawer]);
 
   return (
     <div className="p-6">
@@ -131,13 +145,13 @@ const AssignedStudentsList = () => {
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 300 }}
+            style={INPUT_STYLE}
             allowClear
           />
           <Select
             value={departmentFilter}
             onChange={setDepartmentFilter}
-            style={{ width: 200 }}
+            style={SELECT_STYLE}
             placeholder="Filter by Department"
           >
             <Select.Option value="all">All Departments</Select.Option>
@@ -148,7 +162,7 @@ const AssignedStudentsList = () => {
           <Select
             value={batchFilter}
             onChange={setBatchFilter}
-            style={{ width: 200 }}
+            style={SELECT_STYLE}
             placeholder="Filter by Batch"
           >
             <Select.Option value="all">All Batches</Select.Option>
@@ -175,7 +189,7 @@ const AssignedStudentsList = () => {
       <Drawer
         title="Student Details"
         placement="right"
-        width={600}
+        size="default"
         onClose={() => {
           setDetailDrawer(false);
           setSelectedStudent(null);
@@ -228,7 +242,7 @@ const AssignedStudentsList = () => {
                     <Progress
                       percent={(selectedStudent.cgpa / 10) * 100}
                       size="small"
-                      style={{ width: 100 }}
+                      style={PROGRESS_STYLE}
                       showInfo={false}
                     />
                   )}
@@ -309,6 +323,8 @@ const AssignedStudentsList = () => {
       </Drawer>
     </div>
   );
-};
+});
+
+AssignedStudentsList.displayName = 'AssignedStudentsList';
 
 export default AssignedStudentsList;

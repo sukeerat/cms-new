@@ -67,6 +67,8 @@ const initialState = {
     loading: false,
     statsLoading: false,
     activityLoading: false,
+    actionLoading: false,
+    actionError: null,
     error: null,
   },
   internshipStats: {
@@ -89,13 +91,16 @@ const initialState = {
     batches: null,
     departments: null,
     mentorAssignments: null,
+    mentorAssignmentsKey: null,
     mentorStats: null,
     mentorCoverage: null,
     complianceMetrics: null,
     alertsEnhanced: null,
     joiningLetterStats: null,
     joiningLetters: null,
+    joiningLettersKey: null,
     joiningLetterActivity: null,
+    joiningLetterActivityKey: null,
     internshipStats: null,
     facultyWorkload: null,
   },
@@ -118,7 +123,11 @@ export const fetchPrincipalDashboard = createAsyncThunk(
       const response = await apiClient.get(API_ENDPOINTS.PRINCIPAL_DASHBOARD);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch dashboard');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch dashboard data. Please check your connection and try again.';
+      console.error('Dashboard fetch error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -158,7 +167,11 @@ export const fetchStudents = createAsyncThunk(
       const response = await principalService.getStudents(params);
       return { ...response, _cacheKey: requestKey };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch students');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch students. Please try again.';
+      console.error('Fetch students error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -193,7 +206,11 @@ export const fetchStaff = createAsyncThunk(
       const response = await principalService.getStaff(params);
       return { ...response, _cacheKey: requestKey };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch staff');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch staff. Please try again.';
+      console.error('Fetch staff error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -212,7 +229,11 @@ export const fetchMentors = createAsyncThunk(
       const response = await principalService.getMentors(params);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch mentors');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch mentors. Please try again.';
+      console.error('Fetch mentors error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -231,7 +252,11 @@ export const fetchBatches = createAsyncThunk(
       const response = await apiClient.get('/principal/batches');
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch batches');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch batches. Please try again.';
+      console.error('Fetch batches error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -252,7 +277,11 @@ export const fetchDepartments = createAsyncThunk(
       const branches = response.data?.data || response.data || [];
       return { data: branches };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch departments');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch departments. Please try again.';
+      console.error('Fetch departments error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -265,7 +294,11 @@ export const createStudent = createAsyncThunk(
       const response = await principalService.createStudent(studentData);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create student');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to create student. Please check the form and try again.';
+      console.error('Create student error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -277,7 +310,11 @@ export const updateStudent = createAsyncThunk(
       const response = await principalService.updateStudent(id, data);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update student');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to update student. Please try again.';
+      console.error('Update student error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -289,7 +326,11 @@ export const deleteStudent = createAsyncThunk(
       const response = await principalService.deleteStudent(id);
       return { id, ...response };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete student');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to delete student. Please try again.';
+      console.error('Delete student error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -301,7 +342,11 @@ export const bulkUploadStudents = createAsyncThunk(
       const response = await principalService.bulkUploadStudents(file);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to bulk upload students');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to bulk upload students. Please check the file format and try again.';
+      console.error('Bulk upload students error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -313,7 +358,11 @@ export const bulkUploadStaff = createAsyncThunk(
       const response = await principalService.bulkUploadStaff(file);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to bulk upload staff');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to bulk upload staff. Please check the file format and try again.';
+      console.error('Bulk upload staff error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -325,7 +374,11 @@ export const downloadTemplate = createAsyncThunk(
       const response = await principalService.downloadTemplate(type);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to download template');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to download template. Please try again.';
+      console.error('Download template error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -338,7 +391,11 @@ export const createStaff = createAsyncThunk(
       const response = await principalService.createStaff(staffData);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create staff');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to create staff. Please check the form and try again.';
+      console.error('Create staff error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -350,7 +407,11 @@ export const updateStaff = createAsyncThunk(
       const response = await principalService.updateStaff(id, data);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update staff');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to update staff. Please try again.';
+      console.error('Update staff error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -362,7 +423,11 @@ export const deleteStaff = createAsyncThunk(
       const response = await principalService.deleteStaff(id);
       return { id, ...response };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete staff');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to delete staff. Please try again.';
+      console.error('Delete staff error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -376,7 +441,11 @@ export const assignMentor = createAsyncThunk(
       const response = await principalService.assignMentor(data);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to assign mentor');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to assign mentor. Please try again.';
+      console.error('Assign mentor error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -388,7 +457,11 @@ export const removeMentorAssignment = createAsyncThunk(
       const response = await apiClient.delete(`/principal/students/${studentId}/mentor`);
       return { studentId, ...response.data };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to remove mentor assignment');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to remove mentor assignment. Please try again.';
+      console.error('Remove mentor assignment error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -407,7 +480,11 @@ export const fetchMentorStats = createAsyncThunk(
       const response = await apiClient.get('/principal/mentors/stats');
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch mentor stats');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch mentor stats. Please try again.';
+      console.error('Fetch mentor stats error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -419,7 +496,11 @@ export const bulkUnassignMentors = createAsyncThunk(
       const response = await apiClient.post('/principal/mentors/bulk-unassign', { studentIds });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to bulk unassign mentors');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to bulk unassign mentors. Please try again.';
+      console.error('Bulk unassign mentors error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -431,7 +512,11 @@ export const autoAssignMentors = createAsyncThunk(
       const response = await apiClient.post('/principal/mentors/auto-assign');
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to auto-assign mentors');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to auto-assign mentors. Please try again.';
+      console.error('Auto-assign mentors error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -443,14 +528,33 @@ export const fetchMentorAssignments = createAsyncThunk(
       const state = getState();
       const lastFetched = state.principal.lastFetched.mentorAssignments;
 
-      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Normalize params for cache key
+      const normalizedParams = {
+        mentorId: params?.mentorId ?? '',
+        search: params?.search ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.principal.lastFetched.mentorAssignmentsKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await principalService.getMentorAssignments(params);
-      return response;
+      // Response is an array from backend, wrap it properly
+      const data = Array.isArray(response) ? response : (response?.data || []);
+      return { data, _cacheKey: requestKey };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch mentor assignments');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch mentor assignments. Please try again.';
+      console.error('Fetch mentor assignments error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -463,7 +567,11 @@ export const forceRefreshDashboard = createAsyncThunk(
       const response = await apiClient.get(API_ENDPOINTS.PRINCIPAL_DASHBOARD);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to refresh dashboard');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to refresh dashboard. Please try again.';
+      console.error('Force refresh dashboard error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -475,7 +583,11 @@ export const forceRefreshStudents = createAsyncThunk(
       const response = await principalService.getStudents(params);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to refresh students');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to refresh students. Please try again.';
+      console.error('Force refresh students error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -487,7 +599,11 @@ export const forceRefreshStaff = createAsyncThunk(
       const response = await principalService.getStaff(params);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to refresh staff');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to refresh staff. Please try again.';
+      console.error('Force refresh staff error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -507,7 +623,11 @@ export const fetchMentorCoverage = createAsyncThunk(
       const response = await principalService.getMentorCoverage();
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch mentor coverage');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch mentor coverage. Please try again.';
+      console.error('Fetch mentor coverage error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -527,7 +647,11 @@ export const fetchComplianceMetrics = createAsyncThunk(
       const response = await principalService.getComplianceMetrics();
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch compliance metrics');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch compliance metrics. Please try again.';
+      console.error('Fetch compliance metrics error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -547,7 +671,11 @@ export const fetchAlertsEnhanced = createAsyncThunk(
       const response = await principalService.getAlertsEnhanced();
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch enhanced alerts');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch enhanced alerts. Please try again.';
+      console.error('Fetch alerts enhanced error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -567,38 +695,84 @@ export const fetchJoiningLetterStats = createAsyncThunk(
       const response = await principalService.getJoiningLetterStats();
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch joining letter stats');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch joining letter stats. Please try again.';
+      console.error('Fetch joining letter stats error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
 
 export const fetchJoiningLetters = createAsyncThunk(
   'principal/fetchJoiningLetters',
-  async (params = {}, { rejectWithValue }) => {
+  async (params = {}, { getState, rejectWithValue }) => {
     try {
+      const state = getState();
+      const lastFetched = state.principal.lastFetched.joiningLetters;
+
+      // Normalize params for cache key
+      const normalizedParams = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+        search: params?.search ?? '',
+        status: params?.status ?? '',
+      };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.principal.lastFetched.joiningLettersKey;
+
+      // Check cache
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
+        return { cached: true };
+      }
+
       const response = await principalService.getJoiningLetters(params);
-      return response;
+      return { ...response, _cacheKey: requestKey };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch joining letters');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch joining letters. Please try again.';
+      console.error('Fetch joining letters error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
 
 export const fetchJoiningLetterActivity = createAsyncThunk(
   'principal/fetchJoiningLetterActivity',
-  async (limit = 10, { getState, rejectWithValue }) => {
+  async (params = {}, { getState, rejectWithValue }) => {
     try {
       const state = getState();
       const lastFetched = state.principal.lastFetched.joiningLetterActivity;
+      const limit = params?.limit ?? 10;
 
-      if (lastFetched && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Normalize params for cache key
+      const normalizedParams = { limit };
+      const requestKey = JSON.stringify(normalizedParams);
+      const lastKey = state.principal.lastFetched.joiningLetterActivityKey;
+
+      if (
+        lastFetched &&
+        !params?.forceRefresh &&
+        lastKey === requestKey &&
+        (Date.now() - lastFetched) < CACHE_DURATION
+      ) {
         return { cached: true };
       }
 
       const response = await principalService.getJoiningLetterActivity(limit);
-      return response;
+      return { data: response, _cacheKey: requestKey };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch joining letter activity');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch joining letter activity. Please try again.';
+      console.error('Fetch joining letter activity error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -610,7 +784,11 @@ export const verifyJoiningLetter = createAsyncThunk(
       const response = await principalService.verifyJoiningLetter(applicationId, data);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to verify joining letter');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to verify joining letter. Please try again.';
+      console.error('Verify joining letter error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -622,7 +800,11 @@ export const rejectJoiningLetter = createAsyncThunk(
       const response = await principalService.rejectJoiningLetter(applicationId, remarks);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to reject joining letter');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to reject joining letter. Please try again.';
+      console.error('Reject joining letter error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -642,7 +824,11 @@ export const fetchInternshipStats = createAsyncThunk(
       const response = await principalService.getInternshipStats();
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch internship stats');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch internship stats. Please try again.';
+      console.error('Fetch internship stats error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -662,7 +848,11 @@ export const fetchFacultyWorkload = createAsyncThunk(
       const response = await principalService.getFacultyProgress(params);
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch faculty workload');
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Failed to fetch faculty workload. Please try again.';
+      console.error('Fetch faculty workload error:', error);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -706,6 +896,9 @@ const principalSlice = createSlice({
       state.lastFetched.batches = 0;
       state.lastFetched.departments = 0;
       state.lastFetched.mentorAssignments = 0;
+      state.lastFetched.mentorAssignmentsKey = null;
+      state.lastFetched.joiningLetterActivity = 0;
+      state.lastFetched.joiningLetterActivityKey = null;
     },
 
     // Reset slice
@@ -966,7 +1159,7 @@ const principalSlice = createSlice({
       .addCase(fetchMentors.fulfilled, (state, action) => {
         state.mentors.loading = false;
         if (!action.payload.cached) {
-          state.mentors.list = action.payload.data || action.payload;
+          state.mentors.list = action.payload.data || action.payload || [];
           state.lastFetched.mentors = Date.now();
         }
       })
@@ -984,6 +1177,7 @@ const principalSlice = createSlice({
         state.lastFetched.students = null;
         state.lastFetched.studentsKey = null;
         state.lastFetched.mentorAssignments = null;
+        state.lastFetched.mentorAssignmentsKey = null;
       })
       .addCase(assignMentor.rejected, (state, action) => {
         state.students.loading = false;
@@ -1003,6 +1197,7 @@ const principalSlice = createSlice({
         state.lastFetched.students = null;
         state.lastFetched.studentsKey = null;
         state.lastFetched.mentorAssignments = null;
+        state.lastFetched.mentorAssignmentsKey = null;
         state.lastFetched.mentorStats = null;
       })
       .addCase(removeMentorAssignment.rejected, (state, action) => {
@@ -1038,6 +1233,7 @@ const principalSlice = createSlice({
         state.lastFetched.students = null;
         state.lastFetched.studentsKey = null;
         state.lastFetched.mentorAssignments = null;
+        state.lastFetched.mentorAssignmentsKey = null;
         state.lastFetched.mentorStats = null;
       })
       .addCase(bulkUnassignMentors.rejected, (state, action) => {
@@ -1056,6 +1252,7 @@ const principalSlice = createSlice({
         state.lastFetched.students = null;
         state.lastFetched.studentsKey = null;
         state.lastFetched.mentorAssignments = null;
+        state.lastFetched.mentorAssignmentsKey = null;
         state.lastFetched.mentorStats = null;
       })
       .addCase(autoAssignMentors.rejected, (state, action) => {
@@ -1073,6 +1270,7 @@ const principalSlice = createSlice({
         if (!action.payload.cached) {
           state.mentorAssignments = action.payload.data || action.payload || [];
           state.lastFetched.mentorAssignments = Date.now();
+          state.lastFetched.mentorAssignmentsKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchMentorAssignments.rejected, (state, action) => {
@@ -1142,6 +1340,7 @@ const principalSlice = createSlice({
           totalPages: action.payload.totalPages || 1,
         };
         state.lastFetched.students = Date.now();
+        state.lastFetched.studentsKey = null; // Clear cache key on force refresh
       })
       .addCase(forceRefreshStudents.rejected, (state, action) => {
         state.students.loading = false;
@@ -1161,6 +1360,7 @@ const principalSlice = createSlice({
           totalPages: action.payload.totalPages || 1,
         };
         state.lastFetched.staff = Date.now();
+        state.lastFetched.staffKey = null; // Clear cache key on force refresh
       })
       .addCase(forceRefreshStaff.rejected, (state, action) => {
         state.staff.loading = false;
@@ -1240,9 +1440,12 @@ const principalSlice = createSlice({
       })
       .addCase(fetchJoiningLetters.fulfilled, (state, action) => {
         state.joiningLetters.loading = false;
-        state.joiningLetters.list = action.payload.data || [];
-        state.joiningLetters.pagination = action.payload.pagination;
-        state.lastFetched.joiningLetters = Date.now();
+        if (!action.payload.cached) {
+          state.joiningLetters.list = action.payload.data || [];
+          state.joiningLetters.pagination = action.payload.pagination;
+          state.lastFetched.joiningLetters = Date.now();
+          state.lastFetched.joiningLettersKey = action.payload._cacheKey ?? null;
+        }
       })
       .addCase(fetchJoiningLetters.rejected, (state, action) => {
         state.joiningLetters.loading = false;
@@ -1255,15 +1458,21 @@ const principalSlice = createSlice({
       .addCase(fetchJoiningLetterActivity.fulfilled, (state, action) => {
         state.joiningLetters.activityLoading = false;
         if (!action.payload.cached) {
-          state.joiningLetters.activity = action.payload;
+          state.joiningLetters.activity = action.payload.data || action.payload;
           state.lastFetched.joiningLetterActivity = Date.now();
+          state.lastFetched.joiningLetterActivityKey = action.payload._cacheKey ?? null;
         }
       })
       .addCase(fetchJoiningLetterActivity.rejected, (state, action) => {
         state.joiningLetters.activityLoading = false;
       })
       // Verify Joining Letter
+      .addCase(verifyJoiningLetter.pending, (state) => {
+        state.joiningLetters.actionLoading = true;
+        state.joiningLetters.actionError = null;
+      })
       .addCase(verifyJoiningLetter.fulfilled, (state, action) => {
+        state.joiningLetters.actionLoading = false;
         // Update the list item if it exists
         const index = state.joiningLetters.list.findIndex(
           item => item.applicationId === action.payload.data?.applicationId
@@ -1274,14 +1483,27 @@ const principalSlice = createSlice({
         // Invalidate stats cache
         state.lastFetched.joiningLetterStats = null;
       })
+      .addCase(verifyJoiningLetter.rejected, (state, action) => {
+        state.joiningLetters.actionLoading = false;
+        state.joiningLetters.actionError = action.payload || 'Failed to verify joining letter';
+      })
       // Reject Joining Letter
+      .addCase(rejectJoiningLetter.pending, (state) => {
+        state.joiningLetters.actionLoading = true;
+        state.joiningLetters.actionError = null;
+      })
       .addCase(rejectJoiningLetter.fulfilled, (state, action) => {
+        state.joiningLetters.actionLoading = false;
         // Remove from list since letter is cleared
         state.joiningLetters.list = state.joiningLetters.list.filter(
           item => item.applicationId !== action.payload.data?.applicationId
         );
         // Invalidate stats cache
         state.lastFetched.joiningLetterStats = null;
+      })
+      .addCase(rejectJoiningLetter.rejected, (state, action) => {
+        state.joiningLetters.actionLoading = false;
+        state.joiningLetters.actionError = action.payload || 'Failed to reject joining letter';
       })
       // Internship Stats (with company details)
       .addCase(fetchInternshipStats.pending, (state) => {

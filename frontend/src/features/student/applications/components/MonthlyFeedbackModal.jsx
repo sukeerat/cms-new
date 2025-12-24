@@ -72,7 +72,7 @@ const MonthlyFeedbackModal = ({
     >
       <div className="mt-6">
         <Alert
-          message="Share Your Monthly Progress"
+          title="Share Your Monthly Progress"
           description="Upload an image showing your work, achievements, or progress during this month."
           type="info"
           showIcon

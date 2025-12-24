@@ -188,7 +188,7 @@ const BulkUpload = () => {
 
         if (fieldError) {
           return (
-            <Space direction="vertical" size={0}>
+            <Space orientation="vertical" size={0}>
               <Text type="danger">{text}</Text>
               <Text type="danger" style={{ fontSize: '12px' }}>
                 {fieldError.message}

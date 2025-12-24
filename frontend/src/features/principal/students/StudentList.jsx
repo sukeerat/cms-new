@@ -1,21 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Button, Space, Tag, Avatar, Input, Select, Card, Modal, message } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import { fetchStudents, deleteStudent, fetchDepartments, optimisticallyDeleteStudent, rollbackStudentOperation } from '../store/principalSlice';
 import DataTable from '../../../components/tables/DataTable';
 import { EyeOutlined, EditOutlined, UserOutlined, SearchOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getStatusColor } from '../../../utils/format';
 import { generateTxnId, snapshotManager, optimisticToast } from '../../../store/optimisticMiddleware';
+import StudentModal from './StudentModal';
 
 const { Search } = Input;
 const { Option } = Select;
 
 const StudentList = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { list, loading, pagination } = useSelector((state) => state.principal.students);
   const departments = useSelector((state) => state.principal.departments.list);
+  const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({
     search: '',
     department: '',
@@ -24,6 +24,31 @@ const StudentList = () => {
     page: 1,
     limit: 10,
   });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState(null);
+
+  const handleOpenModal = (studentId = null) => {
+    setEditingStudentId(studentId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingStudentId(null);
+  };
+
+  const handleModalSuccess = () => {
+    dispatch(fetchStudents({ ...filters, forceRefresh: true }));
+  };
+
+  // Debounced search effect - 300ms delay
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput, page: 1 }));
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchInput]);
 
   useEffect(() => {
     dispatch(fetchStudents(filters));
@@ -31,11 +56,11 @@ const StudentList = () => {
   }, [dispatch, filters]);
 
   const handleView = (record) => {
-    navigate(`/students/${record.id}`);
+    handleOpenModal(record.id);
   };
 
   const handleEdit = (record) => {
-    navigate(`/students/${record.id}/edit`);
+    handleOpenModal(record.id);
   };
 
   const handleDelete = (record) => {
@@ -84,7 +109,8 @@ const StudentList = () => {
     });
   };
 
-  const columns = [
+  // Memoized columns definition
+  const columns = useMemo(() => [
     {
       title: 'Student',
       dataIndex: 'name',
@@ -144,28 +170,28 @@ const StudentList = () => {
         </Space>
       ),
     },
-  ];
+  ], []);
 
-  const handleSearch = (value) => {
-    setFilters({ ...filters, search: value, page: 1 });
-  };
+  const handleSearch = useCallback((value) => {
+    setSearchInput(value);
+  }, []);
 
-  const handleFilterChange = (key, value) => {
-    setFilters({ ...filters, [key]: value, page: 1 });
-  };
+  const handleFilterChange = useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+  }, []);
 
-  const handlePageChange = (page, pageSize) => {
-    setFilters({ ...filters, page, limit: pageSize });
-  };
+  const handlePageChange = useCallback((page, pageSize) => {
+    setFilters(prev => ({ ...prev, page, limit: pageSize }));
+  }, []);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-text-primary">Students</h1>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          onClick={() => navigate('/students/new')}
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenModal()}
           className="rounded-lg shadow-md shadow-primary/20"
         >
           Add Student
@@ -177,6 +203,8 @@ const StudentList = () => {
           <Search
             placeholder="Search by name or roll number"
             allowClear
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             onSearch={handleSearch}
             className="w-full md:w-[300px]"
             prefix={<SearchOutlined className="text-text-tertiary" />}
@@ -231,6 +259,13 @@ const StudentList = () => {
           }}
         />
       </div>
+
+      <StudentModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        studentId={editingStudentId}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };

@@ -232,7 +232,7 @@ const BulkUserCreate = () => {
         if (key === 'role') {
           if (fieldError) {
             return (
-              <Space direction="vertical" size={0}>
+              <Space orientation="vertical" size={0}>
                 <Tag color="red">{text}</Tag>
                 <Text type="danger" style={{ fontSize: '12px' }}>
                   {fieldError.message}
@@ -246,7 +246,7 @@ const BulkUserCreate = () => {
         // Highlight email duplicates
         if (key === 'email' && fieldError) {
           return (
-            <Space direction="vertical" size={0}>
+            <Space orientation="vertical" size={0}>
               <Text type="danger">{text}</Text>
               <Text type="danger" style={{ fontSize: '12px' }}>
                 {fieldError.message}
@@ -258,7 +258,7 @@ const BulkUserCreate = () => {
         // General error handling
         if (fieldError) {
           return (
-            <Space direction="vertical" size={0}>
+            <Space orientation="vertical" size={0}>
               <Text type="danger">{text}</Text>
               <Text type="danger" style={{ fontSize: '12px' }}>
                 {fieldError.message}

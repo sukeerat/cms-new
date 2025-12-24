@@ -11,7 +11,7 @@ import {
 
 const { Title, Text, Paragraph } = Typography;
 
-export default function AssignedStudents() {
+const AssignedStudents = React.memo(() => {
   const dispatch = useDispatch();
   const studentsState = useSelector(selectStudents);
 
@@ -33,7 +33,6 @@ export default function AssignedStudents() {
   // Safely process students data
   const safeStudents = useMemo(() => {
     if (!Array.isArray(students)) {
-      console.warn("Students data is not an array:", students);
       return [];
     }
     return students;
@@ -235,4 +234,8 @@ export default function AssignedStudents() {
       </div>
     </div>
   );
-}
+});
+
+AssignedStudents.displayName = 'AssignedStudents';
+
+export default AssignedStudents;

@@ -311,9 +311,12 @@ export class StateReportService {
       return await this.cache.getOrSet(
         cacheKey,
         async () => {
-          // Get all self-identified applications - use single query to avoid MongoDB count query issues
+          // Get only APPROVED self-identified applications - these are expected to upload joining letters
           const applications = await this.prisma.internshipApplication.findMany({
-            where: { isSelfIdentified: true },
+            where: {
+              isSelfIdentified: true,
+              status: ApplicationStatus.APPROVED,
+            },
             select: {
               joiningLetterUrl: true,
               hasJoined: true,

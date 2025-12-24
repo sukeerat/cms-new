@@ -248,7 +248,8 @@ const SelfIdentifiedInternships = () => {
         total: internshipStats.total || 0,
         ongoing: (internshipStats.approved || 0) + (internshipStats.joined || 0) + (internshipStats.selected || 0),
         completed: internshipStats.completed || 0,
-        uniqueCompanies: internshipStats.byCompany?.length || 0,
+        // Use totalUniqueCompanies (actual count) instead of byCompany.length (top 10 only)
+        uniqueCompanies: internshipStats.totalUniqueCompanies || internshipStats.byCompany?.length || 0,
       };
     }
 
@@ -597,7 +598,7 @@ const SelfIdentifiedInternships = () => {
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Internships</Text>}
               value={stats.total}
               prefix={<ShopOutlined className="text-primary mr-2" />}
-              valueStyle={{ color: 'var(--ant-primary-color)', fontWeight: 'bold' }}
+              styles={{ content: { color: 'var(--ant-primary-color)', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
@@ -607,7 +608,7 @@ const SelfIdentifiedInternships = () => {
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Ongoing</Text>}
               value={stats.ongoing}
               prefix={<RiseOutlined className="text-success mr-2" />}
-              valueStyle={{ color: 'rgb(var(--color-success))', fontWeight: 'bold' }}
+              styles={{ content: { color: 'rgb(var(--color-success))', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
@@ -617,7 +618,7 @@ const SelfIdentifiedInternships = () => {
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Completed</Text>}
               value={stats.completed}
               prefix={<CheckCircleOutlined className="text-info mr-2" />}
-              valueStyle={{ color: 'rgb(var(--color-info))', fontWeight: 'bold' }}
+              styles={{ content: { color: 'rgb(var(--color-info))', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
@@ -627,7 +628,7 @@ const SelfIdentifiedInternships = () => {
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Companies</Text>}
               value={stats.uniqueCompanies}
               prefix={<BankOutlined className="text-secondary mr-2" />}
-              valueStyle={{ color: 'rgb(var(--color-secondary-500))', fontWeight: 'bold' }}
+              styles={{ content: { color: 'rgb(var(--color-secondary-500))', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>

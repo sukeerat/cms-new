@@ -100,15 +100,15 @@ const PostInternship = () => {
           toast.error(
             "Your profile is not approved yet. You cannot post internships."
           );
-          navigate("/industry/dashboard");
+          navigate("/dashboard");
         }
       } else {
         toast.error("Please complete your profile first");
-        navigate("/industry/create");
+        navigate("/company/profile");
       }
     } catch (error) {
       toast.error("Please complete your profile first");
-      navigate("/industry/create");
+      navigate("/company/profile");
     }
   };
 
@@ -141,7 +141,7 @@ const PostInternship = () => {
 
       if (response.data) {
         toast.success("Internship posted successfully!");
-        navigate("/industry/internships?tab=manage");
+        navigate("/postings");
       } else {
         toast.error(response.data.message || "Error posting internship");
       }
@@ -170,7 +170,7 @@ const PostInternship = () => {
       //       action={
       //         <Button
       //           size="small"
-      //           onClick={() => navigate("/industry/dashboard")}
+      //           onClick={() => navigate("/dashboard")}
       //         >
       //           Go to Dashboard
       //         </Button>
@@ -394,7 +394,7 @@ const PostInternship = () => {
             <div className="flex justify-end gap-4 py-8 border-t border-border">
               <Button 
                 size="large" 
-                onClick={() => navigate("/industry/dashboard")}
+                onClick={() => navigate("/dashboard")}
                 className="rounded-xl px-10 h-14 border-border text-text-secondary font-bold hover:text-text-primary"
               >
                 Cancel

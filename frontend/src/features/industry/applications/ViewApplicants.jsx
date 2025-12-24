@@ -150,7 +150,7 @@ const ViewApplicants = () => {
 
   const handleBackToInternships = () => {
     // Clear all current query parameters and navigate with clean URL
-    navigate("/industry/internships?tab=manage", { replace: true });
+    navigate("/postings", { replace: true });
     window.location.reload();
   };
 
@@ -539,7 +539,7 @@ const ViewApplicants = () => {
         const monthlyFeedback = getMonthlyFeedbackForApp(record.id);
         const completionFeedback = getCompletionFeedbackForApp(record.id);
         return (
-          <Space direction="vertical" size="small">
+          <Space orientation="vertical" size="small">
             <Button
               type="text"
               icon={<EyeOutlined />}

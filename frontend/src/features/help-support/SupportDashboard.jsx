@@ -562,7 +562,7 @@ const SupportDashboard = () => {
               </div>
             ) : 'Ticket Details'
           }
-          width={700}
+          size="large"
           open={drawerVisible}
           onClose={() => {
             setDrawerVisible(false);
@@ -747,7 +747,6 @@ const SupportDashboard = () => {
             assignForm.resetFields();
           }}
           footer={null}
-          width={500}
           className="rounded-2xl overflow-hidden"
         >
           <Form form={assignForm} layout="vertical" onFinish={handleAssignTicket} className="pt-4">
@@ -785,7 +784,6 @@ const SupportDashboard = () => {
             resolveForm.resetFields();
           }}
           footer={null}
-          width={600}
           className="rounded-2xl overflow-hidden"
         >
           <Form form={resolveForm} layout="vertical" onFinish={handleResolveTicket} className="pt-4">

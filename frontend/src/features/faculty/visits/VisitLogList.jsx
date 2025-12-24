@@ -1,29 +1,49 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import { Card, Table, Button, Tag, Space, Modal, message, Input, DatePicker, Descriptions, Drawer, Typography } from 'antd';
 import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons';
 import { fetchVisitLogs, deleteVisitLog } from '../store/facultySlice';
+import VisitLogModal from './VisitLogModal';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 const { Title, Text, Paragraph } = Typography;
 
-const VisitLogList = () => {
+// Constant styles outside component
+const CARD_BODY_STYLE = { padding: '16px' };
+const TABLE_CARD_BODY_STYLE = { padding: 0 };
+const DRAWER_MASK_STYLE = { backdropFilter: 'blur(4px)' };
+
+const VisitLogList = React.memo(() => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { visitLogs } = useSelector((state) => state.faculty);
   const { list: visitLogsList = [], loading } = visitLogs || {};
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const [detailDrawer, setDetailDrawer] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingVisitLogId, setEditingVisitLogId] = useState(null);
+
+  const handleOpenModal = (visitLogId = null) => {
+    setEditingVisitLogId(visitLogId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingVisitLogId(null);
+  };
+
+  const handleModalSuccess = () => {
+    dispatch(fetchVisitLogs());
+  };
 
   useEffect(() => {
     dispatch(fetchVisitLogs());
   }, [dispatch]);
 
-  const handleDelete = (id) => {
+  const handleDelete = useCallback((id) => {
     Modal.confirm({
       title: 'Delete Visit Log',
       content: 'Are you sure you want to delete this visit log? This action cannot be undone.',
@@ -38,23 +58,25 @@ const VisitLogList = () => {
         }
       },
     });
-  };
+  }, [dispatch]);
 
-  const filteredLogs = visitLogsList?.filter(log => {
-    const matchesSearch = !searchText ||
-      log.student?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      log.company?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      log.purpose?.toLowerCase().includes(searchText.toLowerCase());
+  const filteredLogs = useMemo(() => {
+    return visitLogsList?.filter(log => {
+      const matchesSearch = !searchText ||
+        log.student?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        log.company?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        log.purpose?.toLowerCase().includes(searchText.toLowerCase());
 
-    const matchesDate = !dateRange || (
-      dayjs(log.visitDate).isAfter(dateRange[0]) &&
-      dayjs(log.visitDate).isBefore(dateRange[1])
-    );
+      const matchesDate = !dateRange || (
+        dayjs(log.visitDate).isAfter(dateRange[0]) &&
+        dayjs(log.visitDate).isBefore(dateRange[1])
+      );
 
-    return matchesSearch && matchesDate;
-  }) || [];
+      return matchesSearch && matchesDate;
+    }) || [];
+  }, [visitLogsList, searchText, dateRange]);
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Visit Date',
       dataIndex: 'visitDate',
@@ -121,7 +143,7 @@ const VisitLogList = () => {
           </Button>
           <Button
             icon={<EditOutlined />}
-            onClick={() => navigate(`/visit-logs/${record.id}/edit`)}
+            onClick={() => handleOpenModal(record.id)}
             size="small"
           >
             Edit
@@ -137,7 +159,7 @@ const VisitLogList = () => {
         </Space>
       ),
     },
-  ];
+  ], [handleDelete]);
 
   return (
     <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
@@ -161,7 +183,7 @@ const VisitLogList = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => navigate('/visit-logs/new')}
+            onClick={() => handleOpenModal()}
             className="h-10 rounded-xl font-bold shadow-lg shadow-primary/20"
           >
             Add Visit Log
@@ -169,7 +191,7 @@ const VisitLogList = () => {
         </div>
 
         {/* Filters */}
-        <Card className="rounded-xl border-border shadow-sm" styles={{ body: { padding: '16px' } }}>
+        <Card className="rounded-xl border-border shadow-sm" styles={{ body: CARD_BODY_STYLE }}>
           <div className="flex flex-wrap items-center gap-4">
             <Input
               placeholder="Search by student, company..."
@@ -190,7 +212,7 @@ const VisitLogList = () => {
         </Card>
 
         {/* Table Container */}
-        <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>
+        <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: TABLE_CARD_BODY_STYLE }}>
           <Table
             columns={columns}
             dataSource={filteredLogs}
@@ -219,13 +241,13 @@ const VisitLogList = () => {
           </div>
         }
         placement="right"
-        width={600}
+        size="default"
         onClose={() => {
           setDetailDrawer(false);
           setSelectedLog(null);
         }}
         open={detailDrawer}
-        styles={{ mask: { backdropFilter: 'blur(4px)' } }}
+        styles={{ mask: DRAWER_MASK_STYLE }}
         className="rounded-l-2xl overflow-hidden"
       >
         {selectedLog && (
@@ -300,7 +322,7 @@ const VisitLogList = () => {
                 icon={<EditOutlined />}
                 onClick={() => {
                   setDetailDrawer(false);
-                  navigate(`/visit-logs/${selectedLog.id}/edit`);
+                  handleOpenModal(selectedLog.id);
                 }}
                 className="rounded-xl px-6 h-10 font-bold bg-primary border-0"
               >
@@ -310,8 +332,17 @@ const VisitLogList = () => {
           </div>
         )}
       </Drawer>
+
+      <VisitLogModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        visitLogId={editingVisitLogId}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
-};
+});
+
+VisitLogList.displayName = 'VisitLogList';
 
 export default VisitLogList;

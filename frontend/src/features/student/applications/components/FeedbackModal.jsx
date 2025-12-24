@@ -43,7 +43,7 @@ const FeedbackModal = ({
     >
       <div className="mt-6">
         <Alert
-          message="Share Your Experience"
+          title="Share Your Experience"
           description="Your feedback helps us improve the internship program and assists future students in making informed decisions."
           type="info"
           showIcon

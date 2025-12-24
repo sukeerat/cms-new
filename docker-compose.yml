@@ -1,0 +1,245 @@
+# Docker Compose for CMS - Production
+# All images pinned to stable versions
+
+services:
+  # ===========================================
+  # Frontend - React/Vite with Nginx
+  # ===========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5000/api}
+        VITE_APP_NAME: ${VITE_APP_NAME:-CMS Portal}
+        VITE_APP_ENV: ${VITE_APP_ENV:-production}
+    image: cms-frontend:latest
+    container_name: cms-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - cms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ===========================================
+  # Backend - NestJS with PM2 Cluster
+  # ===========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: cms-backend:latest
+    container_name: cms-backend
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    environment:
+      # Core Settings
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=5000
+      - BACKEND_PORT=5000
+      # Database
+      - DATABASE_URL=${DATABASE_URL:-mongodb://cmsuser:cmspassword123@mongodb:27017/cms?authSource=cms}
+      # Redis/Cache (DragonflyDB)
+      - REDIS_URL=${REDIS_URL:-redis://dragonfly:6379}
+      - REDIS_HOST=dragonfly
+      - REDIS_PORT=6379
+      # JWT Authentication
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      # CORS Settings
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:80,http://localhost:5173}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:80}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:80}
+      # Rate Limiting
+      - THROTTLE_TTL=${THROTTLE_TTL:-60}
+      - THROTTLE_LIMIT=${THROTTLE_LIMIT:-100}
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # File Upload
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10485760}
+      - UPLOAD_PATH=/app/uploads
+      # MinIO/S3 Configuration
+      - AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT:-http://minio:9000}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-cms-uploads}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_S3_FORCE_PATH_STYLE=true
+      # Mail Configuration (optional)
+      - MAIL_USER=${MAIL_USER:-}
+      - MAIL_PASS=${MAIL_PASS:-}
+      # Firebase Configuration (optional)
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL:-}
+      - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET:-}
+      # Google OAuth (optional)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-}
+      # Cloudinary (optional)
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-}
+      # PM2 Settings
+      - PM2_INSTANCES=${PM2_INSTANCES:-max}
+    volumes:
+      - backend-uploads:/app/uploads
+      - backend-logs:/app/logs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - cms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ===========================================
+  # MongoDB 7.0 (LTS) - Primary Database
+  # ===========================================
+  mongodb:
+    image: mongo:7.0
+    container_name: cms-mongodb
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin123}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-cms}
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/01-init.js:ro
+    networks:
+      - cms-network
+    restart: unless-stopped
+    healthcheck:
+      test: |
+        mongosh --quiet --eval "
+          try {
+            db.adminCommand('ping');
+            print('MongoDB is healthy');
+            quit(0);
+          } catch(e) {
+            print('MongoDB health check failed: ' + e);
+            quit(1);
+          }
+        "
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    command: ["mongod", "--bind_ip_all"]
+
+  # ===========================================
+  # DragonflyDB 1.x - Redis-compatible Cache
+  # High-performance, memory-efficient
+  # ===========================================
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.24.0
+    container_name: cms-dragonfly
+    ports:
+      - "${DRAGONFLY_PORT:-6379}:6379"
+    volumes:
+      - dragonfly-data:/data
+    networks:
+      - cms-network
+    restart: unless-stopped
+    ulimits:
+      memlock: -1
+    command: >
+      --logtostderr
+      --cache_mode=true
+      --maxmemory=512mb
+      --keys_output_limit=12288
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ===========================================
+  # MinIO - S3-compatible Object Storage
+  # ===========================================
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: cms-minio
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio-data:/data
+    networks:
+      - cms-network
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ===========================================
+  # MinIO Init - Create buckets on startup
+  # ===========================================
+  minio-init:
+    image: minio/mc:RELEASE.2024-12-18T02-01-23Z
+    container_name: cms-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - cms-network
+    restart: "no"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "Waiting for MinIO to be ready..."
+        sleep 5
+        mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin123}
+        mc mb myminio/${AWS_S3_BUCKET:-cms-uploads} --ignore-existing
+        mc anonymous set download myminio/${AWS_S3_BUCKET:-cms-uploads}
+        echo "MinIO bucket initialized successfully!"
+
+networks:
+  cms-network:
+    driver: bridge
+    name: cms-network
+
+volumes:
+  mongodb-data:
+    name: cms-mongodb-data
+  mongodb-config:
+    name: cms-mongodb-config
+  dragonfly-data:
+    name: cms-dragonfly-data
+  minio-data:
+    name: cms-minio-data
+  backend-uploads:
+    name: cms-backend-uploads
+  backend-logs:
+    name: cms-backend-logs

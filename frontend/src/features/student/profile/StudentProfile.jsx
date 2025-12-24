@@ -1088,17 +1088,17 @@ export default function StudentProfile() {
 
                                                               </div>
 
-                                                              <Progress 
+                                                              <Progress
 
-                                                                percent={getInternshipProgress(app.internship?.startDate, app.internship?.endDate)} 
+                                                                percent={getInternshipProgress(app.internship?.startDate, app.internship?.endDate)}
 
-                                                                size="small" 
+                                                                size="small"
 
-                                                                showInfo={false} 
+                                                                showInfo={false}
 
                                                                 strokeColor="rgb(var(--color-primary))"
 
-                                                                trailColor="rgba(var(--color-border), 0.1)"
+                                                                railColor="rgba(var(--color-border), 0.1)"
 
                                                               />
 

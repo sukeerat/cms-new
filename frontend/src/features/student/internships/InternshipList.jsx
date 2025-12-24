@@ -125,7 +125,7 @@ const InternshipList = () => {
           <Button
             type="link"
             icon={<EyeOutlined />}
-            onClick={() => navigate(`/student/internships/${record.id}`)}
+            onClick={() => navigate(`/internships/${record.id}`)}
           >
             View Details
           </Button>

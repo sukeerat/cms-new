@@ -288,7 +288,7 @@ const SubmitGrievance = () => {
 
           {/* Info Alert */}
           <Alert
-            message="How Grievances Work"
+            title="How Grievances Work"
             description="Submit any academic, internship, or placement-related concerns. Our team will review and address them promptly. You can track the status of your grievances below."
             type="info"
             showIcon
@@ -526,7 +526,7 @@ const SubmitGrievance = () => {
                 </div>
 
                 <Alert
-                  message={<span className="font-bold text-xs uppercase tracking-wide">Status Information</span>}
+                  title={<span className="font-bold text-xs uppercase tracking-wide">Status Information</span>}
                   description={
                     <Text className="text-sm block mt-1">
                       {selectedGrievance.status === 'RESOLVED'

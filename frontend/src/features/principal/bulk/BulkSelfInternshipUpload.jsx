@@ -1,0 +1,535 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Card,
+  Upload,
+  Button,
+  message,
+  Steps,
+  Table,
+  Alert,
+  Space,
+  Divider,
+  Progress,
+  Switch,
+  Tooltip,
+  Select,
+} from 'antd';
+import {
+  UploadOutlined,
+  DownloadOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  InfoCircleOutlined,
+  HistoryOutlined,
+  BankOutlined,
+} from '@ant-design/icons';
+import { bulkService } from '../../../services/bulk.service';
+import { stateService } from '../../../services/state.service';
+import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import * as XLSX from 'xlsx';
+
+const { Step } = Steps;
+const { Dragger } = Upload;
+
+const BulkSelfInternshipUpload = () => {
+  const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
+  const isStateDirectorate = user?.role === 'STATE_DIRECTORATE';
+
+  const [currentStep, setCurrentStep] = useState(0);
+  const [fileData, setFileData] = useState([]);
+  const [originalFile, setOriginalFile] = useState(null);
+  const [validationResults, setValidationResults] = useState({ valid: [], invalid: [] });
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [useAsync, setUseAsync] = useState(true);
+  const [uploadResult, setUploadResult] = useState(null);
+
+  // Institution selector state for STATE_DIRECTORATE
+  const [institutions, setInstitutions] = useState([]);
+  const [selectedInstitution, setSelectedInstitution] = useState(null);
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+
+  // Fetch institutions for STATE_DIRECTORATE
+  useEffect(() => {
+    if (isStateDirectorate) {
+      fetchInstitutions();
+    }
+  }, [isStateDirectorate]);
+
+  const fetchInstitutions = async () => {
+    setLoadingInstitutions(true);
+    try {
+      const response = await stateService.getInstitutions({ limit: 1000 });
+      setInstitutions(response.data || response.institutions || []);
+    } catch (error) {
+      message.error('Failed to fetch institutions');
+    } finally {
+      setLoadingInstitutions(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await bulkService.downloadSelfInternshipTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bulk-self-internship-upload-template.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success('Template downloaded successfully');
+    } catch (error) {
+      message.error('Failed to download template');
+    }
+  };
+
+  const validateInternshipData = (data) => {
+    const valid = [];
+    const invalid = [];
+    const seenIdentifiers = new Set();
+
+    data.forEach((row, index) => {
+      const errors = [];
+      const warnings = [];
+
+      // Get student identifier
+      const studentEmail = row['Student Email'] || row['studentEmail'] || row['Email'];
+      const rollNumber = row['Roll Number'] || row['rollNumber'] || row['Roll No'];
+      const enrollmentNumber = row['Enrollment Number'] || row['enrollmentNumber'];
+      const companyName = row['Company Name'] || row['companyName'] || row['Company'];
+
+      // At least one student identifier required
+      if (!studentEmail && !rollNumber && !enrollmentNumber) {
+        errors.push('At least one student identifier (Email, Roll Number, or Enrollment Number) is required');
+      }
+
+      // Check for duplicates
+      const identifier = studentEmail || rollNumber || enrollmentNumber;
+      if (identifier && seenIdentifiers.has(identifier.toLowerCase())) {
+        errors.push('Duplicate student entry in file');
+      } else if (identifier) {
+        seenIdentifiers.add(identifier.toLowerCase());
+      }
+
+      // Company name is required
+      if (!companyName || companyName.trim() === '') {
+        errors.push('Company name is required');
+      }
+
+      // Validate email formats if provided
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (studentEmail && !emailRegex.test(studentEmail)) {
+        errors.push('Invalid student email format');
+      }
+
+      const companyEmail = row['Company Email'] || row['companyEmail'];
+      if (companyEmail && !emailRegex.test(companyEmail)) {
+        warnings.push('Invalid company email format');
+      }
+
+      const hrEmail = row['HR Email'] || row['hrEmail'];
+      if (hrEmail && !emailRegex.test(hrEmail)) {
+        warnings.push('Invalid HR email format');
+      }
+
+      const mentorEmail = row['Faculty Mentor Email'] || row['Mentor Email'];
+      if (mentorEmail && !emailRegex.test(mentorEmail)) {
+        warnings.push('Invalid faculty mentor email format');
+      }
+
+      const record = {
+        ...row,
+        studentIdentifier: studentEmail || rollNumber || enrollmentNumber,
+        companyName: companyName,
+        rowNumber: index + 2,
+        errors,
+        warnings,
+      };
+
+      if (errors.length === 0) {
+        valid.push(record);
+      } else {
+        invalid.push(record);
+      }
+    });
+
+    return { valid, invalid };
+  };
+
+  const handleFileUpload = (file) => {
+    setOriginalFile(file);
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+        if (jsonData.length === 0) {
+          message.error('The file is empty or has no valid data');
+          setOriginalFile(null);
+          return false;
+        }
+
+        if (jsonData.length > 500) {
+          message.error('Maximum 500 records can be uploaded at once');
+          setOriginalFile(null);
+          return false;
+        }
+
+        setFileData(jsonData);
+
+        const results = validateInternshipData(jsonData);
+        setValidationResults(results);
+        setCurrentStep(1);
+
+        if (results.invalid.length > 0) {
+          message.warning(`Found ${results.invalid.length} invalid record(s). Please review before uploading.`);
+        } else {
+          message.success(`All ${results.valid.length} record(s) are valid!`);
+        }
+      } catch (error) {
+        message.error('Failed to read file. Please ensure it is a valid Excel file.');
+        setOriginalFile(null);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+    return false;
+  };
+
+  const handleUpload = async () => {
+    if (validationResults.valid.length === 0) {
+      message.error('No valid records to upload');
+      return;
+    }
+
+    if (!originalFile) {
+      message.error('File not found. Please upload again.');
+      return;
+    }
+
+    // STATE_DIRECTORATE must select an institution
+    if (isStateDirectorate && !selectedInstitution) {
+      message.error('Please select an institution first');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const institutionId = isStateDirectorate ? selectedInstitution : null;
+      const result = await bulkService.uploadSelfInternships(
+        originalFile,
+        (progressEvent) => {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percent);
+        },
+        useAsync,
+        institutionId
+      );
+
+      setUploadResult(result);
+
+      if (useAsync && result.jobId) {
+        message.success('Upload queued successfully! You can track progress in Job History.');
+        setCurrentStep(2);
+      } else {
+        message.success(`Successfully processed ${result.success} internship records`);
+        setCurrentStep(2);
+      }
+    } catch (error) {
+      message.error(error?.response?.data?.message || error?.message || 'Failed to upload data');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resetUpload = () => {
+    setCurrentStep(0);
+    setFileData([]);
+    setOriginalFile(null);
+    setValidationResults({ valid: [], invalid: [] });
+    setUploadProgress(0);
+    setUploadResult(null);
+  };
+
+  const validColumns = [
+    { title: 'Row', dataIndex: 'rowNumber', key: 'rowNumber', width: 60 },
+    { title: 'Student', dataIndex: 'studentIdentifier', key: 'studentIdentifier', ellipsis: true },
+    { title: 'Company', dataIndex: 'companyName', key: 'companyName', ellipsis: true },
+    {
+      title: 'Job Profile',
+      key: 'jobProfile',
+      render: (_, record) => record['Job Profile'] || record['jobProfile'] || '-',
+      ellipsis: true,
+    },
+    {
+      title: 'Stipend',
+      key: 'stipend',
+      render: (_, record) => record['Stipend'] || record['stipend'] || '-',
+    },
+    {
+      title: 'Warnings',
+      dataIndex: 'warnings',
+      key: 'warnings',
+      render: (warnings) =>
+        warnings?.length > 0 ? (
+          <Tooltip title={warnings.join(', ')}>
+            <span className="text-yellow-600">{warnings.length} warning(s)</span>
+          </Tooltip>
+        ) : (
+          '-'
+        ),
+    },
+  ];
+
+  const invalidColumns = [
+    { title: 'Row', dataIndex: 'rowNumber', key: 'rowNumber', width: 60 },
+    { title: 'Student', dataIndex: 'studentIdentifier', key: 'studentIdentifier', ellipsis: true },
+    { title: 'Company', dataIndex: 'companyName', key: 'companyName', ellipsis: true },
+    {
+      title: 'Errors',
+      dataIndex: 'errors',
+      key: 'errors',
+      render: (errors) => (
+        <ul className="text-red-500 text-xs list-disc ml-4">
+          {errors.map((error, idx) => (
+            <li key={idx}>{error}</li>
+          ))}
+        </ul>
+      ),
+    },
+  ];
+
+  return (
+    <div className="p-6">
+      <Card
+        title="Bulk Upload Self-Identified Internships"
+        extra={
+          <Button
+            icon={<HistoryOutlined />}
+            onClick={() => navigate('/bulk/job-history')}
+          >
+            View Job History
+          </Button>
+        }
+      >
+        <Steps current={currentStep} className="mb-6">
+          <Step title="Upload File" description="Select Excel file" />
+          <Step title="Validate" description="Review records" />
+          <Step title="Complete" description="Upload successful" />
+        </Steps>
+
+        {currentStep === 0 && (
+          <div>
+            <Space className="mb-4" size="middle" wrap>
+              {/* Institution selector for STATE_DIRECTORATE */}
+              {isStateDirectorate && (
+                <Select
+                  placeholder="Select Institution"
+                  value={selectedInstitution}
+                  onChange={setSelectedInstitution}
+                  loading={loadingInstitutions}
+                  style={{ width: 300 }}
+                  showSearch
+                  optionFilterProp="label"
+                  suffixIcon={<BankOutlined />}
+                  options={institutions.map((inst) => ({
+                    value: inst.id,
+                    label: inst.name,
+                  }))}
+                />
+              )}
+              <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
+                Download Template
+              </Button>
+            </Space>
+
+            {/* Warning for STATE_DIRECTORATE if no institution selected */}
+            {isStateDirectorate && !selectedInstitution && (
+              <Alert
+                title="Select an Institution"
+                description="As a State Directorate user, you must select an institution before uploading self-identified internships."
+                type="warning"
+                showIcon
+                className="mb-4"
+              />
+            )}
+
+            <Alert
+              title="Instructions"
+              description={
+                <ul className="list-disc ml-4 mt-2">
+                  <li>Download the template file first</li>
+                  <li>Fill in student identifier (Email, Roll Number, or Enrollment Number)</li>
+                  <li>Company Name is required for each record</li>
+                  <li>Include company details, HR info, and faculty mentor (optional)</li>
+                  <li>Maximum 500 records per upload</li>
+                  <li>Supported formats: .xlsx, .xls</li>
+                </ul>
+              }
+              type="info"
+              showIcon
+              icon={<InfoCircleOutlined />}
+              className="mb-4"
+            />
+
+            <Dragger
+              accept=".xlsx,.xls"
+              beforeUpload={handleFileUpload}
+              maxCount={1}
+              showUploadList={false}
+              disabled={isStateDirectorate && !selectedInstitution}
+            >
+              <p className="ant-upload-drag-icon">
+                <UploadOutlined style={{ fontSize: 48, opacity: isStateDirectorate && !selectedInstitution ? 0.5 : 1 }} />
+              </p>
+              <p className="ant-upload-text">
+                {isStateDirectorate && !selectedInstitution
+                  ? 'Please select an institution first'
+                  : 'Click or drag file to upload'}
+              </p>
+              <p className="ant-upload-hint">
+                Upload Excel file with self-identified internship data
+              </p>
+            </Dragger>
+          </div>
+        )}
+
+        {currentStep === 1 && (
+          <div>
+            <Alert
+              title={`Total Records: ${fileData.length}`}
+              description={
+                <div className="flex items-center gap-4">
+                  <span className="text-green-600">
+                    <CheckCircleOutlined /> Valid: {validationResults.valid.length}
+                  </span>
+                  <span className="text-red-600">
+                    <CloseCircleOutlined /> Invalid: {validationResults.invalid.length}
+                  </span>
+                </div>
+              }
+              type={validationResults.invalid.length > 0 ? 'warning' : 'success'}
+              className="mb-4"
+            />
+
+            {validationResults.valid.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-green-600">
+                  Valid Records ({validationResults.valid.length})
+                </h3>
+                <Table
+                  columns={validColumns}
+                  dataSource={validationResults.valid}
+                  rowKey="rowNumber"
+                  pagination={{ pageSize: 5 }}
+                  size="small"
+                />
+              </div>
+            )}
+
+            {validationResults.invalid.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-red-600">
+                  Invalid Records ({validationResults.invalid.length})
+                </h3>
+                <Table
+                  columns={invalidColumns}
+                  dataSource={validationResults.invalid}
+                  rowKey="rowNumber"
+                  pagination={{ pageSize: 5 }}
+                  size="small"
+                />
+              </div>
+            )}
+
+            <Divider />
+
+            <div className="mb-4">
+              <Space>
+                <span>Process in background:</span>
+                <Switch
+                  checked={useAsync}
+                  onChange={setUseAsync}
+                  checkedChildren="Yes"
+                  unCheckedChildren="No"
+                />
+                <Tooltip title="Background processing is recommended for large files. You can track progress in Job History.">
+                  <InfoCircleOutlined className="text-gray-400" />
+                </Tooltip>
+              </Space>
+            </div>
+
+            {uploading && (
+              <div className="mb-4">
+                <Progress percent={uploadProgress} status="active" />
+              </div>
+            )}
+
+            <Space>
+              <Button onClick={resetUpload}>Cancel</Button>
+              <Button
+                type="primary"
+                onClick={handleUpload}
+                loading={uploading}
+                disabled={validationResults.valid.length === 0}
+              >
+                Upload {validationResults.valid.length} Valid Record(s)
+              </Button>
+            </Space>
+          </div>
+        )}
+
+        {currentStep === 2 && (
+          <div className="text-center py-8">
+            <CheckCircleOutlined style={{ fontSize: 72, color: '#52c41a' }} />
+            <h2 className="text-2xl font-semibold mt-4">
+              {useAsync && uploadResult?.jobId ? 'Upload Queued!' : 'Upload Successful!'}
+            </h2>
+            <p className="text-gray-600 mt-2">
+              {useAsync && uploadResult?.jobId
+                ? 'Your upload is being processed in the background.'
+                : `Successfully processed ${uploadResult?.success || 0} internship records.`}
+            </p>
+
+            {uploadResult && !useAsync && (
+              <div className="mt-4 text-left max-w-md mx-auto">
+                <div className="bg-gray-50 p-4 rounded">
+                  <p>
+                    <strong>Total:</strong> {uploadResult.total}
+                  </p>
+                  <p className="text-green-600">
+                    <strong>Success:</strong> {uploadResult.success}
+                  </p>
+                  <p className="text-red-600">
+                    <strong>Failed:</strong> {uploadResult.failed}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <Space className="mt-6">
+              <Button type="primary" onClick={resetUpload}>
+                Upload Another File
+              </Button>
+              <Button onClick={() => navigate('/bulk/job-history')}>View Job History</Button>
+              <Button onClick={() => navigate('/internships/self-identified')}>
+                View Self-Identified Internships
+              </Button>
+            </Space>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+export default BulkSelfInternshipUpload;

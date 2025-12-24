@@ -634,7 +634,7 @@ const Grievances = () => {
             type="info"
             className="mt-3"
             showIcon
-            message={`Can escalate to ${ESCALATION_LEVELS[nextLevel]?.label || nextLevel}`}
+            title={`Can escalate to ${ESCALATION_LEVELS[nextLevel]?.label || nextLevel}`}
           />
         )}
       </Card>
@@ -804,7 +804,7 @@ const Grievances = () => {
         </Row>
         {stats.byEscalationLevel.notSet > 0 && isState && (
           <Alert
-            message={`${stats.byEscalationLevel.notSet} Grievances Need Migration`}
+            title={`${stats.byEscalationLevel.notSet} Grievances Need Migration`}
             description="These grievances were submitted before the escalation system was implemented. Click the button to assign them to Faculty Mentor level."
             type="warning"
             showIcon
@@ -833,7 +833,7 @@ const Grievances = () => {
       {/* Alert for escalated grievances */}
       {stats.escalated > 0 && (
         <Alert
-          message="Escalated Grievances Require Attention"
+          title="Escalated Grievances Require Attention"
           description={`You have ${stats.escalated} escalated grievances that need immediate attention.`}
           type="error"
           showIcon
@@ -974,7 +974,7 @@ const Grievances = () => {
           <div className="space-y-4">
             {/* Status Banner */}
             <Alert
-              message={`Status: ${getStatusConfig(selectedGrievance.status).text}`}
+              title={`Status: ${getStatusConfig(selectedGrievance.status).text}`}
               type={
                 selectedGrievance.status === 'RESOLVED' || selectedGrievance.status === 'CLOSED' ? 'success' :
                 selectedGrievance.status === 'ESCALATED' || selectedGrievance.status === 'REJECTED' ? 'error' : 'info'
@@ -1088,7 +1088,7 @@ const Grievances = () => {
         <Form form={form} layout="vertical" onFinish={handleSubmitResponse}>
           {selectedGrievance && (
             <Alert
-              message={selectedGrievance.title}
+              title={selectedGrievance.title}
               type="info"
               className="mb-4"
             />
@@ -1127,7 +1127,7 @@ const Grievances = () => {
         <Form form={escalateForm} layout="vertical" onFinish={handleSubmitEscalation}>
           {selectedGrievance && (
             <Alert
-              message={`Escalating: ${selectedGrievance.title}`}
+              title={`Escalating: ${selectedGrievance.title}`}
               description={`Current level: ${ESCALATION_LEVELS[selectedGrievance.escalationLevel]?.label || selectedGrievance.escalationLevel}`}
               type="warning"
               className="mb-4"
@@ -1161,7 +1161,7 @@ const Grievances = () => {
         <Form form={assignForm} layout="vertical" onFinish={handleSubmitAssignment}>
           {selectedGrievance && (
             <Alert
-              message={selectedGrievance.title}
+              title={selectedGrievance.title}
               type="info"
               className="mb-4"
             />

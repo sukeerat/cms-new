@@ -689,7 +689,6 @@ const JoiningLettersPage = () => {
           </Button>,
         ]}
         className="rounded-2xl"
-        width={600}
       >
         <div className="space-y-4">
           <div>
@@ -775,7 +774,7 @@ const JoiningLettersPage = () => {
           </div>
         }
         placement="right"
-        width={600}
+        size="default"
         onClose={() => {
           setDetailDrawer(false);
           setSelectedLetter(null);

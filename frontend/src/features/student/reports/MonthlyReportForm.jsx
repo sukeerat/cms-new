@@ -69,7 +69,7 @@ const MonthlyReportForm = () => {
         await dispatch(createMonthlyReport(values)).unwrap();
         message.success('Monthly report submitted successfully');
       }
-      navigate('/student/reports');
+      navigate('/reports/submit');
     } catch (error) {
       message.error(error?.message || 'Operation failed');
     } finally {
@@ -289,7 +289,7 @@ const MonthlyReportForm = () => {
           <Button type="primary" htmlType="submit" loading={loading} size="large">
             {id ? 'Update Report' : 'Submit Report'}
           </Button>
-          <Button style={{ marginLeft: 8 }} onClick={() => navigate('/student/reports')} size="large">
+          <Button style={{ marginLeft: 8 }} onClick={() => navigate('/reports/submit')} size="large">
             Cancel
           </Button>
         </Form.Item>

@@ -167,7 +167,7 @@ const ManageSupervisors = () => {
       title: "Supervisor Details",
       key: "details",
       render: (_, record) => (
-        <Space direction="vertical" size="small">
+        <Space orientation="vertical" size="small">
           <Space>
             <UserOutlined className="text-blue-500" />
             <Text strong>{record.name}</Text>
@@ -475,7 +475,7 @@ const ManageSupervisors = () => {
         >
           {selectedRecord && (
             <div className="py-4">
-              <Space direction="vertical" size="large" className="w-full">
+              <Space orientation="vertical" size="large" className="w-full">
                 <div>
                   <Text type="secondary">Full Name</Text>
                   <div>

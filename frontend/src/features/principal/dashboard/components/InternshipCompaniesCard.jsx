@@ -110,15 +110,17 @@ const InternshipCompaniesCard = () => {
     const companiesData = stats?.byCompany || [];
     const industryData = stats?.byIndustry || [];
 
-    // Backend returns individual status counts: joined, selected, completed, etc.
-    const ongoing = (stats?.joined || 0) + (stats?.selected || 0);
+    // Backend returns individual status counts: approved, joined, selected, completed, etc.
+    // Ongoing = approved + joined + selected (all active internship states)
+    const ongoing = (stats?.approved || 0) + (stats?.joined || 0) + (stats?.selected || 0);
     const completed = stats?.completed || 0;
     const total = stats?.total || companiesData.reduce((sum, c) => sum + (c.count || 0), 0);
 
     return {
       companies: companiesData,
       industryDistribution: industryData,
-      totalCompanies: companiesData.length,
+      // Use totalUniqueCompanies from backend (actual count), fallback to array length (top 10 only)
+      totalCompanies: stats?.totalUniqueCompanies || companiesData.length,
       totalInterns: total,
       ongoingCount: ongoing,
       completedCount: completed,
@@ -189,7 +191,7 @@ const InternshipCompaniesCard = () => {
             '0%': '#9333ea',
             '100%': '#22c55e',
           }}
-          trailColor="rgba(0,0,0,0.06)"
+          railColor="rgba(0,0,0,0.06)"
           showInfo={false}
           size="small"
         />
@@ -262,7 +264,7 @@ const InternshipCompaniesCard = () => {
           className="mt-3 text-primary hover:bg-primary/5 rounded-lg font-medium"
           onClick={() => navigate('/analytics')}
           icon={<RightOutlined />}
-          iconPosition="end"
+          iconPlacement="end"
         >
           View Detailed Analytics
         </Button>

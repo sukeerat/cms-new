@@ -85,7 +85,7 @@ const getStatusColor = (status) => STATUS_COLORS[status] || 'default';
 // Memoized Overview Tab Component - Refactored for Clean UI
 const OverviewTab = memo(({ data, loading, error }) => {
   if (loading) return <div className="flex justify-center py-20"><Spin size="large" /></div>;
-  if (error) return <Alert type="error" message="Failed to load overview" description={error} showIcon className="rounded-xl border-error/20 bg-error/5" />;
+  if (error) return <Alert type="error" title="Failed to load overview" description={error} showIcon className="rounded-xl border-error/20 bg-error/5" />;
   if (!data) return <Empty description="No data available" />;
 
   return (
@@ -229,10 +229,10 @@ const OverviewTab = memo(({ data, loading, error }) => {
           extra={<Tag color={data.joiningLetterStatus?.rate >= 80 ? 'green' : 'orange'} className="rounded-md font-bold">{data.joiningLetterStatus?.rate || 0}%</Tag>}
         >
           <div className="grid grid-cols-2 gap-y-4">
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.joiningLetterStatus?.submitted || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.joiningLetterStatus?.pending || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold', color: '#faad14' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.joiningLetterStatus?.approved || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Rejected</span>} value={data.joiningLetterStatus?.rejected || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold', color: '#ff4d4f' }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.joiningLetterStatus?.submitted || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.joiningLetterStatus?.pending || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold', color: '#faad14' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.joiningLetterStatus?.approved || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold', color: '#52c41a' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Rejected</span>} value={data.joiningLetterStatus?.rejected || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold', color: '#ff4d4f' } }} />
           </div>
         </Card>
 
@@ -249,10 +249,10 @@ const OverviewTab = memo(({ data, loading, error }) => {
           extra={<Tag color={data.monthlyReportStatus?.rate >= 80 ? 'green' : 'orange'} className="rounded-md font-bold">{data.monthlyReportStatus?.rate || 0}%</Tag>}
         >
           <div className="grid grid-cols-2 gap-y-4">
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.monthlyReportStatus?.submitted || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.monthlyReportStatus?.pending || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold', color: '#faad14' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.monthlyReportStatus?.approved || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Missing</span>} value={data.monthlyReportStatus?.notSubmitted || 0} valueStyle={{ fontSize: '18px', fontWeight: 'bold', color: '#ff4d4f' }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.monthlyReportStatus?.submitted || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.monthlyReportStatus?.pending || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold', color: '#faad14' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.monthlyReportStatus?.approved || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold', color: '#52c41a' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Missing</span>} value={data.monthlyReportStatus?.notSubmitted || 0} styles={{ content: { fontSize: '18px', fontWeight: 'bold', color: '#ff4d4f' } }} />
           </div>
         </Card>
       </div>
@@ -318,7 +318,7 @@ OverviewTab.displayName = 'OverviewTab';
 // Memoized Faculty Tab Component - Refactored
 const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
   if (loading) return <div className="flex justify-center py-20"><Spin size="large" /></div>;
-  if (error) return <Alert type="error" message="Failed to load faculty data" description={error} showIcon className="rounded-xl border-error/20 bg-error/5" />;
+  if (error) return <Alert type="error" title="Failed to load faculty data" description={error} showIcon className="rounded-xl border-error/20 bg-error/5" />;
 
   return (
     <div className="space-y-6 p-4">
@@ -363,7 +363,7 @@ const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
             <Avatar size={64} icon={<UserOutlined />} className="bg-indigo-500 rounded-2xl" />
             <div className="flex-1">
               <Title level={5} className="!mb-1 text-text-primary">{principal.name}</Title>
-              <Space direction="vertical" size={0} className="mb-3">
+              <Space orientation="vertical" size={0} className="mb-3">
                 <Text className="text-text-secondary text-sm"><MailOutlined className="mr-2 text-text-tertiary" />{principal.email}</Text>
                 {principal.phoneNo && <Text className="text-text-secondary text-sm"><PhoneOutlined className="mr-2 text-text-tertiary" />{principal.phoneNo}</Text>}
               </Space>
@@ -493,7 +493,7 @@ const StudentDetailModal = memo(({ visible, student, onClose }) => {
 StudentDetailModal.displayName = 'StudentDetailModal';
 
 // Main Component
-const InstituteDetailView = () => {
+const InstituteDetailView = ({ defaultTab = null }) => {
   const dispatch = useDispatch();
   const selectedInstitute = useSelector(selectSelectedInstitute);
   const overview = useSelector(selectInstituteOverview);
@@ -502,6 +502,13 @@ const InstituteDetailView = () => {
   const facultyPrincipal = useSelector(selectInstituteFacultyPrincipal);
 
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Handle defaultTab prop - set tab when provided
+  useEffect(() => {
+    if (defaultTab && ['overview', 'students', 'companies', 'faculty'].includes(defaultTab)) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
   const [studentModalVisible, setStudentModalVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [companyModalVisible, setCompanyModalVisible] = useState(false);
@@ -1039,7 +1046,7 @@ const InstituteDetailView = () => {
                     )}
                   </Card>
                   
-                  {students.error && <Alert type="error" message={students.error} className="rounded-xl" showIcon closable />}
+                  {students.error && <Alert type="error" title={students.error} className="rounded-xl" showIcon closable />}
                   
                   <Card className="rounded-2xl border-border shadow-sm flex-1 overflow-hidden" styles={{ body: { padding: 0 } }}>
                     <div className="h-full flex flex-col">
@@ -1134,7 +1141,7 @@ const InstituteDetailView = () => {
                   </Card>
 
                   {/* Error Alert */}
-                  {companies.error && <Alert type="error" message={companies.error} className="rounded-xl" showIcon closable />}
+                  {companies.error && <Alert type="error" title={companies.error} className="rounded-xl" showIcon closable />}
 
                   {/* Companies Table */}
                   <Card className="rounded-2xl border-border shadow-sm overflow-hidden" styles={{ body: { padding: 0 } }}>

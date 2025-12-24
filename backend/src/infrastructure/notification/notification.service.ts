@@ -1,6 +1,7 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Notification as PrismaNotification, Prisma } from '@prisma/client';
+import { Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Notification as PrismaNotification, Prisma, NotificationSettings } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
+import { NotificationGateway } from './notification.gateway';
 
 interface NotificationOptions {
   page?: number;
@@ -9,18 +10,147 @@ interface NotificationOptions {
   type?: string;
 }
 
+// Map notification types to settings keys
+const TYPE_TO_SETTING_MAP: Record<string, keyof Omit<NotificationSettings, 'id' | 'userId'>> = {
+  // Internship related
+  'INTERNSHIP_DEADLINE': 'internships',
+  'INTERNSHIP_APPLICATION': 'internships',
+  'INTERNSHIP_ACCEPTED': 'internships',
+  'INTERNSHIP_REJECTED': 'internships',
+  'ELIGIBLE_INTERNSHIPS': 'internships',
+
+  // Placement related
+  'PLACEMENT_UPDATE': 'placements',
+  'PLACEMENT_OFFER': 'placements',
+
+  // Assignment/Report related
+  'MONTHLY_REPORT_REMINDER': 'assignments',
+  'MONTHLY_REPORT_URGENT': 'assignments',
+  'ASSIGNMENT_NEW': 'assignments',
+  'ASSIGNMENT_DUE': 'assignments',
+
+  // Attendance related
+  'ATTENDANCE_MARKED': 'attendance',
+  'ATTENDANCE_WARNING': 'attendance',
+
+  // Exam related
+  'EXAM_SCHEDULED': 'examSchedules',
+  'EXAM_REMINDER': 'examSchedules',
+
+  // Announcements/General
+  'ANNOUNCEMENT': 'announcements',
+  'GRIEVANCE_ASSIGNED': 'announcements',
+  'GRIEVANCE_UPDATE': 'announcements',
+  'GRIEVANCE_STATUS_CHANGED': 'announcements',
+  'SUPPORT_TICKET_NEW': 'announcements',
+  'WEEKLY_SUMMARY': 'announcements',
+
+  // Fee related
+  'FEE_DUE': 'feeReminders',
+  'FEE_REMINDER': 'feeReminders',
+
+  // Grades
+  'GRADE_PUBLISHED': 'grades',
+  'GRADE_UPDATE': 'grades',
+};
+
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationGateway))
+    private readonly gateway: NotificationGateway,
   ) {}
 
   /**
-   * Create a new notification
+   * Check if user has enabled notifications for a specific type
+   */
+  private async isNotificationEnabled(userId: string, type: string): Promise<boolean> {
+    try {
+      const settingKey = TYPE_TO_SETTING_MAP[type];
+
+      // If notification type is not mapped, allow it (system notifications)
+      if (!settingKey) {
+        return true;
+      }
+
+      const settings = await this.prisma.notificationSettings.findUnique({
+        where: { userId },
+      });
+
+      // If no settings exist, default to enabled
+      if (!settings) {
+        return true;
+      }
+
+      return settings[settingKey] === true;
+    } catch (error) {
+      this.logger.warn(`Failed to check notification settings for user ${userId}, defaulting to enabled`);
+      return true;
+    }
+  }
+
+  /**
+   * Create a new notification and emit via WebSocket
+   * Respects user notification settings
    */
   async create(
+    userId: string,
+    type: string,
+    title: string,
+    body: string,
+    data?: any,
+  ): Promise<PrismaNotification | null> {
+    try {
+      // Check if user has enabled this notification type
+      const isEnabled = await this.isNotificationEnabled(userId, type);
+      if (!isEnabled) {
+        this.logger.debug(`Notification type ${type} disabled for user ${userId}, skipping`);
+        return null;
+      }
+
+      const savedNotification = await this.prisma.notification.create({
+        data: {
+          userId,
+          type,
+          title,
+          body,
+          data: (data ?? undefined) as Prisma.InputJsonValue | undefined,
+          read: false,
+        },
+      });
+      this.logger.log(`Notification created for user ${userId}`);
+
+      // Emit notification via WebSocket for real-time delivery
+      if (this.gateway) {
+        this.gateway.emitToUser(userId, 'notification', {
+          id: savedNotification.id,
+          title: savedNotification.title,
+          body: savedNotification.body,
+          type: savedNotification.type,
+          data: savedNotification.data,
+          read: savedNotification.read,
+          createdAt: savedNotification.createdAt,
+        });
+
+        // Also emit updated unread count
+        const unreadCount = await this.getUnreadCount(userId);
+        this.gateway.emitToUser(userId, 'unreadCount', { count: unreadCount });
+      }
+
+      return savedNotification;
+    } catch (error) {
+      this.logger.error('Failed to create notification', error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Create notification bypassing user settings (for critical system notifications)
+   */
+  async createForced(
     userId: string,
     type: string,
     title: string,
@@ -38,11 +168,27 @@ export class NotificationService {
           read: false,
         },
       });
-      this.logger.log(`Notification created for user ${userId}`);
+      this.logger.log(`Forced notification created for user ${userId}`);
+
+      // Emit notification via WebSocket for real-time delivery
+      if (this.gateway) {
+        this.gateway.emitToUser(userId, 'notification', {
+          id: savedNotification.id,
+          title: savedNotification.title,
+          body: savedNotification.body,
+          type: savedNotification.type,
+          data: savedNotification.data,
+          read: savedNotification.read,
+          createdAt: savedNotification.createdAt,
+        });
+
+        const unreadCount = await this.getUnreadCount(userId);
+        this.gateway.emitToUser(userId, 'unreadCount', { count: unreadCount });
+      }
 
       return savedNotification;
     } catch (error) {
-      this.logger.error('Failed to create notification', error.stack);
+      this.logger.error('Failed to create forced notification', error.stack);
       throw error;
     }
   }

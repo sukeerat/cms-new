@@ -274,9 +274,16 @@ export const fetchInternships = fetchAvailableInternships;
 // Mentor - extracted from profile data (no separate API call needed)
 export const fetchMentor = createAsyncThunk(
   'student/fetchMentor',
-  async (_, { getState, rejectWithValue }) => {
+  async (params, { getState, rejectWithValue }) => {
     try {
       const state = getState();
+      const lastFetched = state.student.lastFetched.mentor;
+
+      // Check cache first
+      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+        return { cached: true };
+      }
+
       // If profile is already loaded, extract mentor from it
       if (state.student.profile.data) {
         const profile = state.student.profile.data;
@@ -297,8 +304,15 @@ export const fetchMentor = createAsyncThunk(
 // Grievances
 export const fetchGrievances = createAsyncThunk(
   'student/fetchGrievances',
-  async (params, { rejectWithValue }) => {
+  async (params, { getState, rejectWithValue }) => {
     try {
+      const state = getState();
+      const lastFetched = state.student.lastFetched.grievances;
+
+      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
+        return { cached: true };
+      }
+
       const response = await apiClient.get('/student/grievances', { params });
       return response.data;
     } catch (error) {
@@ -489,6 +503,8 @@ const studentSlice = createSlice({
         state.internships.loading = false;
         // Add to internships list
         state.internships.list = [action.payload, ...state.internships.list];
+        state.lastFetched.internships = null; // Invalidate cache after mutation
+        state.lastFetched.applications = null; // Also invalidate applications
       })
       .addCase(applyForInternship.rejected, (state, action) => {
         state.internships.loading = false;
@@ -518,7 +534,7 @@ const studentSlice = createSlice({
       .addCase(createReport.fulfilled, (state, action) => {
         state.reports.loading = false;
         state.reports.list = [action.payload, ...state.reports.list];
-        state.lastFetched.reports = Date.now();
+        state.lastFetched.reports = null; // Invalidate cache after mutation
       })
       .addCase(createReport.rejected, (state, action) => {
         state.reports.loading = false;
@@ -534,7 +550,7 @@ const studentSlice = createSlice({
         if (index !== -1) {
           state.reports.list[index] = action.payload;
         }
-        state.lastFetched.reports = Date.now();
+        state.lastFetched.reports = null; // Invalidate cache after mutation
       })
       .addCase(updateReport.rejected, (state, action) => {
         state.reports.loading = false;
@@ -583,8 +599,10 @@ const studentSlice = createSlice({
       })
       .addCase(fetchMentor.fulfilled, (state, action) => {
         state.mentor.loading = false;
-        state.mentor.data = action.payload;
-        state.lastFetched.mentor = Date.now();
+        if (!action.payload?.cached) {
+          state.mentor.data = action.payload;
+          state.lastFetched.mentor = Date.now();
+        }
       })
       .addCase(fetchMentor.rejected, (state, action) => {
         state.mentor.loading = false;
@@ -598,8 +616,10 @@ const studentSlice = createSlice({
       })
       .addCase(fetchGrievances.fulfilled, (state, action) => {
         state.grievances.loading = false;
-        state.grievances.list = action.payload.data || action.payload;
-        state.lastFetched.grievances = Date.now();
+        if (!action.payload?.cached) {
+          state.grievances.list = action.payload.data || action.payload;
+          state.lastFetched.grievances = Date.now();
+        }
       })
       .addCase(fetchGrievances.rejected, (state, action) => {
         state.grievances.loading = false;
@@ -611,6 +631,7 @@ const studentSlice = createSlice({
       .addCase(createGrievance.fulfilled, (state, action) => {
         state.grievances.loading = false;
         state.grievances.list = [action.payload, ...state.grievances.list];
+        state.lastFetched.grievances = null; // Invalidate cache after mutation
       })
       .addCase(createGrievance.rejected, (state, action) => {
         state.grievances.loading = false;
@@ -626,6 +647,7 @@ const studentSlice = createSlice({
         state.applications.list = state.applications.list.filter(
           app => app.id !== action.payload.id
         );
+        state.lastFetched.applications = null; // Invalidate cache after mutation
       })
       .addCase(withdrawApplication.rejected, (state, action) => {
         state.applications.loading = false;
@@ -640,6 +662,7 @@ const studentSlice = createSlice({
         if (index !== -1) {
           state.applications.list[index] = action.payload;
         }
+        state.lastFetched.applications = null; // Invalidate cache after mutation
       })
       .addCase(updateApplication.rejected, (state, action) => {
         state.applications.loading = false;
@@ -656,6 +679,7 @@ const studentSlice = createSlice({
         if (index !== -1) {
           state.reports.list[index] = action.payload;
         }
+        state.lastFetched.reports = null; // Invalidate cache after mutation
       })
       .addCase(submitMonthlyReport.rejected, (state, action) => {
         state.reports.loading = false;

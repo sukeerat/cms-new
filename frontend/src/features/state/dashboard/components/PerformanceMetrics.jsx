@@ -38,7 +38,7 @@ const MetricItem = ({ label, value, total, color, icon, tooltip }) => {
       <Progress
         percent={percent}
         strokeColor={color}
-        trailColor="rgba(var(--color-border), 0.5)"
+        railColor="rgba(var(--color-border), 0.5)"
         size="small"
         className="!m-0"
       />

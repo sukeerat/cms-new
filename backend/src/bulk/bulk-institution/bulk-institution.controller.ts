@@ -9,9 +9,10 @@ import {
   BadRequestException,
   Res,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
 import { BulkInstitutionService } from './bulk-institution.service';
 import { JwtAuthGuard } from '../../core/auth/guards/jwt-auth.guard';
@@ -19,19 +20,24 @@ import { RolesGuard } from '../../core/auth/guards/roles.guard';
 import { Roles } from '../../core/auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { BulkInstitutionResultDto } from './dto/bulk-institution.dto';
+import { BulkQueueService } from '../shared/bulk-queue.service';
 
 @ApiTags('Bulk Operations - Institutions')
 @Controller('bulk/institutions')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BulkInstitutionController {
-  constructor(private readonly bulkInstitutionService: BulkInstitutionService) {}
+  constructor(
+    private readonly bulkInstitutionService: BulkInstitutionService,
+    private readonly bulkQueueService: BulkQueueService,
+  ) {}
 
   @Post('upload')
   @Roles(Role.SYSTEM_ADMIN, Role.STATE_DIRECTORATE)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Bulk upload institutions from CSV/Excel file (Admin only)' })
   @ApiConsumes('multipart/form-data')
+  @ApiQuery({ name: 'async', type: Boolean, required: false, description: 'Process asynchronously via queue (recommended for large files)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -46,14 +52,15 @@ export class BulkInstitutionController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Bulk upload results',
+    description: 'Bulk upload results or job queued response',
     type: BulkInstitutionResultDto,
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid file or data' })
   async bulkUploadInstitutions(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: any,
-  ): Promise<BulkInstitutionResultDto> {
+    @Query('async') async?: string,
+  ) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
@@ -88,7 +95,27 @@ export class BulkInstitutionController {
       throw new BadRequestException('Maximum 100 institutions can be uploaded at once');
     }
 
-    // Process bulk upload
+    // Check if async processing is requested (default to async for large files)
+    const useAsync = async === 'true' || async === '1' || institutions.length > 20;
+
+    if (useAsync) {
+      // Queue the job for background processing
+      // For state-level uploads, use 'SYSTEM' as institutionId
+      const result = await this.bulkQueueService.queueInstitutionUpload(
+        institutions,
+        user.sub,
+        file.originalname,
+        file.size,
+        'SYSTEM',
+      );
+
+      return {
+        ...result,
+        message: `Bulk upload of ${institutions.length} institutions queued for processing. You can track progress in the Job History.`,
+      };
+    }
+
+    // Process synchronously for smaller files
     const result = await this.bulkInstitutionService.bulkUploadInstitutions(institutions, user.sub);
 
     return result;

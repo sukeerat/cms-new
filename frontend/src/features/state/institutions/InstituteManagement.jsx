@@ -333,7 +333,7 @@ const InstituteManagement = () => {
 
   // Handle view details - navigate to progress page with selected institute
   const handleViewDetails = (institute) => {
-    navigate("/state/institutes", {
+    navigate("/institutions", {
       state: { selectedInstitute: institute }
     });
   };
@@ -381,7 +381,7 @@ const InstituteManagement = () => {
       key: "location",
       width: 200,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text style={{ fontSize: "13px" }} className="text-slate-700">
             <EnvironmentOutlined className="text-slate-500" /> {record.city}, {record.state}
           </Text>
@@ -396,7 +396,7 @@ const InstituteManagement = () => {
       key: "contact",
       width: 220,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text style={{ fontSize: "12px" }} className="text-slate-700">
             <PhoneOutlined className="text-slate-500" /> {record.contactPhone}
           </Text>
@@ -420,7 +420,7 @@ const InstituteManagement = () => {
       width: 150,
       align: "center",
       render: (_, record) => (
-        <Space direction="vertical" size={4}>
+        <Space orientation="vertical" size={4}>
           <Tag
             color={record.isActive ? "success" : "error"}
             icon={
@@ -443,7 +443,7 @@ const InstituteManagement = () => {
       width: 120,
       align: "center",
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           {record.totalStudentSeats && (
             <Text style={{ fontSize: "12px" }} className="text-slate-700">
               <TeamOutlined className="text-slate-500" /> {record.totalStudentSeats} Students
@@ -514,7 +514,7 @@ const InstituteManagement = () => {
                       title={<span className="text-slate-600 dark:text-slate-400">Total Institutes</span>}
                       value={stats.total}
                       prefix={<BankOutlined className="text-blue-500" />}
-                      valueStyle={{ fontWeight: 'bold' }}
+                      styles={{ content: { fontWeight: 'bold' } }}
                       className="text-slate-900 dark:text-slate-100"
                     />
                   </Card>
@@ -525,7 +525,7 @@ const InstituteManagement = () => {
                       title={<span className="text-slate-600 dark:text-slate-400">Active Institutes</span>}
                       value={stats.active}
                       prefix={<CheckCircleOutlined className="text-green-500" />}
-                      valueStyle={{ fontWeight: 'bold' }}
+                      styles={{ content: { fontWeight: 'bold' } }}
                       className="text-slate-900 dark:text-slate-100"
                     />
                   </Card>
@@ -536,7 +536,7 @@ const InstituteManagement = () => {
                       title={<span className="text-slate-600 dark:text-slate-400">Inactive Institutes</span>}
                       value={stats.inactive}
                       prefix={<CloseCircleOutlined className="text-red-500" />}
-                      valueStyle={{ fontWeight: 'bold' }}
+                      styles={{ content: { fontWeight: 'bold' } }}
                       className="text-slate-900 dark:text-slate-100"
                     />
                   </Card>
@@ -547,7 +547,7 @@ const InstituteManagement = () => {
                       title={<span className="text-slate-600 dark:text-slate-400">Autonomous Institutes</span>}
                       value={stats.autonomous}
                       prefix={<CheckCircleOutlined className="text-purple-500" />}
-                      valueStyle={{ fontWeight: 'bold' }}
+                      styles={{ content: { fontWeight: 'bold' } }}
                       className="text-slate-900 dark:text-slate-100"
                     />
                   </Card>
@@ -1091,7 +1091,7 @@ const InstituteManagement = () => {
           width={500}
         >
           {instituteToDelete && (
-            <Space direction="vertical" style={{ width: "100%" }} size="middle">
+            <Space orientation="vertical" style={{ width: "100%" }} size="middle">
               {/* Warning Alert */}
               <Alert
                 title="Warning: This action cannot be undone"

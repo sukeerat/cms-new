@@ -40,13 +40,18 @@ const initialState = {
     bottomPerformers: [],
     topIndustries: [],
     monthlyStats: null,
-    loading: false,
+    // Split loading states to prevent race conditions
+    topPerformersLoading: false,
+    topIndustriesLoading: false,
+    monthlyAnalyticsLoading: false,
     error: null,
   },
   placements: {
     stats: null,
     trends: [],
-    loading: false,
+    // Split loading states to prevent race conditions
+    statsLoading: false,
+    trendsLoading: false,
     error: null,
   },
   joiningLetters: {
@@ -145,8 +150,13 @@ const initialState = {
     staff: null,
     staffKey: null,
     reports: null,
-    analytics: null,
-    placements: null,
+    // Split analytics timestamps to prevent race conditions
+    topPerformers: null,
+    topIndustries: null,
+    monthlyAnalytics: null,
+    // Split placement timestamps
+    placementStats: null,
+    placementTrends: null,
     joiningLetters: null,
     criticalAlerts: null,
     actionItems: null,
@@ -524,13 +534,13 @@ export const generateReport = createAsyncThunk(
   }
 );
 
-// Analytics thunks
+// Analytics thunks - each uses its own timestamp to prevent race conditions
 export const fetchTopPerformers = createAsyncThunk(
   'state/fetchTopPerformers',
   async (params = {}, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const lastFetched = state.state.lastFetched.analytics;
+      const lastFetched = state.state.lastFetched.topPerformers;
 
       if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
         return { cached: true };
@@ -549,10 +559,10 @@ export const fetchTopIndustries = createAsyncThunk(
   async (params = {}, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const lastFetched = state.state.lastFetched.analytics;
+      const lastFetched = state.state.lastFetched.topIndustries;
 
-      // Skip cache for industries to always get fresh data unless forceRefresh is explicitly false
-      if (lastFetched && params?.forceRefresh === false && (Date.now() - lastFetched) < CACHE_DURATION) {
+      // Fixed: Use standard cache logic (was inverted before)
+      if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
         return { cached: true };
       }
 
@@ -569,7 +579,7 @@ export const fetchMonthlyAnalytics = createAsyncThunk(
   async (params = {}, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const lastFetched = state.state.lastFetched.analytics;
+      const lastFetched = state.state.lastFetched.monthlyAnalytics;
 
       if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
         return { cached: true };
@@ -693,13 +703,13 @@ export const checkReportStatus = createAsyncThunk(
   }
 );
 
-// Placement Statistics thunks
+// Placement Statistics thunks - each uses its own timestamp
 export const fetchPlacementStats = createAsyncThunk(
   'state/fetchPlacementStats',
   async (params = {}, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const lastFetched = state.state.lastFetched.placements;
+      const lastFetched = state.state.lastFetched.placementStats;
 
       if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
         return { cached: true };
@@ -718,7 +728,7 @@ export const fetchPlacementTrends = createAsyncThunk(
   async (params = {}, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const lastFetched = state.state.lastFetched.placements;
+      const lastFetched = state.state.lastFetched.placementTrends;
 
       if (lastFetched && !params?.forceRefresh && (Date.now() - lastFetched) < CACHE_DURATION) {
         return { cached: true };
@@ -1158,7 +1168,8 @@ const stateSlice = createSlice({
       .addCase(createInstitution.fulfilled, (state, action) => {
         state.institutions.loading = false;
         state.institutions.list = [action.payload, ...state.institutions.list];
-        state.lastFetched.institutions = Date.now();
+        state.lastFetched.institutions = null; // Invalidate cache after mutation
+        state.lastFetched.institutionsKey = null;
       })
       .addCase(createInstitution.rejected, (state, action) => {
         state.institutions.loading = false;
@@ -1174,7 +1185,8 @@ const stateSlice = createSlice({
         if (index !== -1) {
           state.institutions.list[index] = action.payload;
         }
-        state.lastFetched.institutions = Date.now();
+        state.lastFetched.institutions = null; // Invalidate cache after mutation
+        state.lastFetched.institutionsKey = null;
       })
       .addCase(updateInstitution.rejected, (state, action) => {
         state.institutions.loading = false;
@@ -1187,7 +1199,8 @@ const stateSlice = createSlice({
       .addCase(deleteInstitution.fulfilled, (state, action) => {
         state.institutions.loading = false;
         state.institutions.list = state.institutions.list.filter(i => i.id !== action.payload.id);
-        state.lastFetched.institutions = Date.now();
+        state.lastFetched.institutions = null; // Invalidate cache after mutation
+        state.lastFetched.institutionsKey = null;
       })
       .addCase(deleteInstitution.rejected, (state, action) => {
         state.institutions.loading = false;
@@ -1236,7 +1249,8 @@ const stateSlice = createSlice({
       .addCase(createPrincipal.fulfilled, (state, action) => {
         state.principals.loading = false;
         state.principals.list = [action.payload, ...state.principals.list];
-        state.lastFetched.principals = Date.now();
+        state.lastFetched.principals = null; // Invalidate cache after mutation
+        state.lastFetched.principalsKey = null;
       })
       .addCase(createPrincipal.rejected, (state, action) => {
         state.principals.loading = false;
@@ -1254,7 +1268,8 @@ const stateSlice = createSlice({
           state.principals.list[index] = updatedPrincipal;
         }
         state.currentPrincipal = null; // Clear current principal after update
-        state.lastFetched.principals = Date.now();
+        state.lastFetched.principals = null; // Invalidate cache after mutation
+        state.lastFetched.principalsKey = null;
       })
       .addCase(updatePrincipal.rejected, (state, action) => {
         state.principals.loading = false;
@@ -1267,7 +1282,8 @@ const stateSlice = createSlice({
       .addCase(deletePrincipal.fulfilled, (state, action) => {
         state.principals.loading = false;
         state.principals.list = state.principals.list.filter(p => p.id !== action.payload.id);
-        state.lastFetched.principals = Date.now();
+        state.lastFetched.principals = null; // Invalidate cache after mutation
+        state.lastFetched.principalsKey = null;
       })
       .addCase(deletePrincipal.rejected, (state, action) => {
         state.principals.loading = false;
@@ -1418,43 +1434,49 @@ const stateSlice = createSlice({
         state.reports.error = action.payload;
       })
 
-      // Analytics
+      // Analytics - each thunk uses its own loading state to prevent race conditions
       .addCase(fetchTopPerformers.pending, (state) => {
-        state.analytics.loading = true;
+        state.analytics.topPerformersLoading = true;
         state.analytics.error = null;
       })
       .addCase(fetchTopPerformers.fulfilled, (state, action) => {
-        state.analytics.loading = false;
+        state.analytics.topPerformersLoading = false;
         if (!action.payload.cached) {
           state.analytics.topPerformers = action.payload.topPerformers || [];
           state.analytics.bottomPerformers = action.payload.bottomPerformers || [];
-          state.lastFetched.analytics = Date.now();
+          state.lastFetched.topPerformers = Date.now();
         }
       })
       .addCase(fetchTopPerformers.rejected, (state, action) => {
-        state.analytics.loading = false;
+        state.analytics.topPerformersLoading = false;
         state.analytics.error = action.payload;
       })
       .addCase(fetchTopIndustries.pending, (state) => {
-        state.analytics.loading = true;
+        state.analytics.topIndustriesLoading = true;
       })
       .addCase(fetchTopIndustries.fulfilled, (state, action) => {
-        state.analytics.loading = false;
-        state.analytics.topIndustries = action.payload.data || action.payload || [];
+        state.analytics.topIndustriesLoading = false;
+        if (!action.payload.cached) {
+          state.analytics.topIndustries = action.payload.data || action.payload || [];
+          state.lastFetched.topIndustries = Date.now();
+        }
       })
       .addCase(fetchTopIndustries.rejected, (state, action) => {
-        state.analytics.loading = false;
+        state.analytics.topIndustriesLoading = false;
         state.analytics.error = action.payload;
       })
       .addCase(fetchMonthlyAnalytics.pending, (state) => {
-        state.analytics.loading = true;
+        state.analytics.monthlyAnalyticsLoading = true;
       })
       .addCase(fetchMonthlyAnalytics.fulfilled, (state, action) => {
-        state.analytics.loading = false;
-        state.analytics.monthlyStats = action.payload.data || action.payload;
+        state.analytics.monthlyAnalyticsLoading = false;
+        if (!action.payload.cached) {
+          state.analytics.monthlyStats = action.payload.data || action.payload;
+          state.lastFetched.monthlyAnalytics = Date.now();
+        }
       })
       .addCase(fetchMonthlyAnalytics.rejected, (state, action) => {
-        state.analytics.loading = false;
+        state.analytics.monthlyAnalyticsLoading = false;
         state.analytics.error = action.payload;
       })
 
@@ -1557,35 +1579,35 @@ const stateSlice = createSlice({
         }
       })
 
-      // Placement Stats
+      // Placement Stats - each thunk uses its own loading state to prevent race conditions
       .addCase(fetchPlacementStats.pending, (state) => {
-        state.placements.loading = true;
+        state.placements.statsLoading = true;
         state.placements.error = null;
       })
       .addCase(fetchPlacementStats.fulfilled, (state, action) => {
-        state.placements.loading = false;
+        state.placements.statsLoading = false;
         if (!action.payload.cached) {
           state.placements.stats = action.payload;
-          state.lastFetched.placements = Date.now();
+          state.lastFetched.placementStats = Date.now();
         }
       })
       .addCase(fetchPlacementStats.rejected, (state, action) => {
-        state.placements.loading = false;
+        state.placements.statsLoading = false;
         state.placements.error = action.payload;
       })
       .addCase(fetchPlacementTrends.pending, (state) => {
-        state.placements.loading = true;
+        state.placements.trendsLoading = true;
         state.placements.error = null;
       })
       .addCase(fetchPlacementTrends.fulfilled, (state, action) => {
-        state.placements.loading = false;
+        state.placements.trendsLoading = false;
         if (!action.payload.cached) {
           state.placements.trends = action.payload || [];
-          state.lastFetched.placements = Date.now();
+          state.lastFetched.placementTrends = Date.now();
         }
       })
       .addCase(fetchPlacementTrends.rejected, (state, action) => {
-        state.placements.loading = false;
+        state.placements.trendsLoading = false;
         state.placements.error = action.payload;
       })
 
@@ -1826,7 +1848,15 @@ export const selectTopPerformers = (state) => state.state.analytics.topPerformer
 export const selectBottomPerformers = (state) => state.state.analytics.bottomPerformers;
 export const selectTopIndustries = (state) => state.state.analytics.topIndustries;
 export const selectMonthlyStats = (state) => state.state.analytics.monthlyStats;
-export const selectAnalyticsLoading = (state) => state.state.analytics.loading;
+// Split loading selectors for granular control
+export const selectTopPerformersLoading = (state) => state.state.analytics.topPerformersLoading;
+export const selectTopIndustriesLoading = (state) => state.state.analytics.topIndustriesLoading;
+export const selectMonthlyAnalyticsLoading = (state) => state.state.analytics.monthlyAnalyticsLoading;
+// Combined loading selector for backward compatibility
+export const selectAnalyticsLoading = (state) =>
+  state.state.analytics.topPerformersLoading ||
+  state.state.analytics.topIndustriesLoading ||
+  state.state.analytics.monthlyAnalyticsLoading;
 export const selectAnalyticsError = (state) => state.state.analytics.error;
 
 // Report Builder selectors
@@ -1840,7 +1870,13 @@ export const selectReportBuilderError = (state) => state.state.reportBuilder.err
 // Placement selectors
 export const selectPlacementStats = (state) => state.state.placements.stats;
 export const selectPlacementTrends = (state) => state.state.placements.trends;
-export const selectPlacementsLoading = (state) => state.state.placements.loading;
+// Split loading selectors for granular control
+export const selectPlacementStatsLoading = (state) => state.state.placements.statsLoading;
+export const selectPlacementTrendsLoading = (state) => state.state.placements.trendsLoading;
+// Combined loading selector for backward compatibility
+export const selectPlacementsLoading = (state) =>
+  state.state.placements.statsLoading ||
+  state.state.placements.trendsLoading;
 export const selectPlacementsError = (state) => state.state.placements.error;
 
 // Joining Letter selectors
@@ -1861,8 +1897,11 @@ export const selectAnyLoading = (state) =>
   state.state.institutions.loading ||
   state.state.principals.loading ||
   state.state.reports.loading ||
-  state.state.analytics.loading ||
-  state.state.placements.loading ||
+  state.state.analytics.topPerformersLoading ||
+  state.state.analytics.topIndustriesLoading ||
+  state.state.analytics.monthlyAnalyticsLoading ||
+  state.state.placements.statsLoading ||
+  state.state.placements.trendsLoading ||
   state.state.joiningLetters.loading;
 
 // Institute Detail View selectors

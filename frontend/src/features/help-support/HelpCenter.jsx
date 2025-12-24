@@ -34,32 +34,62 @@ const { Title, Text, Paragraph } = Typography;
 const { Panel } = Collapse;
 const { TextArea } = Input;
 
-// Simple markdown-like text to HTML converter
+// Enhanced markdown-like text to HTML converter
 const renderMarkdown = (text) => {
   if (!text) return '';
 
-  // Convert markdown-like formatting to HTML
-  let html = text
-    // Escape HTML entities
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // Bold text with **
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    // Bullet points with •
-    .replace(/^• (.+)$/gm, '<li>$1</li>')
-    // Numbered lists (1., 2., etc.)
-    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-    // Convert newlines to <br> for regular text
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br/>');
+  // Split into paragraphs first
+  const paragraphs = text.split(/\n\n+/);
 
-  // Wrap list items in <ul> tags
-  if (html.includes('<li>')) {
-    html = html.replace(/(<li>.*?<\/li>)+/g, '<ul style="margin: 8px 0; padding-left: 20px;">$&</ul>');
-  }
+  const processedParagraphs = paragraphs.map(para => {
+    let html = para
+      // Escape HTML entities
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Bold text with **
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-text-primary font-semibold">$1</strong>')
+      // Code/monospace with backticks
+      .replace(/`([^`]+)`/g, '<code class="bg-background-tertiary px-1.5 py-0.5 rounded text-primary text-sm font-mono">$1</code>');
 
-  return `<p>${html}</p>`;
+    // Check if this paragraph is a list
+    const lines = html.split('\n');
+    const isBulletList = lines.every(line => line.trim() === '' || line.trim().startsWith('•') || line.trim().startsWith('-'));
+    const isNumberedList = lines.every(line => line.trim() === '' || /^\d+\./.test(line.trim()));
+
+    if (isBulletList && lines.some(line => line.trim().startsWith('•') || line.trim().startsWith('-'))) {
+      const listItems = lines
+        .filter(line => line.trim())
+        .map(line => {
+          const content = line.replace(/^[•-]\s*/, '').trim();
+          return `<li class="mb-1.5 pl-1">${content}</li>`;
+        })
+        .join('');
+      return `<ul class="list-disc list-outside ml-5 my-3 space-y-1 text-text-secondary">${listItems}</ul>`;
+    }
+
+    if (isNumberedList && lines.some(line => /^\d+\./.test(line.trim()))) {
+      const listItems = lines
+        .filter(line => line.trim())
+        .map(line => {
+          const content = line.replace(/^\d+\.\s*/, '').trim();
+          return `<li class="mb-1.5 pl-1">${content}</li>`;
+        })
+        .join('');
+      return `<ol class="list-decimal list-outside ml-5 my-3 space-y-1 text-text-secondary">${listItems}</ol>`;
+    }
+
+    // Check if it's a header-like line (ends with :)
+    if (html.trim().endsWith(':') && !html.includes('<li>') && html.length < 100) {
+      return `<p class="font-semibold text-text-primary mt-4 mb-2">${html}</p>`;
+    }
+
+    // Regular paragraph
+    html = html.replace(/\n/g, '<br/>');
+    return `<p class="mb-3 text-text-secondary leading-relaxed">${html}</p>`;
+  });
+
+  return processedParagraphs.join('');
 };
 
 const HelpCenter = () => {
@@ -225,7 +255,7 @@ const HelpCenter = () => {
               className="rounded-2xl border-border shadow-sm bg-surface"
               size="small"
             >
-              <Space direction="vertical" style={{ width: '100%' }}>
+              <Space orientation="vertical" style={{ width: '100%' }}>
                 <Button
                   type={selectedCategory === null ? 'primary' : 'text'}
                   block
@@ -308,48 +338,61 @@ const HelpCenter = () => {
                       <Panel
                         key={faq.id}
                         header={
-                          <div className="py-2">
-                            <Text strong className="text-text-primary text-base block mb-1">{faq.title}</Text>
-                            <Space size={8}>
-                              <Tag color={getCategoryInfo(faq.category).color} className="rounded-md border-0 font-bold uppercase tracking-wider text-[10px] m-0">
-                                {getCategoryInfo(faq.category).label}
-                              </Tag>
-                              <Text className="text-text-tertiary text-xs flex items-center gap-1">
-                                <EyeOutlined /> {faq.viewCount}
-                              </Text>
-                            </Space>
+                          <div className="py-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <QuestionCircleOutlined className="text-primary text-sm" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <Text strong className="text-text-primary text-[15px] block mb-1.5 leading-snug">{faq.title}</Text>
+                                <Space size={8} wrap>
+                                  <Tag color={getCategoryInfo(faq.category).color} className="rounded-md border-0 font-bold uppercase tracking-wider text-[10px] m-0">
+                                    {getCategoryInfo(faq.category).label}
+                                  </Tag>
+                                  <Text className="text-text-tertiary text-xs flex items-center gap-1">
+                                    <EyeOutlined /> {faq.viewCount} views
+                                  </Text>
+                                  <Text className="text-text-tertiary text-xs flex items-center gap-1">
+                                    <LikeOutlined /> {faq.helpfulCount || 0} found helpful
+                                  </Text>
+                                </Space>
+                              </div>
+                            </div>
                           </div>
                         }
-                        className="border-b border-border last:border-0"
+                        className="border-b border-border last:border-0 hover:bg-background-secondary/30 transition-colors"
                       >
-                        <div className="pb-4 pl-2 pr-4">
+                        <div className="pb-5 pl-11 pr-4">
                           {faq.summary && (
-                            <Paragraph className="text-text-secondary italic mb-4 border-l-2 border-primary/30 pl-3">
-                              {faq.summary}
-                            </Paragraph>
+                            <div className="bg-primary/5 border-l-4 border-primary rounded-r-lg p-3 mb-4">
+                              <Text className="text-text-secondary text-sm italic">{faq.summary}</Text>
+                            </div>
                           )}
                           <div
-                            className="text-text-primary leading-relaxed"
+                            className="faq-content prose prose-sm max-w-none"
                             dangerouslySetInnerHTML={{ __html: renderMarkdown(faq.content) }}
                           />
 
                           {faq.tags && faq.tags.length > 0 && (
-                            <div className="mt-4 mb-4">
+                            <div className="mt-5 pt-4 border-t border-border/50">
+                              <Text className="text-text-tertiary text-xs mr-2">Related topics:</Text>
                               {faq.tags.map((tag) => (
-                                <Tag key={tag} className="rounded-full bg-background-tertiary border-border text-text-secondary">{tag}</Tag>
+                                <Tag key={tag} className="rounded-full bg-background-tertiary border-0 text-text-secondary text-xs mb-1">{tag}</Tag>
                               ))}
                             </div>
                           )}
 
-                          <div className="border-t border-border pt-3 mt-4 flex items-center gap-3">
-                            <Text className="text-text-tertiary text-sm">Was this helpful?</Text>
+                          <div className="bg-background-tertiary/50 rounded-xl p-3 mt-5 flex items-center justify-between">
+                            <Text className="text-text-tertiary text-sm">Was this article helpful?</Text>
                             <Button
+                              type="primary"
+                              ghost
                               size="small"
                               icon={<LikeOutlined />}
                               onClick={() => handleMarkHelpful(faq.id)}
-                              className="rounded-lg text-text-secondary hover:text-primary hover:border-primary"
+                              className="rounded-lg"
                             >
-                              Yes ({faq.helpfulCount || 0})
+                              Yes, this helped
                             </Button>
                           </div>
                         </div>

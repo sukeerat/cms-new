@@ -32,17 +32,11 @@ const InstitutionsTable = ({ institutions, loading, onViewAll, onViewDetails, mo
     }
   };
 
-  // Calculate compliance score based on assignments, visits, and reports
+  // Use the pre-calculated compliance score from backend (consistent with Institution Overview)
   const getComplianceScore = (stats) => {
     if (!stats) return 0;
-    const { studentsWithInternships, assigned, facultyVisits, reportsSubmitted } = stats;
-    if (studentsWithInternships === 0) return 100;
-
-    const assignmentScore = (assigned / studentsWithInternships) * 100;
-    const visitScore = facultyVisits > 0 ? Math.min((facultyVisits / studentsWithInternships) * 100, 100) : 0;
-    const reportScore = (reportsSubmitted / studentsWithInternships) * 100;
-
-    return Math.round((assignmentScore + visitScore + reportScore) / 3);
+    // Use backend-calculated complianceScore for consistency
+    return stats.complianceScore ?? 0;
   };
 
   const columns = [
@@ -110,7 +104,7 @@ const InstitutionsTable = ({ institutions, loading, onViewAll, onViewDetails, mo
                 showInfo={false}
                 size="small"
                 strokeColor="rgb(var(--color-primary))"
-                trailColor="rgba(var(--color-border), 0.5)"
+                railColor="rgba(var(--color-border), 0.5)"
                 className="!m-0"
               />
             </div>

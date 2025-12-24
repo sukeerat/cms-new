@@ -28,34 +28,9 @@ function Login() {
   const [activeTab, setActiveTab] = useState("email");
   const { token } = theme.useToken();
 
-  // Navigate based on role stored in the login response (role expected uppercase)
-  const navigateByRole = (loginResp) => {
-    let resp = loginResp;
-    if (typeof resp === "string") {
-      try {
-        resp = JSON.parse(resp);
-      } catch (e) {
-        resp = {};
-      }
-    }
-
-    const roleRaw =
-      resp?.user?.role || resp?.role || (Array.isArray(resp?.roles) && resp.roles[0]) ||
-      (Array.isArray(resp?.user?.roles) && resp.user.roles[0]);
-
-    const role = (roleRaw || "").toString().toUpperCase();
-
-    if (role === "TEACHER" || role === "FACULTY_SUPERVISOR") {
-      navigate("/faculty/supervision");
-    } else if (role === "PRINCIPAL") {
-      navigate("/principal/analytics");
-    } else if (role === "STUDENT") {
-      navigate("/internships/dashboard");
-    } else if (role === "STATE_DIRECTORATE") {
-      navigate("/state/dashboard");
-    } else {
-      navigate("/main");
-    }
+  // Navigate to dashboard after login - DashboardRouter handles role-based routing
+  const navigateByRole = () => {
+    navigate("/dashboard");
   };
 
   const onFinishEmail = async (values) => {

@@ -327,7 +327,7 @@ const SelfIdentifiedApproval = () => {
       key: "actions",
       width: "18%",
       render: (_, record) => (
-        <Space direction="vertical" size="small">
+        <Space orientation="vertical" size="small">
           <Button
             type="link"
             icon={<EyeOutlined />}

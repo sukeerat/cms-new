@@ -35,7 +35,7 @@ function StudentLogin() {
         tokenStorage.setRefreshToken(res.data.refresh_token || res.data.refreshToken);
       }
       toast.success("Login successful!");
-      navigate("/main");
+      navigate("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
       // Check for rate limiting (429 status code)
@@ -150,7 +150,7 @@ function StudentLogin() {
             <p className="text-text-secondary text-sm">
               Don't have an account?{" "}
               <Link
-                to="/student/signup"
+                to="/student-signup"
                 className="text-primary hover:text-primary-600 font-bold no-underline"
               >
                 Create Account

@@ -118,6 +118,29 @@ export interface ServiceAlertPayload {
 }
 
 /**
+ * Backup progress payload
+ */
+export interface BackupProgressPayload {
+  backupId: string;
+  status: 'in_progress' | 'completed' | 'failed';
+  progress?: number;
+  message?: string;
+  timestamp: Date;
+}
+
+/**
+ * Bulk operation progress payload
+ */
+export interface BulkOperationProgressPayload {
+  operationId: string;
+  type: string;
+  progress: number;
+  total: number;
+  completed: number;
+  timestamp: Date;
+}
+
+/**
  * Connected user data stored in socket
  */
 export interface SocketUserData {

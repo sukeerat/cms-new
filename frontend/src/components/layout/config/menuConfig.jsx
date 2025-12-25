@@ -191,15 +191,52 @@ export const menuConfig = {
   // ==========================================
   // SYSTEM ADMIN MENUS
   // ==========================================
-  SYSTEM_ADMIN: {
-    key: 'system-admin',
-    title: 'System Administration',
-    icon: <SafetyCertificateOutlined />,
+  SYSTEM_ADMIN_OVERVIEW: {
+    key: 'admin-overview',
+    title: 'Overview',
+    icon: <DashboardOutlined />,
     items: [
       { key: 'system-admin-dashboard', label: 'Dashboard', icon: <DashboardOutlined />, path: '/admin/dashboard' },
-      { key: 'technical-queries', label: 'Technical Queries', icon: <ExclamationCircleOutlined />, path: '/support/queries' },
-      { key: 'audit-logs', label: 'Audit Logs', icon: <AuditOutlined />, path: '/audit-logs' },
-      { key: 'settings', label: 'System Settings', icon: <SettingOutlined />, path: '/admin/settings' },
+      { key: 'system-health', label: 'System Health', icon: <SafetyCertificateOutlined />, path: '/admin/health' },
+      { key: 'analytics', label: 'Analytics', icon: <LineChartOutlined />, path: '/admin/analytics' },
+    ],
+  },
+  SYSTEM_ADMIN_USERS: {
+    key: 'admin-users',
+    title: 'User Management',
+    icon: <TeamOutlined />,
+    items: [
+      { key: 'all-users', label: 'All Users', icon: <UsergroupAddOutlined />, path: '/admin/users' },
+      { key: 'active-sessions', label: 'Active Sessions', icon: <LaptopOutlined />, path: '/admin/sessions' },
+      { key: 'security-insights', label: 'Security Insights', icon: <SafetyOutlined />, path: '/admin/security' },
+    ],
+  },
+  SYSTEM_ADMIN_BACKUP: {
+    key: 'admin-backup',
+    title: 'Backup & Restore',
+    icon: <DatabaseOutlined />,
+    items: [
+      { key: 'backup-management', label: 'Backup Management', icon: <CloudUploadOutlined />, path: '/admin/backups' },
+      { key: 'backup-schedules', label: 'Scheduled Backups', icon: <HistoryOutlined />, path: '/admin/backup-schedules' },
+    ],
+  },
+  SYSTEM_ADMIN_CONFIG: {
+    key: 'admin-config',
+    title: 'Configuration',
+    icon: <SettingOutlined />,
+    items: [
+      { key: 'system-settings', label: 'System Settings', icon: <SettingOutlined />, path: '/admin/settings' },
+      { key: 'feature-flags', label: 'Feature Flags', icon: <SwapOutlined />, path: '/admin/features' },
+      { key: 'audit-logs', label: 'Audit Logs', icon: <AuditOutlined />, path: '/admin/audit-logs' },
+    ],
+  },
+  SYSTEM_ADMIN_SUPPORT: {
+    key: 'admin-support',
+    title: 'Support',
+    icon: <CustomerServiceOutlined />,
+    items: [
+      { key: 'technical-queries', label: 'Technical Queries', icon: <ExclamationCircleOutlined />, path: '/admin/queries' },
+      { key: 'system-alerts', label: 'System Alerts', icon: <AlertOutlined />, path: '/admin/alerts' },
     ],
   },
 
@@ -267,7 +304,11 @@ export const getMenuSectionsForRole = (role) => {
       break;
 
     case 'SYSTEM_ADMIN':
-      sections.push(menuConfig.SYSTEM_ADMIN);
+      sections.push(menuConfig.SYSTEM_ADMIN_OVERVIEW);
+      sections.push(menuConfig.SYSTEM_ADMIN_USERS);
+      sections.push(menuConfig.SYSTEM_ADMIN_BACKUP);
+      sections.push(menuConfig.SYSTEM_ADMIN_CONFIG);
+      sections.push(menuConfig.SYSTEM_ADMIN_SUPPORT);
       break;
 
     case 'ADMISSION_OFFICER':

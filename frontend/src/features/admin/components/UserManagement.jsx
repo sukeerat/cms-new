@@ -27,8 +27,10 @@ import {
   SearchOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { adminService } from '../../../services/admin.service';
+import { Progress } from 'antd';
 
 const { Text } = Typography;
 
@@ -44,7 +46,7 @@ const ROLES = [
   { value: 'INDUSTRY_PARTNER', label: 'Industry Partner', color: 'orange' },
 ];
 
-const UserManagement = () => {
+const UserManagement = ({ bulkOperationProgress, connected }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 });
@@ -83,6 +85,13 @@ const UserManagement = () => {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Refresh users when bulk operation completes via WebSocket
+  useEffect(() => {
+    if (bulkOperationProgress?.completed === bulkOperationProgress?.total && bulkOperationProgress?.total > 0) {
+      fetchUsers();
+    }
+  }, [bulkOperationProgress, fetchUsers]);
 
   const handleTableChange = (paginationConfig) => {
     fetchUsers(paginationConfig.current, paginationConfig.pageSize);
@@ -303,6 +312,29 @@ const UserManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Real-time Bulk Operation Progress */}
+      {bulkOperationProgress && bulkOperationProgress.completed < bulkOperationProgress.total && (
+        <Card className="shadow-sm border-primary/50 rounded-xl bg-primary/5">
+          <div className="flex items-center gap-4">
+            <SyncOutlined spin className="text-primary text-2xl" />
+            <div className="flex-1">
+              <Text strong className="text-text-primary block">
+                Bulk {bulkOperationProgress.type || 'Operation'} in Progress
+              </Text>
+              <Text className="text-text-secondary text-sm">
+                Processing {bulkOperationProgress.completed} of {bulkOperationProgress.total} users...
+              </Text>
+              <Progress
+                percent={Math.round((bulkOperationProgress.completed / bulkOperationProgress.total) * 100)}
+                status="active"
+                className="mt-2 mb-0"
+                strokeColor={{ from: '#1890ff', to: '#52c41a' }}
+              />
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Stats Row */}
       <Row gutter={[16, 16]}>
         {Object.entries(roleStats).slice(0, 6).map(([role, count]) => {

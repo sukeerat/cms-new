@@ -24,7 +24,9 @@ import {
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173')
+      .split(',')
+      .map(o => o.trim()),
     credentials: true,
   },
   namespace: '/ws',

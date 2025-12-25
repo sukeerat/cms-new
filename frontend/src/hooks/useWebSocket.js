@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const WS_NAMESPACE = '/ws';
+const WS_PATH = '/socket.io';
 
 // Singleton socket instance
 let sharedSocket = null;
@@ -38,6 +39,7 @@ export const useWebSocket = () => {
     // Create shared socket if not exists
     if (!sharedSocket) {
       sharedSocket = io(`${SOCKET_URL}${WS_NAMESPACE}`, {
+        path: WS_PATH,
         auth: { token },
         query: { token },
         transports: ['websocket', 'polling'],
@@ -45,6 +47,8 @@ export const useWebSocket = () => {
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
+        forceNew: false,
+        timeout: 10000,
       });
 
       // Connection events

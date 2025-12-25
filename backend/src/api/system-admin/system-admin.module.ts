@@ -11,8 +11,12 @@ import { SystemAdminController } from './system-admin.controller';
 import {
   MetricsService,
   BackupService,
+  BackupSchedulerService,
   UserManagementService,
   SessionService,
+  AnalyticsService,
+  SystemConfigService,
+  HealthMonitorService,
 } from './services';
 import { MetricsGateway } from './gateways/metrics.gateway';
 
@@ -33,10 +37,14 @@ import { MetricsGateway } from './gateways/metrics.gateway';
   providers: [
     MetricsService,
     BackupService,
+    BackupSchedulerService,
     UserManagementService,
     SessionService,
+    AnalyticsService,
+    SystemConfigService,
+    HealthMonitorService,
     MetricsGateway,
   ],
-  exports: [MetricsService, MetricsGateway],
+  exports: [MetricsService, MetricsGateway, SystemConfigService],
 })
 export class SystemAdminModule {}

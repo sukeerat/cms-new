@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role, Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { NotificationService } from './notification.service';
 import { WebSocketService } from '../websocket/websocket.service';
@@ -269,14 +269,11 @@ export class NotificationSenderService {
     roleFilter?: Role[],
   ): Promise<{ sentCount: number; skippedCount: number }> {
     try {
-      const whereClause: any = {
+      const whereClause: Prisma.UserWhereInput = {
         institutionId,
         active: true,
+        ...(roleFilter && roleFilter.length > 0 ? { role: { in: roleFilter } } : {}),
       };
-
-      if (roleFilter && roleFilter.length > 0) {
-        whereClause.role = { in: roleFilter };
-      }
 
       const users = await this.prisma.user.findMany({
         where: whereClause,

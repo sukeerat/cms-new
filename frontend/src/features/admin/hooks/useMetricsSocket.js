@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { metricsSocket } from '../../../services/metricsSocket.service';
+import { useWebSocket } from '../../../hooks/useWebSocket';
 import { message } from 'antd';
 
 /**
  * Custom hook for real-time system metrics via WebSocket
  * Provides health and metrics data with automatic updates
+ * Uses the shared useWebSocket hook for unified WebSocket connection
  */
 export const useMetricsSocket = (options = {}) => {
   const { autoConnect = true, fallbackToPolling = true } = options;
@@ -12,10 +13,14 @@ export const useMetricsSocket = (options = {}) => {
   const [health, setHealth] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [sessionStats, setSessionStats] = useState(null);
-  const [connected, setConnected] = useState(false);
+  const [backupProgress, setBackupProgress] = useState(null);
+  const [bulkOperationProgress, setBulkOperationProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+
+  // Use shared WebSocket connection
+  const { isConnected, connectionError, on, off, emit } = useWebSocket();
 
   const pollingInterval = useRef(null);
   const mounted = useRef(true);
@@ -61,43 +66,51 @@ export const useMetricsSocket = (options = {}) => {
     }
   }, []);
 
-  // Connect to WebSocket
-  const connect = useCallback(async () => {
-    try {
-      setLoading(true);
-      await metricsSocket.connect();
-    } catch (err) {
-      console.error('[useMetricsSocket] Failed to connect:', err.message);
-      setError(err.message);
+  // Manual refresh via WebSocket
+  const refresh = useCallback(() => {
+    if (isConnected) {
+      emit('refreshMetrics');
+    } else {
+      fetchMetricsHttp();
+    }
+  }, [isConnected, emit, fetchMetricsHttp]);
 
+  // Refresh sessions via WebSocket
+  const refreshSessions = useCallback(() => {
+    if (isConnected) {
+      emit('refreshSessions');
+    }
+  }, [isConnected, emit]);
+
+  // Handle connection state changes
+  useEffect(() => {
+    if (isConnected) {
+      stopPolling();
+      setLoading(false);
+    } else if (fallbackToPolling && autoConnect) {
+      startPolling();
+    }
+  }, [isConnected, fallbackToPolling, autoConnect, startPolling, stopPolling]);
+
+  // Handle connection errors
+  useEffect(() => {
+    if (connectionError) {
+      setError(connectionError);
       if (fallbackToPolling) {
         message.info('Using HTTP polling for metrics updates');
         startPolling();
       }
     }
-  }, [fallbackToPolling, startPolling]);
+  }, [connectionError, fallbackToPolling, startPolling]);
 
-  // Disconnect from WebSocket
-  const disconnect = useCallback(() => {
-    metricsSocket.disconnect();
-    stopPolling();
-  }, [stopPolling]);
-
-  // Manual refresh
-  const refresh = useCallback(() => {
-    if (connected) {
-      metricsSocket.refreshMetrics();
-    } else {
-      fetchMetricsHttp();
-    }
-  }, [connected, fetchMetricsHttp]);
-
-  // Setup effect
+  // Setup WebSocket event listeners
   useEffect(() => {
     mounted.current = true;
 
-    // Handle metrics updates
-    const unsubMetrics = metricsSocket.on('metricsUpdate', (data) => {
+    if (!isConnected) return;
+
+    // Handler for metrics updates
+    const handleMetricsUpdate = (data) => {
       if (mounted.current) {
         setHealth(data.health);
         setMetrics(data.metrics);
@@ -105,10 +118,10 @@ export const useMetricsSocket = (options = {}) => {
         setLoading(false);
         setError(null);
       }
-    });
+    };
 
-    // Handle quick metrics (CPU/Memory only)
-    const unsubQuick = metricsSocket.on('quickMetrics', (data) => {
+    // Handler for quick metrics (CPU/Memory only)
+    const handleQuickMetrics = (data) => {
       if (mounted.current) {
         setMetrics((prev) => ({
           ...prev,
@@ -118,27 +131,10 @@ export const useMetricsSocket = (options = {}) => {
         }));
         setLastUpdate(new Date(data.timestamp));
       }
-    });
+    };
 
-    // Handle connection changes
-    const unsubConnection = metricsSocket.on('connectionChange', ({ connected: isConnected, error: connError }) => {
-      if (mounted.current) {
-        setConnected(isConnected);
-
-        if (!isConnected && fallbackToPolling) {
-          startPolling();
-        } else if (isConnected) {
-          stopPolling();
-        }
-
-        if (connError) {
-          setError(connError);
-        }
-      }
-    });
-
-    // Handle service alerts
-    const unsubAlert = metricsSocket.on('serviceAlert', (data) => {
+    // Handler for service alerts
+    const handleServiceAlert = (data) => {
       if (mounted.current) {
         const alertType = data.status === 'down' ? 'error' : 'success';
         message[alertType](`${data.service} is ${data.status.toUpperCase()}`);
@@ -162,63 +158,101 @@ export const useMetricsSocket = (options = {}) => {
           return prev;
         });
       }
-    });
+    };
 
-    // Handle session updates
-    const unsubSession = metricsSocket.on('sessionUpdate', (data) => {
+    // Handler for session updates
+    const handleSessionUpdate = (data) => {
       if (mounted.current) {
         setSessionStats(data.stats);
-        // Show notification for session terminations
         if (data.action === 'terminated') {
           message.info('Session activity updated');
         }
       }
-    });
+    };
 
-    // Handle errors
-    const unsubError = metricsSocket.on('error', (err) => {
+    // Handler for backup progress
+    const handleBackupProgress = (data) => {
+      if (mounted.current) {
+        setBackupProgress(data);
+        if (data.status === 'completed') {
+          message.success('Backup completed successfully');
+        } else if (data.status === 'failed') {
+          message.error(`Backup failed: ${data.message || 'Unknown error'}`);
+        }
+      }
+    };
+
+    // Handler for bulk operation progress
+    const handleBulkOperationProgress = (data) => {
+      if (mounted.current) {
+        setBulkOperationProgress(data);
+        if (data.completed === data.total) {
+          message.success(`Bulk ${data.type} operation completed: ${data.completed}/${data.total}`);
+        }
+      }
+    };
+
+    // Handler for initial data (sent when admin connects)
+    const handleInitialData = (data) => {
+      if (mounted.current) {
+        setHealth(data.health);
+        setMetrics(data.metrics);
+        setLastUpdate(new Date());
+        setLoading(false);
+      }
+    };
+
+    // Handler for errors
+    const handleError = (err) => {
       if (mounted.current) {
         setError(err.message || 'WebSocket error');
       }
-    });
+    };
 
-    // Auto-connect if enabled
-    if (autoConnect) {
-      connect();
-    }
+    // Subscribe to events
+    on('metricsUpdate', handleMetricsUpdate);
+    on('quickMetrics', handleQuickMetrics);
+    on('serviceAlert', handleServiceAlert);
+    on('sessionUpdate', handleSessionUpdate);
+    on('backupProgress', handleBackupProgress);
+    on('bulkOperationProgress', handleBulkOperationProgress);
+    on('initialData', handleInitialData);
+    on('error', handleError);
 
     // Cleanup
     return () => {
       mounted.current = false;
-      unsubMetrics();
-      unsubQuick();
-      unsubConnection();
-      unsubAlert();
-      unsubSession();
-      unsubError();
-      disconnect();
+      off('metricsUpdate', handleMetricsUpdate);
+      off('quickMetrics', handleQuickMetrics);
+      off('serviceAlert', handleServiceAlert);
+      off('sessionUpdate', handleSessionUpdate);
+      off('backupProgress', handleBackupProgress);
+      off('bulkOperationProgress', handleBulkOperationProgress);
+      off('initialData', handleInitialData);
+      off('error', handleError);
+      stopPolling();
     };
-  }, [autoConnect, connect, disconnect, fallbackToPolling, startPolling, stopPolling]);
+  }, [isConnected, on, off, stopPolling]);
 
-  // Refresh sessions via WebSocket
-  const refreshSessions = useCallback(() => {
-    if (connected) {
-      metricsSocket.refreshSessions();
+  // Initial data fetch if using polling
+  useEffect(() => {
+    if (autoConnect && !isConnected && fallbackToPolling) {
+      fetchMetricsHttp();
     }
-  }, [connected]);
+  }, [autoConnect, isConnected, fallbackToPolling, fetchMetricsHttp]);
 
   return {
     health,
     metrics,
     sessionStats,
-    connected,
+    backupProgress,
+    bulkOperationProgress,
+    connected: isConnected,
     loading,
     error,
     lastUpdate,
     refresh,
     refreshSessions,
-    connect,
-    disconnect,
   };
 };
 

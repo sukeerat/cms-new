@@ -11,6 +11,8 @@ import {
   MetricsUpdatePayload,
   SessionUpdatePayload,
   ServiceAlertPayload,
+  BackupProgressPayload,
+  BulkOperationProgressPayload,
 } from './dto';
 
 @Injectable()
@@ -138,21 +140,25 @@ export class WebSocketService {
   /**
    * Send backup progress update
    */
-  sendBackupProgress(data: { backupId: string; status: string; progress?: number; message?: string }): void {
-    this.sendToAdminChannel(AdminChannel.BACKUP, WebSocketEvent.BACKUP_PROGRESS, {
+  sendBackupProgress(data: Omit<BackupProgressPayload, 'timestamp'>): void {
+    const payload: BackupProgressPayload = {
       ...data,
       timestamp: new Date(),
-    });
+    };
+    this.sendToAdminChannel(AdminChannel.BACKUP, WebSocketEvent.BACKUP_PROGRESS, payload);
+    this.logger.debug(`Sent backup progress: ${data.status}`);
   }
 
   /**
    * Send bulk operation progress
    */
-  sendBulkOperationProgress(data: { operationId: string; type: string; progress: number; total: number; completed: number }): void {
-    this.sendToAdminChannel(AdminChannel.USERS, WebSocketEvent.BULK_OPERATION_PROGRESS, {
+  sendBulkOperationProgress(data: Omit<BulkOperationProgressPayload, 'timestamp'>): void {
+    const payload: BulkOperationProgressPayload = {
       ...data,
       timestamp: new Date(),
-    });
+    };
+    this.sendToAdminChannel(AdminChannel.USERS, WebSocketEvent.BULK_OPERATION_PROGRESS, payload);
+    this.logger.debug(`Sent bulk operation progress: ${data.completed}/${data.total}`);
   }
 
   // ============ Broadcast Methods ============

@@ -2505,6 +2505,22 @@ enum BackupStatus {
   RESTORED
 }
 
+model BackupSchedule {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  cronExpression String    // Cron expression for schedule timing
+  storageType    String    // 'minio', 'local', 'both'
+  retentionDays  Int       @default(30)
+  isActive       Boolean   @default(true)
+  lastRun        DateTime?
+  createdById    String    @db.ObjectId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([isActive])
+  @@map("backup_schedules")
+}
+
 model SystemConfig {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   key       String   @unique

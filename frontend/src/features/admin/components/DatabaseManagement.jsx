@@ -34,7 +34,7 @@ import { adminService } from '../../../services/admin.service';
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-const DatabaseManagement = () => {
+const DatabaseManagement = ({ backupProgress, connected }) => {
   const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
@@ -68,6 +68,13 @@ const DatabaseManagement = () => {
   useEffect(() => {
     fetchBackups();
   }, [fetchBackups]);
+
+  // Refresh backups when backup completes via WebSocket
+  useEffect(() => {
+    if (backupProgress?.status === 'completed' || backupProgress?.status === 'failed') {
+      fetchBackups();
+    }
+  }, [backupProgress, fetchBackups]);
 
   const handleTableChange = (paginationConfig) => {
     fetchBackups(paginationConfig.current, paginationConfig.pageSize);
@@ -267,6 +274,31 @@ const DatabaseManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Real-time Backup Progress */}
+      {backupProgress && backupProgress.status === 'in_progress' && (
+        <Card className="shadow-sm border-primary/50 rounded-xl bg-primary/5">
+          <div className="flex items-center gap-4">
+            <SyncOutlined spin className="text-primary text-2xl" />
+            <div className="flex-1">
+              <Text strong className="text-text-primary block">
+                Backup in Progress
+              </Text>
+              <Text className="text-text-secondary text-sm">
+                {backupProgress.message || 'Creating database backup...'}
+              </Text>
+              {backupProgress.progress !== undefined && (
+                <Progress
+                  percent={backupProgress.progress}
+                  status="active"
+                  className="mt-2 mb-0"
+                  strokeColor={{ from: '#1890ff', to: '#52c41a' }}
+                />
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Actions Row */}
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={8} md={6}>

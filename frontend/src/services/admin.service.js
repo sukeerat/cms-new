@@ -17,6 +17,46 @@ export const adminService = {
     return response.data;
   },
 
+  async getHealthReport() {
+    const response = await API.get('/system-admin/health/report');
+    return response.data;
+  },
+
+  async getQuickStatus() {
+    const response = await API.get('/system-admin/health/quick');
+    return response.data;
+  },
+
+  async getAlertHistory(limit = 50) {
+    const response = await API.get(`/system-admin/health/alerts?limit=${limit}`);
+    return response.data;
+  },
+
+  async getUptimeStats() {
+    const response = await API.get('/system-admin/health/uptime');
+    return response.data;
+  },
+
+  async getSystemMetrics() {
+    const response = await API.get('/system-admin/health/metrics');
+    return response.data;
+  },
+
+  async getThresholds() {
+    const response = await API.get('/system-admin/health/thresholds');
+    return response.data;
+  },
+
+  async updateThresholds(thresholds) {
+    const response = await API.put('/system-admin/health/thresholds', thresholds);
+    return response.data;
+  },
+
+  async getServiceDetails(name) {
+    const response = await API.get(`/system-admin/health/service/${name}`);
+    return response.data;
+  },
+
   // ==================== BACKUP MANAGEMENT ====================
 
   async createBackup(data) {
@@ -56,6 +96,38 @@ export const adminService = {
 
   async deleteBackup(id) {
     const response = await API.delete(`/system-admin/backup/${id}`);
+    return response.data;
+  },
+
+  // ==================== BACKUP SCHEDULES ====================
+
+  async listBackupSchedules() {
+    const response = await API.get('/system-admin/backup/schedules');
+    return response.data;
+  },
+
+  async getScheduleStatus() {
+    const response = await API.get('/system-admin/backup/schedules/status');
+    return response.data;
+  },
+
+  async createBackupSchedule(data) {
+    const response = await API.post('/system-admin/backup/schedules', data);
+    return response.data;
+  },
+
+  async updateBackupSchedule(id, data) {
+    const response = await API.put(`/system-admin/backup/schedules/${id}`, data);
+    return response.data;
+  },
+
+  async deleteBackupSchedule(id) {
+    const response = await API.delete(`/system-admin/backup/schedules/${id}`);
+    return response.data;
+  },
+
+  async triggerBackupSchedule(id) {
+    const response = await API.post(`/system-admin/backup/schedules/${id}/trigger`);
     return response.data;
   },
 
@@ -130,6 +202,93 @@ export const adminService = {
 
   async terminateUserSessions(userId) {
     const response = await API.post(`/system-admin/sessions/terminate-user/${userId}`);
+    return response.data;
+  },
+
+  // ==================== ANALYTICS & INSIGHTS ====================
+
+  async getDashboardSummary() {
+    const response = await API.get('/system-admin/analytics/dashboard');
+    return response.data;
+  },
+
+  async getLoginAnalytics(days = 30) {
+    const response = await API.get(`/system-admin/analytics/login?days=${days}`);
+    return response.data;
+  },
+
+  async getSuspiciousActivities(days = 7) {
+    const response = await API.get(`/system-admin/analytics/suspicious-activities?days=${days}`);
+    return response.data;
+  },
+
+  async getSystemTrends(days = 30) {
+    const response = await API.get(`/system-admin/analytics/trends?days=${days}`);
+    return response.data;
+  },
+
+  async getUserActivityHeatmap(userId = null) {
+    const url = userId
+      ? `/system-admin/analytics/activity-heatmap?userId=${userId}`
+      : '/system-admin/analytics/activity-heatmap';
+    const response = await API.get(url);
+    return response.data;
+  },
+
+  // ==================== SYSTEM CONFIGURATION ====================
+
+  async getAllConfigs() {
+    const response = await API.get('/system-admin/config');
+    return response.data;
+  },
+
+  async getConfigsByCategory(category) {
+    const response = await API.get(`/system-admin/config/category/${category}`);
+    return response.data;
+  },
+
+  async getConfig(key) {
+    const response = await API.get(`/system-admin/config/${key}`);
+    return response.data;
+  },
+
+  async setConfig(key, value) {
+    const response = await API.put(`/system-admin/config/${key}`, { value });
+    return response.data;
+  },
+
+  async bulkUpdateConfigs(updates) {
+    const response = await API.put('/system-admin/config', { updates });
+    return response.data;
+  },
+
+  async resetConfig(key) {
+    const response = await API.post(`/system-admin/config/${key}/reset`);
+    return response.data;
+  },
+
+  async resetAllConfigs() {
+    const response = await API.post('/system-admin/config/reset-all');
+    return response.data;
+  },
+
+  async exportConfigs() {
+    const response = await API.get('/system-admin/config/export');
+    return response.data;
+  },
+
+  async importConfigs(data) {
+    const response = await API.post('/system-admin/config/import', data);
+    return response.data;
+  },
+
+  async isFeatureEnabled(feature) {
+    const response = await API.get(`/system-admin/config/feature/${feature}`);
+    return response.data;
+  },
+
+  async isMaintenanceMode() {
+    const response = await API.get('/system-admin/config/maintenance-mode');
     return response.data;
   },
 };

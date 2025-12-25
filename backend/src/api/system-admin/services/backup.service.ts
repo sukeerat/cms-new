@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { FileStorageService } from '../../../infrastructure/file-storage/file-storage.service';
 import { AuditService } from '../../../infrastructure/audit/audit.service';
+import { WebSocketService } from '../../../infrastructure/websocket/websocket.service';
 import { AuditAction, AuditCategory, AuditSeverity, BackupStatus, Role } from '@prisma/client';
 import { CreateBackupDto, StorageType } from '../dto/backup.dto';
 import { spawn } from 'child_process';
@@ -26,6 +27,7 @@ export class BackupService {
     private readonly configService: ConfigService,
     private readonly fileStorageService: FileStorageService,
     private readonly auditService: AuditService,
+    private readonly wsService: WebSocketService,
   ) {
     this.backupDir = '/tmp/backups';
     this.localBackupDir = '/app/backups';
@@ -66,14 +68,37 @@ export class BackupService {
       },
     });
 
+    // Emit initial progress
+    this.wsService.sendBackupProgress({
+      backupId: backupRecord.id,
+      status: 'in_progress',
+      progress: 10,
+      message: 'Starting database backup...',
+    });
+
     try {
       // Execute mongodump
       const dbUrl = this.configService.get<string>('DATABASE_URL');
+
+      this.wsService.sendBackupProgress({
+        backupId: backupRecord.id,
+        status: 'in_progress',
+        progress: 20,
+        message: 'Executing database dump...',
+      });
+
       await this.executeMongoDump(dbUrl, tempPath);
 
       // Get file size
       const stats = fs.statSync(tempPath);
       const size = stats.size;
+
+      this.wsService.sendBackupProgress({
+        backupId: backupRecord.id,
+        status: 'in_progress',
+        progress: 50,
+        message: `Database dump complete (${this.formatBytes(size)}). Uploading...`,
+      });
 
       const storageLocations: string[] = [];
       let minioKey: string | undefined;
@@ -129,6 +154,14 @@ export class BackupService {
       // Cleanup temp file
       fs.unlinkSync(tempPath);
 
+      // Emit completion progress
+      this.wsService.sendBackupProgress({
+        backupId: updatedRecord.id,
+        status: 'completed',
+        progress: 100,
+        message: `Backup completed successfully (${this.formatBytes(size)})`,
+      });
+
       // Audit log
       await this.auditService.log({
         action: AuditAction.SYSTEM_BACKUP,
@@ -147,6 +180,14 @@ export class BackupService {
         message: `Backup created successfully. Size: ${this.formatBytes(size)}`,
       };
     } catch (error) {
+      // Emit failure progress
+      this.wsService.sendBackupProgress({
+        backupId: backupRecord.id,
+        status: 'failed',
+        progress: 0,
+        message: `Backup failed: ${error.message}`,
+      });
+
       // Update record to failed status
       await this.prisma.backupRecord.update({
         where: { id: backupRecord.id },

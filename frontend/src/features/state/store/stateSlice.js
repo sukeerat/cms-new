@@ -1811,131 +1811,133 @@ export const {
 } = stateSlice.actions;
 
 // ============= SELECTORS =============
+// All selectors use optional chaining for null safety during redux-persist rehydration
 
 // Dashboard selectors
-export const selectDashboardStats = (state) => state.state.dashboard.stats;
-export const selectDashboardLoading = (state) => state.state.dashboard.loading;
-export const selectDashboardError = (state) => state.state.dashboard.error;
+export const selectDashboardStats = (state) => state.state?.dashboard?.stats ?? null;
+export const selectDashboardLoading = (state) => state.state?.dashboard?.loading ?? false;
+export const selectDashboardError = (state) => state.state?.dashboard?.error ?? null;
 
 // Institution selectors
-export const selectInstitutions = (state) => state.state.institutions.list;
-export const selectSelectedInstitution = (state) => state.state.institutions.selected;
-export const selectInstitutionsPagination = (state) => state.state.institutions.pagination;
-export const selectInstitutionsLoading = (state) => state.state.institutions.loading;
-export const selectInstitutionsError = (state) => state.state.institutions.error;
+export const selectInstitutions = (state) => state.state?.institutions?.list ?? [];
+export const selectSelectedInstitution = (state) => state.state?.institutions?.selected ?? null;
+export const selectInstitutionsPagination = (state) => state.state?.institutions?.pagination ?? null;
+export const selectInstitutionsLoading = (state) => state.state?.institutions?.loading ?? false;
+export const selectInstitutionsError = (state) => state.state?.institutions?.error ?? null;
 
 // Institutions with Stats selectors (for dashboard)
-export const selectInstitutionsWithStats = (state) => state.state.institutionsWithStats.list;
-export const selectInstitutionsWithStatsPagination = (state) => state.state.institutionsWithStats.pagination;
-export const selectInstitutionsWithStatsLoading = (state) => state.state.institutionsWithStats.loading;
-export const selectInstitutionsWithStatsError = (state) => state.state.institutionsWithStats.error;
-export const selectInstitutionsWithStatsMonth = (state) => state.state.institutionsWithStats.month;
-export const selectInstitutionsWithStatsYear = (state) => state.state.institutionsWithStats.year;
+export const selectInstitutionsWithStats = (state) => state.state?.institutionsWithStats?.list ?? [];
+export const selectInstitutionsWithStatsPagination = (state) => state.state?.institutionsWithStats?.pagination ?? null;
+export const selectInstitutionsWithStatsLoading = (state) => state.state?.institutionsWithStats?.loading ?? false;
+export const selectInstitutionsWithStatsError = (state) => state.state?.institutionsWithStats?.error ?? null;
+export const selectInstitutionsWithStatsMonth = (state) => state.state?.institutionsWithStats?.month ?? null;
+export const selectInstitutionsWithStatsYear = (state) => state.state?.institutionsWithStats?.year ?? null;
 
 // Principal selectors
-export const selectPrincipals = (state) => state.state.principals.list;
-export const selectCurrentPrincipal = (state) => state.state.currentPrincipal;
-export const selectPrincipalsLoading = (state) => state.state.principals.loading;
-export const selectPrincipalsError = (state) => state.state.principals.error;
+export const selectPrincipals = (state) => state.state?.principals?.list ?? [];
+export const selectCurrentPrincipal = (state) => state.state?.currentPrincipal ?? null;
+export const selectPrincipalsLoading = (state) => state.state?.principals?.loading ?? false;
+export const selectPrincipalsError = (state) => state.state?.principals?.error ?? null;
 
 // Reports selectors
-export const selectReports = (state) => state.state.reports.list;
-export const selectReportsLoading = (state) => state.state.reports.loading;
-export const selectReportsError = (state) => state.state.reports.error;
+export const selectReports = (state) => state.state?.reports?.list ?? [];
+export const selectReportsLoading = (state) => state.state?.reports?.loading ?? false;
+export const selectReportsError = (state) => state.state?.reports?.error ?? null;
 
 // Analytics selectors
-export const selectTopPerformers = (state) => state.state.analytics.topPerformers;
-export const selectBottomPerformers = (state) => state.state.analytics.bottomPerformers;
-export const selectTopIndustries = (state) => state.state.analytics.topIndustries;
-export const selectMonthlyStats = (state) => state.state.analytics.monthlyStats;
+export const selectTopPerformers = (state) => state.state?.analytics?.topPerformers ?? [];
+export const selectBottomPerformers = (state) => state.state?.analytics?.bottomPerformers ?? [];
+export const selectTopIndustries = (state) => state.state?.analytics?.topIndustries ?? [];
+export const selectMonthlyStats = (state) => state.state?.analytics?.monthlyStats ?? null;
 // Split loading selectors for granular control
-export const selectTopPerformersLoading = (state) => state.state.analytics.topPerformersLoading;
-export const selectTopIndustriesLoading = (state) => state.state.analytics.topIndustriesLoading;
-export const selectMonthlyAnalyticsLoading = (state) => state.state.analytics.monthlyAnalyticsLoading;
+export const selectTopPerformersLoading = (state) => state.state?.analytics?.topPerformersLoading ?? false;
+export const selectTopIndustriesLoading = (state) => state.state?.analytics?.topIndustriesLoading ?? false;
+export const selectMonthlyAnalyticsLoading = (state) => state.state?.analytics?.monthlyAnalyticsLoading ?? false;
 // Combined loading selector for backward compatibility
 export const selectAnalyticsLoading = (state) =>
-  state.state.analytics.topPerformersLoading ||
-  state.state.analytics.topIndustriesLoading ||
-  state.state.analytics.monthlyAnalyticsLoading;
-export const selectAnalyticsError = (state) => state.state.analytics.error;
+  (state.state?.analytics?.topPerformersLoading ?? false) ||
+  (state.state?.analytics?.topIndustriesLoading ?? false) ||
+  (state.state?.analytics?.monthlyAnalyticsLoading ?? false);
+export const selectAnalyticsError = (state) => state.state?.analytics?.error ?? null;
 
 // Report Builder selectors
-export const selectReportCatalog = (state) => state.state.reportBuilder.catalog;
-export const selectReportConfig = (state) => state.state.reportBuilder.config;
-export const selectReportHistory = (state) => state.state.reportBuilder.history;
-export const selectReportBuilderLoading = (state) => state.state.reportBuilder.loading;
-export const selectReportGenerating = (state) => state.state.reportBuilder.generating;
-export const selectReportBuilderError = (state) => state.state.reportBuilder.error;
+export const selectReportCatalog = (state) => state.state?.reportBuilder?.catalog ?? [];
+export const selectReportConfig = (state) => state.state?.reportBuilder?.config ?? null;
+export const selectReportHistory = (state) => state.state?.reportBuilder?.history ?? [];
+export const selectReportBuilderLoading = (state) => state.state?.reportBuilder?.loading ?? false;
+export const selectReportGenerating = (state) => state.state?.reportBuilder?.generating ?? false;
+export const selectReportBuilderError = (state) => state.state?.reportBuilder?.error ?? null;
 
 // Placement selectors
-export const selectPlacementStats = (state) => state.state.placements.stats;
-export const selectPlacementTrends = (state) => state.state.placements.trends;
+export const selectPlacementStats = (state) => state.state?.placements?.stats ?? null;
+export const selectPlacementTrends = (state) => state.state?.placements?.trends ?? [];
 // Split loading selectors for granular control
-export const selectPlacementStatsLoading = (state) => state.state.placements.statsLoading;
-export const selectPlacementTrendsLoading = (state) => state.state.placements.trendsLoading;
+export const selectPlacementStatsLoading = (state) => state.state?.placements?.statsLoading ?? false;
+export const selectPlacementTrendsLoading = (state) => state.state?.placements?.trendsLoading ?? false;
 // Combined loading selector for backward compatibility
 export const selectPlacementsLoading = (state) =>
-  state.state.placements.statsLoading ||
-  state.state.placements.trendsLoading;
-export const selectPlacementsError = (state) => state.state.placements.error;
+  (state.state?.placements?.statsLoading ?? false) ||
+  (state.state?.placements?.trendsLoading ?? false);
+export const selectPlacementsError = (state) => state.state?.placements?.error ?? null;
 
 // Joining Letter selectors
-export const selectJoiningLetterStats = (state) => state.state.joiningLetters.stats;
-export const selectJoiningLettersLoading = (state) => state.state.joiningLetters.loading;
-export const selectJoiningLettersError = (state) => state.state.joiningLetters.error;
+export const selectJoiningLetterStats = (state) => state.state?.joiningLetters?.stats ?? null;
+export const selectJoiningLettersLoading = (state) => state.state?.joiningLetters?.loading ?? false;
+export const selectJoiningLettersError = (state) => state.state?.joiningLetters?.error ?? null;
 
 // Last fetched selectors
-export const selectLastFetched = (state) => state.state.lastFetched;
+export const selectLastFetched = (state) => state.state?.lastFetched ?? {};
 export const selectMostRecentFetch = (state) => {
-  const timestamps = Object.values(state.state.lastFetched).filter(Boolean);
+  const lastFetched = state.state?.lastFetched ?? {};
+  const timestamps = Object.values(lastFetched).filter(Boolean);
   return timestamps.length > 0 ? Math.max(...timestamps) : null;
 };
 
 // Combined loading selector
 export const selectAnyLoading = (state) =>
-  state.state.dashboard.loading ||
-  state.state.institutions.loading ||
-  state.state.principals.loading ||
-  state.state.reports.loading ||
-  state.state.analytics.topPerformersLoading ||
-  state.state.analytics.topIndustriesLoading ||
-  state.state.analytics.monthlyAnalyticsLoading ||
-  state.state.placements.statsLoading ||
-  state.state.placements.trendsLoading ||
-  state.state.joiningLetters.loading;
+  (state.state?.dashboard?.loading ?? false) ||
+  (state.state?.institutions?.loading ?? false) ||
+  (state.state?.principals?.loading ?? false) ||
+  (state.state?.reports?.loading ?? false) ||
+  (state.state?.analytics?.topPerformersLoading ?? false) ||
+  (state.state?.analytics?.topIndustriesLoading ?? false) ||
+  (state.state?.analytics?.monthlyAnalyticsLoading ?? false) ||
+  (state.state?.placements?.statsLoading ?? false) ||
+  (state.state?.placements?.trendsLoading ?? false) ||
+  (state.state?.joiningLetters?.loading ?? false);
 
 // Institute Detail View selectors
-export const selectSelectedInstitute = (state) => state.state.selectedInstitute;
-export const selectInstituteOverview = (state) => state.state.instituteOverview;
-export const selectInstituteStudents = (state) => state.state.instituteStudents;
-export const selectInstituteCompanies = (state) => state.state.instituteCompanies;
-export const selectInstituteFacultyPrincipal = (state) => state.state.instituteFacultyPrincipal;
+export const selectSelectedInstitute = (state) => state.state?.selectedInstitute ?? { id: null, data: null, loading: false, error: null };
+export const selectInstituteOverview = (state) => state.state?.instituteOverview ?? { data: null, loading: false, error: null };
+export const selectInstituteStudents = (state) => state.state?.instituteStudents ?? { list: [], cursor: null, hasMore: true, total: 0, loading: false, loadingMore: false, error: null, filters: { branches: [] } };
+export const selectInstituteCompanies = (state) => state.state?.instituteCompanies ?? { list: [], total: 0, summary: null, loading: false, error: null };
+export const selectInstituteFacultyPrincipal = (state) => state.state?.instituteFacultyPrincipal ?? { principal: null, faculty: [], summary: null, loading: false, error: null };
 
 // Critical Alerts selectors
-export const selectCriticalAlerts = (state) => state.state.criticalAlerts.data;
-export const selectCriticalAlertsLoading = (state) => state.state.criticalAlerts.loading;
-export const selectCriticalAlertsError = (state) => state.state.criticalAlerts.error;
+export const selectCriticalAlerts = (state) => state.state?.criticalAlerts?.data ?? null;
+export const selectCriticalAlertsLoading = (state) => state.state?.criticalAlerts?.loading ?? false;
+export const selectCriticalAlertsError = (state) => state.state?.criticalAlerts?.error ?? null;
 
 // Action Items selectors
-export const selectActionItems = (state) => state.state.actionItems.data;
-export const selectActionItemsLoading = (state) => state.state.actionItems.loading;
-export const selectActionItemsError = (state) => state.state.actionItems.error;
+export const selectActionItems = (state) => state.state?.actionItems?.data ?? null;
+export const selectActionItemsLoading = (state) => state.state?.actionItems?.loading ?? false;
+export const selectActionItemsError = (state) => state.state?.actionItems?.error ?? null;
 
 // Compliance Summary selectors
-export const selectComplianceSummary = (state) => state.state.complianceSummary.data;
-export const selectComplianceSummaryLoading = (state) => state.state.complianceSummary.loading;
-export const selectComplianceSummaryError = (state) => state.state.complianceSummary.error;
+export const selectComplianceSummary = (state) => state.state?.complianceSummary?.data ?? null;
+export const selectComplianceSummaryLoading = (state) => state.state?.complianceSummary?.loading ?? false;
+export const selectComplianceSummaryError = (state) => state.state?.complianceSummary?.error ?? null;
 
 // Companies Overview selectors
-export const selectCompaniesOverview = (state) => state.state.companiesOverview;
-export const selectAllCompanies = (state) => state.state.companiesOverview.list;
-export const selectCompaniesPagination = (state) => state.state.companiesOverview.pagination;
-export const selectCompaniesSummary = (state) => state.state.companiesOverview.summary;
-export const selectSelectedCompany = (state) => state.state.companiesOverview.selectedCompany;
-export const selectSelectedCompanyDetails = (state) => state.state.companiesOverview.selectedCompanyDetails;
-export const selectCompaniesLoading = (state) => state.state.companiesOverview.loading;
-export const selectCompanyDetailsLoading = (state) => state.state.companiesOverview.detailsLoading;
-export const selectCompaniesError = (state) => state.state.companiesOverview.error;
-export const selectCompanyDetailsError = (state) => state.state.companiesOverview.detailsError;
+export const selectCompaniesOverview = (state) => state.state?.companiesOverview ?? { list: [], pagination: null, summary: null, selectedCompany: null, selectedCompanyDetails: null, loading: false, detailsLoading: false, error: null, detailsError: null };
+export const selectAllCompanies = (state) => state.state?.companiesOverview?.list ?? [];
+export const selectCompaniesPagination = (state) => state.state?.companiesOverview?.pagination ?? null;
+export const selectCompaniesSummary = (state) => state.state?.companiesOverview?.summary ?? null;
+export const selectSelectedCompany = (state) => state.state?.companiesOverview?.selectedCompany ?? null;
+export const selectSelectedCompanyDetails = (state) => state.state?.companiesOverview?.selectedCompanyDetails ?? null;
+export const selectCompaniesLoading = (state) => state.state?.companiesOverview?.loading ?? false;
+export const selectCompanyDetailsLoading = (state) => state.state?.companiesOverview?.detailsLoading ?? false;
+export const selectCompaniesError = (state) => state.state?.companiesOverview?.error ?? null;
+export const selectCompanyDetailsError = (state) => state.state?.companiesOverview?.detailsError ?? null;
 
 export default stateSlice.reducer;

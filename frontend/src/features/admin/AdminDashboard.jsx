@@ -23,6 +23,8 @@ const AdminDashboard = () => {
     health,
     metrics,
     sessionStats,
+    backupProgress,
+    bulkOperationProgress,
     connected,
     loading,
     lastUpdate,
@@ -74,7 +76,7 @@ const AdminDashboard = () => {
           Database Management
         </span>
       ),
-      children: <DatabaseManagement />,
+      children: <DatabaseManagement backupProgress={backupProgress} connected={connected} />,
     },
     {
       key: 'users',
@@ -84,7 +86,7 @@ const AdminDashboard = () => {
           User Management
         </span>
       ),
-      children: <UserManagement />,
+      children: <UserManagement bulkOperationProgress={bulkOperationProgress} connected={connected} />,
     },
     {
       key: 'sessions',

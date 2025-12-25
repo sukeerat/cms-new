@@ -9,6 +9,7 @@ export { useInfiniteScroll } from './useInfiniteScroll';
 export { useSmartFetch } from './useSmartFetch';
 export { useNotifications } from './useNotifications';
 export { useSmartIndustry } from './useSmartIndustry';
+export { useWebSocket } from './useWebSocket';
 
 // Default exports
 export { default as useAuthDefault } from './useAuth';
@@ -16,3 +17,4 @@ export { default as useDebounceDefault } from './useDebounce';
 export { default as useInfiniteScrollDefault } from './useInfiniteScroll';
 export { default as useSmartFetchDefault } from './useSmartFetch';
 export { default as useNotificationsDefault } from './useNotifications';
+export { default as useWebSocketDefault } from './useWebSocket';

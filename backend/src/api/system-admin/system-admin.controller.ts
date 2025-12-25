@@ -24,8 +24,12 @@ import * as fs from 'fs';
 
 import { MetricsService } from './services/metrics.service';
 import { BackupService } from './services/backup.service';
+import { BackupSchedulerService } from './services/backup-scheduler.service';
 import { UserManagementService } from './services/user-management.service';
 import { SessionService } from './services/session.service';
+import { AnalyticsService } from './services/analytics.service';
+import { SystemConfigService, ConfigCategory } from './services/system-config.service';
+import { HealthMonitorService } from './services/health-monitor.service';
 
 import {
   CreateBackupDto,
@@ -43,8 +47,12 @@ export class SystemAdminController {
   constructor(
     private readonly metricsService: MetricsService,
     private readonly backupService: BackupService,
+    private readonly backupSchedulerService: BackupSchedulerService,
     private readonly userManagementService: UserManagementService,
     private readonly sessionService: SessionService,
+    private readonly analyticsService: AnalyticsService,
+    private readonly systemConfigService: SystemConfigService,
+    private readonly healthMonitorService: HealthMonitorService,
   ) {}
 
   // ==========================================
@@ -59,6 +67,47 @@ export class SystemAdminController {
   @Get('metrics/realtime')
   async getRealtimeMetrics() {
     return this.metricsService.getRealtimeMetrics();
+  }
+
+  @Get('health/report')
+  async getHealthReport() {
+    return this.healthMonitorService.performHealthCheck();
+  }
+
+  @Get('health/quick')
+  async getQuickStatus() {
+    return this.healthMonitorService.getQuickStatus();
+  }
+
+  @Get('health/alerts')
+  async getAlertHistory(@Query('limit') limit?: number) {
+    return this.healthMonitorService.getAlertHistory(limit ? Number(limit) : 50);
+  }
+
+  @Get('health/uptime')
+  async getUptimeStats() {
+    return this.healthMonitorService.getUptimeStats();
+  }
+
+  @Get('health/metrics')
+  async getSystemMetrics() {
+    return this.healthMonitorService.getSystemMetrics();
+  }
+
+  @Get('health/thresholds')
+  async getThresholds() {
+    return this.healthMonitorService.getThresholds();
+  }
+
+  @Put('health/thresholds')
+  async updateThresholds(@Body() thresholds: Record<string, any>) {
+    this.healthMonitorService.updateThresholds(thresholds);
+    return { success: true, message: 'Thresholds updated' };
+  }
+
+  @Get('health/service/:name')
+  async getServiceDetails(@Param('name') name: string) {
+    return this.healthMonitorService.getServiceDetails(name);
   }
 
   // ==========================================
@@ -136,6 +185,60 @@ export class SystemAdminController {
     @CurrentUser() user: { userId: string; role: Role },
   ) {
     return this.backupService.deleteBackup(id, user.userId, user.role);
+  }
+
+  // ==========================================
+  // BACKUP SCHEDULES
+  // ==========================================
+
+  @Get('backup/schedules')
+  async listBackupSchedules() {
+    return this.backupSchedulerService.listSchedules();
+  }
+
+  @Get('backup/schedules/status')
+  async getScheduleStatus() {
+    return this.backupSchedulerService.getScheduleStatus();
+  }
+
+  @Post('backup/schedules')
+  async createBackupSchedule(
+    @Body() body: { name: string; cronExpression: string; storageType: string; retentionDays: number },
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.backupSchedulerService.createSchedule(
+      body.name,
+      body.cronExpression,
+      body.storageType as any,
+      body.retentionDays,
+      user.userId,
+      user.role,
+    );
+  }
+
+  @Put('backup/schedules/:id')
+  async updateBackupSchedule(
+    @Param('id') id: string,
+    @Body() body: Partial<{ name: string; cronExpression: string; storageType: string; retentionDays: number; isActive: boolean }>,
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.backupSchedulerService.updateSchedule(id, body as any, user.userId, user.role);
+  }
+
+  @Delete('backup/schedules/:id')
+  async deleteBackupSchedule(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.backupSchedulerService.deleteSchedule(id, user.userId, user.role);
+  }
+
+  @Post('backup/schedules/:id/trigger')
+  async triggerBackupSchedule(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.backupSchedulerService.triggerNow(id, user.userId, user.role);
   }
 
   // ==========================================
@@ -249,5 +352,110 @@ export class SystemAdminController {
       user.userId,
       user.role,
     );
+  }
+
+  // ==========================================
+  // ANALYTICS & INSIGHTS
+  // ==========================================
+
+  @Get('analytics/dashboard')
+  async getDashboardSummary() {
+    return this.analyticsService.getDashboardSummary();
+  }
+
+  @Get('analytics/login')
+  async getLoginAnalytics(@Query('days') days?: number) {
+    return this.analyticsService.getLoginAnalytics(days ? Number(days) : 30);
+  }
+
+  @Get('analytics/suspicious-activities')
+  async getSuspiciousActivities(@Query('days') days?: number) {
+    return this.analyticsService.detectSuspiciousActivities(days ? Number(days) : 7);
+  }
+
+  @Get('analytics/trends')
+  async getSystemTrends(@Query('days') days?: number) {
+    return this.analyticsService.getSystemTrends(days ? Number(days) : 30);
+  }
+
+  @Get('analytics/activity-heatmap')
+  async getUserActivityHeatmap(@Query('userId') userId?: string) {
+    return this.analyticsService.getUserActivityHeatmap(userId);
+  }
+
+  // ==========================================
+  // SYSTEM CONFIGURATION
+  // ==========================================
+
+  @Get('config')
+  async getAllConfigs() {
+    return this.systemConfigService.getAllGrouped();
+  }
+
+  @Get('config/category/:category')
+  async getConfigsByCategory(@Param('category') category: ConfigCategory) {
+    return this.systemConfigService.getByCategory(category);
+  }
+
+  @Get('config/:key')
+  async getConfig(@Param('key') key: string) {
+    return this.systemConfigService.get(key);
+  }
+
+  @Put('config/:key')
+  async setConfig(
+    @Param('key') key: string,
+    @Body() body: { value: any },
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.systemConfigService.set(key, body.value, user.userId, user.role);
+  }
+
+  @Put('config')
+  async bulkUpdateConfigs(
+    @Body() body: { updates: { key: string; value: any }[] },
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.systemConfigService.bulkUpdate(body.updates, user.userId, user.role);
+  }
+
+  @Post('config/:key/reset')
+  async resetConfig(
+    @Param('key') key: string,
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.systemConfigService.resetToDefault(key, user.userId, user.role);
+  }
+
+  @Post('config/reset-all')
+  async resetAllConfigs(
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.systemConfigService.resetAllToDefaults(user.userId, user.role);
+  }
+
+  @Get('config/export')
+  async exportConfigs() {
+    return this.systemConfigService.exportConfigs();
+  }
+
+  @Post('config/import')
+  async importConfigs(
+    @Body() data: { configs: { key: string; value: any; category: string }[] },
+    @CurrentUser() user: { userId: string; role: Role },
+  ) {
+    return this.systemConfigService.importConfigs(data, user.userId, user.role);
+  }
+
+  @Get('config/feature/:feature')
+  async isFeatureEnabled(@Param('feature') feature: string) {
+    const enabled = await this.systemConfigService.isFeatureEnabled(feature);
+    return { feature, enabled };
+  }
+
+  @Get('config/maintenance-mode')
+  async isMaintenanceMode() {
+    const enabled = await this.systemConfigService.isMaintenanceMode();
+    return { maintenanceMode: enabled };
   }
 }

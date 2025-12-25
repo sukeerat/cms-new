@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationService } from './notification.service';
 import { PrismaService } from '../../core/database/prisma.service';
@@ -7,9 +7,12 @@ import { ConfigService } from '@nestjs/config';
 import { ApplicationStatus } from '@prisma/client';
 
 @Injectable()
-export class NotificationSchedulerService {
+export class NotificationSchedulerService implements OnModuleDestroy {
   private readonly logger = new Logger(NotificationSchedulerService.name);
   private readonly appUrl: string;
+
+  // Track scheduled timeouts for cleanup
+  private scheduledTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(
     private notificationService: NotificationService,
@@ -18,6 +21,18 @@ export class NotificationSchedulerService {
     private configService: ConfigService,
   ) {
     this.appUrl = this.configService.get('APP_URL', 'http://localhost:3000');
+  }
+
+  /**
+   * Cleanup all scheduled timeouts on module destroy
+   */
+  onModuleDestroy(): void {
+    this.logger.log(`Cleaning up ${this.scheduledTimeouts.size} scheduled notifications`);
+    for (const [id, timeout] of this.scheduledTimeouts) {
+      clearTimeout(timeout);
+      this.logger.debug(`Cleared scheduled notification: ${id}`);
+    }
+    this.scheduledTimeouts.clear();
   }
 
   // ============ FACULTY VISIT REMINDERS ============
@@ -513,6 +528,7 @@ export class NotificationSchedulerService {
   // ============ UTILITY METHODS ============
   /**
    * Schedule a notification for a specific user
+   * Returns the schedule ID for cancellation if needed
    */
   async scheduleNotification(
     userId: string,
@@ -521,25 +537,61 @@ export class NotificationSchedulerService {
     body: string,
     scheduledAt: Date,
     data?: any,
-  ): Promise<void> {
+  ): Promise<string | null> {
     try {
       const delay = scheduledAt.getTime() - Date.now();
 
       if (delay > 0) {
-        setTimeout(async () => {
-          await this.notificationService.create(userId, type, title, body, data);
-          this.logger.log(`Scheduled notification sent to user ${userId}`);
+        // Generate unique ID for this scheduled notification
+        const scheduleId = `${userId}-${type}-${Date.now()}`;
+
+        const timeout = setTimeout(async () => {
+          try {
+            await this.notificationService.create(userId, type, title, body, data);
+            this.logger.log(`Scheduled notification sent to user ${userId}`);
+          } catch (error) {
+            this.logger.error(`Failed to send scheduled notification to user ${userId}`, error.stack);
+          } finally {
+            // Remove from tracking after execution
+            this.scheduledTimeouts.delete(scheduleId);
+          }
         }, delay);
 
-        this.logger.log(`Notification scheduled for user ${userId} at ${scheduledAt}`);
+        // Track the timeout for cleanup
+        this.scheduledTimeouts.set(scheduleId, timeout);
+        this.logger.log(`Notification scheduled for user ${userId} at ${scheduledAt} (ID: ${scheduleId})`);
+
+        return scheduleId;
       } else {
         this.logger.warn('Scheduled time is in the past, sending immediately');
         await this.notificationService.create(userId, type, title, body, data);
+        return null;
       }
     } catch (error) {
       this.logger.error('Failed to schedule notification', error.stack);
       throw error;
     }
+  }
+
+  /**
+   * Cancel a scheduled notification
+   */
+  cancelScheduledNotification(scheduleId: string): boolean {
+    const timeout = this.scheduledTimeouts.get(scheduleId);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.scheduledTimeouts.delete(scheduleId);
+      this.logger.log(`Cancelled scheduled notification: ${scheduleId}`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get count of pending scheduled notifications
+   */
+  getPendingScheduledCount(): number {
+    return this.scheduledTimeouts.size;
   }
 
   /**

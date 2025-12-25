@@ -364,6 +364,28 @@ body {
 
 .custom-tabs .ant-tabs-content-holder {
   background: rgb(var(--color-background-secondary));
+  flex: 1;
+  overflow: hidden;
+}
+
+.custom-tabs .ant-tabs-content {
+  height: 100%;
+}
+
+.custom-tabs .ant-tabs-tabpane {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Ensure tabs take full height when nested in flex containers */
+.custom-tabs.h-full {
+  display: flex;
+  flex-direction: column;
+}
+
+.custom-tabs.h-full .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
 }
 
 
@@ -421,5 +443,189 @@ body {
 
 .custom-table .ant-pagination-item-active a {
   color: white !important;
+}
+
+/* ============================================
+   Micro-interactions & Visual Feedback
+============================================ */
+
+/* Smooth focus states */
+*:focus-visible {
+  outline: 2px solid rgba(var(--color-primary), 0.5);
+  outline-offset: 2px;
+}
+
+/* Enhanced button transitions */
+.ant-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.ant-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Card lift effect */
+.shadow-soft {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.shadow-soft:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+/* Pulse animation for status indicators */
+@keyframes gentle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+/* Institution list item hover */
+.institution-item {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.institution-item:hover {
+  transform: translateX(4px);
+}
+
+/* Selection indicator animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%) translateY(-50%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) translateY(-50%);
+    opacity: 1;
+  }
+}
+
+/* Badge animation */
+.ant-badge-status-processing::after {
+  animation: ant-badge-status-processing 1.5s ease-in-out infinite;
+}
+
+/* Input focus glow */
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  box-shadow: 0 0 0 3px rgba(var(--color-primary), 0.1) !important;
+}
+
+/* Tab transition improvements */
+.custom-tabs .ant-tabs-tabpane {
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Skeleton loading shimmer */
+.ant-skeleton-element .ant-skeleton-input,
+.ant-skeleton-element .ant-skeleton-avatar {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--color-background-tertiary)) 25%,
+    rgb(var(--color-background-secondary)) 50%,
+    rgb(var(--color-background-tertiary)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Empty state subtle animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.empty-state-icon {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Tag hover effect */
+.ant-tag {
+  transition: all 0.15s ease !important;
+}
+
+.ant-tag:hover {
+  filter: brightness(1.05);
+}
+
+/* Tooltip improvements */
+.ant-tooltip-inner {
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+}
+
+/* Progress bar animation */
+.ant-progress-circle-trail {
+  stroke: rgb(var(--color-background-tertiary)) !important;
+}
+
+/* Dropdown improvements */
+.ant-dropdown-menu {
+  border-radius: 12px !important;
+  padding: 6px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 8px !important;
+  margin: 2px 0 !important;
+}
+
+/* Modal improvements */
+.ant-modal-content {
+  border-radius: 20px !important;
+  overflow: hidden;
+}
+
+.ant-modal-header {
+  border-radius: 20px 20px 0 0 !important;
+}
+
+/* Gradient backgrounds */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, rgba(var(--color-primary), 0.1) 0%, rgba(var(--color-primary), 0.05) 100%);
+}
+
+.bg-gradient-success {
+  background: linear-gradient(135deg, rgba(var(--color-success), 0.1) 0%, rgba(var(--color-success), 0.05) 100%);
+}
+
+/* Smooth scrolling */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Text selection */
+::selection {
+  background: rgba(var(--color-primary), 0.2);
+  color: rgb(var(--color-text-primary));
 }
 

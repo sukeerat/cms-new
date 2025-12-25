@@ -98,7 +98,19 @@ import ApplicationsList from '../../features/industry/applications/ApplicationsL
 import IndustryProfile from '../../features/industry/profile/IndustryProfile';
 
 // Admin
-import { AdminDashboard } from '../../features/admin';
+import {
+  AdminDashboard,
+  SystemHealth,
+  AdminAnalytics,
+  SecurityInsights,
+  BackupSchedules,
+  SystemSettings,
+  FeatureFlags,
+  SystemAlerts,
+  UserManagement,
+  ActiveSessions,
+  DatabaseManagement,
+} from '../../features/admin';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -520,6 +532,102 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/health"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <SystemHealth />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/analytics"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <AdminAnalytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/users"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <UserManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/sessions"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <ActiveSessions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/security"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <SecurityInsights />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/backups"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <DatabaseManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/backup-schedules"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <BackupSchedules />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/settings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <SystemSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/features"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <FeatureFlags />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/audit-logs"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <AuditLogs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/queries"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <SupportDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/alerts"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+              <SystemAlerts />
             </ProtectedRoute>
           }
         />

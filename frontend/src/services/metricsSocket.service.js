@@ -2,8 +2,13 @@ import { io } from 'socket.io-client';
 import { tokenStorage } from '../utils/tokenManager';
 
 /**
+ * @deprecated This service is deprecated. Use the shared useWebSocket hook instead.
+ * The useMetricsSocket hook now uses useWebSocket for unified WebSocket connection.
+ * This file is kept for backwards compatibility only.
+ *
  * System Metrics WebSocket Service
  * Provides real-time system metrics updates for admin dashboard
+ * Uses the unified /ws namespace for all WebSocket communications
  */
 class MetricsSocketService {
   constructor() {
@@ -16,16 +21,17 @@ class MetricsSocketService {
 
   /**
    * Get WebSocket URL based on current environment
+   * Uses unified /ws namespace
    */
   getSocketUrl() {
-    const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000/api';
-    // Remove /api suffix to get base URL
+    const apiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+    // Remove /api suffix to get base URL if present
     const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-    return `${baseUrl}/system-metrics`;
+    return `${baseUrl}/ws`;
   }
 
   /**
-   * Connect to the metrics WebSocket
+   * Connect to the unified WebSocket
    */
   connect() {
     if (this.socket?.connected || this.isConnecting) {
@@ -54,7 +60,7 @@ class MetricsSocketService {
         });
 
         this.socket.on('connect', () => {
-          console.log('[MetricsSocket] Connected to system metrics');
+          console.log('[MetricsSocket] Connected to unified WebSocket');
           this.reconnectAttempts = 0;
           this.isConnecting = false;
           this.emit('connectionChange', { connected: true });
@@ -63,6 +69,7 @@ class MetricsSocketService {
 
         this.socket.on('connected', (data) => {
           console.log('[MetricsSocket] Authenticated:', data);
+          // Admin users are automatically joined to admin:metrics room on backend
         });
 
         this.socket.on('initialData', (data) => {
@@ -86,6 +93,16 @@ class MetricsSocketService {
         this.socket.on('sessionUpdate', (data) => {
           console.log('[MetricsSocket] Session update:', data);
           this.emit('sessionUpdate', data);
+        });
+
+        this.socket.on('backupProgress', (data) => {
+          console.log('[MetricsSocket] Backup progress:', data);
+          this.emit('backupProgress', data);
+        });
+
+        this.socket.on('bulkOperationProgress', (data) => {
+          console.log('[MetricsSocket] Bulk operation progress:', data);
+          this.emit('bulkOperationProgress', data);
         });
 
         this.socket.on('disconnect', (reason) => {

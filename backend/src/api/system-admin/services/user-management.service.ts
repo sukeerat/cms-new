@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../../core/database/prisma.service';
 import { AuditService } from '../../../infrastructure/audit/audit.service';
 import { TokenBlacklistService } from '../../../core/auth/services/token-blacklist.service';
+import { WebSocketService } from '../../../infrastructure/websocket/websocket.service';
 import {
   AuditAction,
   AuditCategory,
@@ -31,6 +32,7 @@ export class UserManagementService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly tokenBlacklistService: TokenBlacklistService,
+    private readonly wsService: WebSocketService,
   ) {}
 
   async getUsers(query: UserQueryDto) {
@@ -346,8 +348,20 @@ export class UserManagementService {
 
     // Prevent actions on own account
     const filteredUserIds = userIds.filter((id) => id !== adminUserId);
+    const total = filteredUserIds.length;
+    const operationId = `bulk-${action}-${Date.now()}`;
 
-    for (const userId of filteredUserIds) {
+    // Emit initial progress
+    this.wsService.sendBulkOperationProgress({
+      operationId,
+      type: action,
+      progress: 0,
+      total,
+      completed: 0,
+    });
+
+    for (let i = 0; i < filteredUserIds.length; i++) {
+      const userId = filteredUserIds[i];
       try {
         switch (action) {
           case 'activate':
@@ -387,6 +401,17 @@ export class UserManagementService {
       } catch (error) {
         results.failed++;
         results.errors.push({ userId, error: error.message });
+      }
+
+      // Emit progress update every 5 users or on last user
+      if ((i + 1) % 5 === 0 || i === filteredUserIds.length - 1) {
+        this.wsService.sendBulkOperationProgress({
+          operationId,
+          type: action,
+          progress: Math.round(((i + 1) / total) * 100),
+          total,
+          completed: i + 1,
+        });
       }
     }
 

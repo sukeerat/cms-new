@@ -18,6 +18,8 @@ import { JwtAuthGuard } from '../../core/auth/guards/jwt-auth.guard';
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
+  // ============ GET Routes (specific paths BEFORE parameterized) ============
+
   @Get()
   async getNotifications(
     @Request() req,
@@ -40,15 +42,13 @@ export class NotificationsController {
     return this.notificationsService.getNotificationSettings(req.user.userId);
   }
 
+  // Parameterized GET route MUST come AFTER specific GET routes
   @Get(':id')
   async getNotificationById(@Param('id') id: string, @Request() req) {
     return this.notificationsService.getNotificationById(req.user.userId, id);
   }
 
-  @Put(':id/read')
-  async markAsRead(@Param('id') id: string, @Request() req) {
-    return this.notificationsService.markAsRead(req.user.userId, id);
-  }
+  // ============ PUT Routes (specific paths BEFORE parameterized) ============
 
   @Put('read-all')
   async markAllAsRead(@Request() req) {
@@ -68,6 +68,14 @@ export class NotificationsController {
     );
   }
 
+  // Parameterized PUT route MUST come AFTER specific PUT routes
+  @Put(':id/read')
+  async markAsRead(@Param('id') id: string, @Request() req) {
+    return this.notificationsService.markAsRead(req.user.userId, id);
+  }
+
+  // ============ DELETE Routes (specific paths BEFORE parameterized) ============
+
   @Delete('clear-all')
   async clearAllNotifications(@Request() req) {
     return this.notificationsService.clearAllNotifications(req.user.userId);
@@ -78,10 +86,13 @@ export class NotificationsController {
     return this.notificationsService.clearReadNotifications(req.user.userId);
   }
 
+  // Parameterized DELETE route MUST come AFTER specific DELETE routes
   @Delete(':id')
   async deleteNotification(@Param('id') id: string, @Request() req) {
     return this.notificationsService.deleteNotification(req.user.userId, id);
   }
+
+  // ============ POST Routes ============
 
   @Post('delete-multiple')
   async deleteMultipleNotifications(@Request() req, @Body() body: { ids: string[] }) {

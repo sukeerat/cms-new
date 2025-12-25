@@ -322,125 +322,201 @@ OverviewTab.displayName = 'OverviewTab';
 
 // Memoized Faculty Tab Component
 const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
-  if (loading) return <div className="flex justify-center py-20"><Spin size="large" /></div>;
-  if (error) return <Alert type="error" title="Failed to load faculty data" description={error} showIcon className="rounded-xl border-error/20 bg-error/5" />;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Spin size="large" />
+        <Text className="text-text-tertiary">Loading faculty information...</Text>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert
+        type="error"
+        message="Failed to load faculty data"
+        description={error}
+        showIcon
+        className="rounded-xl"
+      />
+    );
+  }
+
+  // Empty state
+  if (!principal && (!faculty || faculty.length === 0)) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="w-20 h-20 rounded-2xl bg-background-tertiary flex items-center justify-center mb-4">
+          <TeamOutlined className="text-3xl text-text-tertiary" />
+        </div>
+        <Text className="text-text-primary font-medium text-lg mb-1">No Faculty Data</Text>
+        <Text className="text-text-tertiary">Faculty and principal information will appear here</Text>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 p-1">
-      {/* Summary */}
+    <div className="space-y-6">
+      {/* Stats Summary Row */}
       {summary && (
-        <Card className="rounded-2xl border-border shadow-soft bg-surface">
-          <div className="flex flex-col md:flex-row items-center gap-8 py-2">
-            <div className="grid grid-cols-3 gap-8 flex-1 w-full text-center">
-              <div>
-                <div className="text-3xl font-black text-text-primary">{summary.totalFaculty || 0}</div>
-                <div className="text-xs uppercase font-bold text-text-tertiary tracking-widest mt-1">Total Faculty</div>
-              </div>
-              <div>
-                <div className="text-3xl font-black text-primary">{summary.totalStudentsAssigned || 0}</div>
-                <div className="text-xs uppercase font-bold text-text-tertiary tracking-widest mt-1">Students Assigned</div>
-              </div>
-              <div>
-                <div className="text-3xl font-black text-success">{summary.totalVisitsCompleted || 0}</div>
-                <div className="text-xs uppercase font-bold text-text-tertiary tracking-widest mt-1">Visits Done</div>
-              </div>
+        <Row gutter={[16, 16]}>
+          <Col xs={12} sm={6}>
+            <div className="bg-surface rounded-xl border border-border p-4 text-center">
+              <div className="text-2xl font-bold text-text-primary">{summary.totalFaculty || 0}</div>
+              <div className="text-xs text-text-tertiary mt-1">Total Faculty</div>
             </div>
-            <div className="text-center shrink-0 pl-8 border-l border-border/50 hidden md:block">
-              <Progress type="circle" percent={summary.overallVisitCompletionRate || 0} size={80} strokeColor="rgb(var(--color-primary))" />
-              <div className="text-[10px] uppercase font-bold text-text-tertiary mt-2">Visit Rate</div>
+          </Col>
+          <Col xs={12} sm={6}>
+            <div className="bg-surface rounded-xl border border-border p-4 text-center">
+              <div className="text-2xl font-bold text-primary">{summary.totalStudentsAssigned || 0}</div>
+              <div className="text-xs text-text-tertiary mt-1">Students Assigned</div>
             </div>
-          </div>
-        </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <div className="bg-surface rounded-xl border border-border p-4 text-center">
+              <div className="text-2xl font-bold text-success">{summary.totalVisitsCompleted || 0}</div>
+              <div className="text-xs text-text-tertiary mt-1">Visits Completed</div>
+            </div>
+          </Col>
+          <Col xs={12} sm={6}>
+            <div className="bg-surface rounded-xl border border-border p-4 text-center">
+              <Progress
+                type="circle"
+                percent={summary.overallVisitCompletionRate || 0}
+                size={48}
+                strokeWidth={8}
+                strokeColor="rgb(var(--color-primary))"
+              />
+              <div className="text-xs text-text-tertiary mt-1">Visit Rate</div>
+            </div>
+          </Col>
+        </Row>
       )}
 
-      {/* Principal */}
+      {/* Principal Card */}
       {principal && (
-        <Card 
-          title={
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
-                 <IdcardOutlined className="text-lg" />
-              </div>
-              <span className="font-bold text-text-primary text-lg">Principal</span>
+        <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl border border-indigo-200/50 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+              <IdcardOutlined className="text-white text-sm" />
             </div>
-          }
-          className="rounded-2xl border-border shadow-soft bg-surface"
-        >
-          <div className="flex items-start gap-6">
-            <Avatar size={72} icon={<UserOutlined />} className="bg-indigo-500 rounded-2xl shadow-sm flex-shrink-0" />
+            <Text className="font-bold text-text-primary">Principal</Text>
+          </div>
+
+          <div className="flex items-start gap-5">
+            <Avatar size={64} icon={<UserOutlined />} className="bg-indigo-500 shrink-0" />
             <div className="flex-1 min-w-0">
-              <Title level={4} className="!mb-1 text-text-primary font-bold">{principal.name}</Title>
-              <div className="flex flex-col gap-1 mb-4">
-                <Text className="text-text-secondary text-sm flex items-center gap-2"><MailOutlined className="text-text-tertiary" />{principal.email}</Text>
-                {principal.phoneNo && <Text className="text-text-secondary text-sm flex items-center gap-2"><PhoneOutlined className="text-text-tertiary" />{principal.phoneNo}</Text>}
+              <Text className="text-xl font-bold text-text-primary block">{principal.name}</Text>
+              <div className="flex flex-col gap-1 mt-2">
+                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                  <MailOutlined className="text-text-tertiary" />
+                  <span>{principal.email}</span>
+                </div>
+                {principal.phoneNo && (
+                  <div className="flex items-center gap-2 text-sm text-text-secondary">
+                    <PhoneOutlined className="text-text-tertiary" />
+                    <span>{principal.phoneNo}</span>
+                  </div>
+                )}
               </div>
               {principal.stats && (
-                <div className="flex flex-wrap gap-2">
-                  <Tag color="blue" className="rounded-lg border-0 px-3 py-1 text-sm font-medium">Students: {principal.stats.totalStudents}</Tag>
-                  <Tag color="green" className="rounded-lg border-0 px-3 py-1 text-sm font-medium">Faculty: {principal.stats.totalFaculty}</Tag>
-                  <Tag color="orange" className="rounded-lg border-0 px-3 py-1 text-sm font-medium">Pending: {principal.stats.pendingApprovals}</Tag>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <div className="bg-white/50 rounded-lg px-3 py-1.5 text-center">
+                    <div className="text-lg font-bold text-text-primary">{principal.stats.totalStudents || 0}</div>
+                    <div className="text-[10px] text-text-tertiary uppercase">Students</div>
+                  </div>
+                  <div className="bg-white/50 rounded-lg px-3 py-1.5 text-center">
+                    <div className="text-lg font-bold text-text-primary">{principal.stats.totalFaculty || 0}</div>
+                    <div className="text-[10px] text-text-tertiary uppercase">Faculty</div>
+                  </div>
+                  <div className="bg-white/50 rounded-lg px-3 py-1.5 text-center">
+                    <div className="text-lg font-bold text-warning">{principal.stats.pendingApprovals || 0}</div>
+                    <div className="text-[10px] text-text-tertiary uppercase">Pending</div>
+                  </div>
                 </div>
               )}
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Faculty List */}
-      <Card 
-        title={
-          <div className="flex items-center gap-3">
-             <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <TeamOutlined className="text-lg" />
-            </div>
-            <span className="font-bold text-text-primary text-lg">Faculty Members</span>
-          </div>
-        }
-        className="rounded-2xl border-border shadow-soft bg-surface overflow-hidden"
-        styles={{ body: { padding: 0 } }}
-      >
+      {/* Faculty Grid */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <TeamOutlined className="text-primary" />
+          <Text className="font-bold text-text-primary">Faculty Members</Text>
+          {faculty && <Tag className="m-0 rounded-full text-xs bg-primary/10 text-primary border-0">{faculty.length}</Tag>}
+        </div>
+
         {(!faculty || faculty.length === 0) ? (
-          <Empty description="No faculty members found" className="py-12" />
+          <div className="bg-surface rounded-xl border border-border p-8 text-center">
+            <Text className="text-text-tertiary">No faculty members found</Text>
+          </div>
         ) : (
-          <List
-            dataSource={faculty}
-            className="w-full"
-            renderItem={(item) => (
-              <List.Item 
-                className="px-6 py-4 hover:bg-background-tertiary/40 transition-colors border-b border-border/50 last:border-0"
-                actions={[<Tag key="role" color={item.role === 'HOD' ? 'purple' : 'blue'} className="rounded-lg m-0 font-bold border-0 px-3 py-0.5">{item.role}</Tag>]}
-              >
-                <List.Item.Meta
-                  avatar={<Avatar size="large" icon={<UserOutlined />} className="bg-background-tertiary text-text-secondary rounded-xl" />}
-                  title={<div className="flex items-center gap-2"><span className="text-text-primary font-bold text-base">{item.name}</span>{item.branchName && <Tag className="text-[10px] rounded border-border bg-background m-0 font-mono">{item.branchName}</Tag>}</div>}
-                  description={
-                    <div className="space-y-2 mt-1">
-                      <Text className="text-xs text-text-tertiary block">{item.email}</Text>
-                      <div className="flex gap-2 flex-wrap mt-2">
+          <Row gutter={[16, 16]}>
+            {faculty.map((member, index) => (
+              <Col xs={24} md={12} key={member.id || index}>
+                <div className="bg-surface rounded-xl border border-border p-4 h-full hover:border-primary/30 hover:shadow-md transition-all">
+                  <div className="flex items-start gap-4">
+                    <Avatar
+                      size={48}
+                      icon={<UserOutlined />}
+                      className={member.role === 'HOD' ? 'bg-purple-500' : 'bg-primary'}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Text className="font-semibold text-text-primary">{member.name}</Text>
+                        <Tag
+                          color={member.role === 'HOD' ? 'purple' : 'blue'}
+                          className="m-0 text-[10px] rounded px-1.5"
+                        >
+                          {member.role}
+                        </Tag>
+                        {member.branchName && (
+                          <Tag className="m-0 text-[10px] rounded bg-background-tertiary text-text-tertiary border-0">
+                            {member.branchName}
+                          </Tag>
+                        )}
+                      </div>
+                      <Text className="text-xs text-text-tertiary block mt-1 truncate">{member.email}</Text>
+
+                      {/* Stats Row */}
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
                         <Tooltip title="Students Assigned">
-                          <Tag icon={<TeamOutlined />} className="rounded-md bg-background border-border text-text-secondary m-0 px-2 py-0.5">
-                            {item.stats?.assignedStudents || 0} Students
-                          </Tag>
+                          <div className="flex items-center gap-1.5">
+                            <TeamOutlined className="text-text-tertiary text-xs" />
+                            <span className="text-sm font-medium text-text-primary">
+                              {member.stats?.assignedStudents || 0}
+                            </span>
+                          </div>
                         </Tooltip>
-                        <Tooltip title="Visits Done/Scheduled">
-                          <Tag icon={<EnvironmentOutlined />} color={item.stats?.visitCompletionRate >= 80 ? 'green' : 'orange'} className="rounded-md border-0 m-0 px-2 py-0.5">
-                            {item.stats?.visitsCompleted || 0}/{item.stats?.visitsScheduled || 0} Visits
-                          </Tag>
+                        <Tooltip title="Visits Completed">
+                          <div className="flex items-center gap-1.5">
+                            <EnvironmentOutlined className="text-text-tertiary text-xs" />
+                            <span className="text-sm font-medium text-text-primary">
+                              {member.stats?.visitsCompleted || 0}
+                              <span className="text-text-tertiary">/{member.stats?.visitsScheduled || 0}</span>
+                            </span>
+                          </div>
                         </Tooltip>
                         <Tooltip title="Reports Reviewed">
-                          <Tag icon={<FileTextOutlined />} className="rounded-md bg-background border-border text-text-secondary m-0 px-2 py-0.5">
-                            {item.stats?.reportsReviewed || 0} Reports
-                          </Tag>
+                          <div className="flex items-center gap-1.5">
+                            <FileTextOutlined className="text-text-tertiary text-xs" />
+                            <span className="text-sm font-medium text-text-primary">
+                              {member.stats?.reportsReviewed || 0}
+                            </span>
+                          </div>
                         </Tooltip>
                       </div>
                     </div>
-                  }
-                />
-              </List.Item>
-            )}
-          />
+                  </div>
+                </div>
+              </Col>
+            ))}
+          </Row>
         )}
-      </Card>
+      </div>
     </div>
   );
 });
@@ -728,111 +804,119 @@ const InstituteDetailView = ({ defaultTab = null }) => {
     ];
   }, [handleEditMentor, handleRemoveMentor, handleViewStudentDetails, handleApproveReport, handleRejectReport]);
 
-  // Memoized student columns
+  // Memoized student columns - Clean and non-overlapping
   const studentColumns = useMemo(() => [
     {
-      title: 'Student', key: 'student', fixed: 'left', width: 240,
+      title: 'Student',
+      key: 'student',
+      fixed: 'left',
+      width: 220,
       render: (_, record) => (
-        <div className="flex items-center gap-3 py-1">
-          <Avatar 
-            icon={<UserOutlined />} 
-            className="bg-primary/10 text-primary border border-primary/20 shrink-0 shadow-sm"
-            size={40}
+        <div className="flex items-center gap-3">
+          <Avatar
+            icon={<UserOutlined />}
+            className="bg-primary/10 text-primary shrink-0"
+            size={36}
           />
-          <div className="min-w-0">
-            <Text strong className="text-sm text-text-primary block truncate leading-tight" title={record.name}>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-text-primary text-sm truncate" title={record.name}>
               {record.name}
-            </Text>
-            <Text className="text-[11px] text-text-tertiary font-mono uppercase tracking-tighter" copyable={{ text: record.rollNumber }}>
-              {record.rollNumber}
-            </Text>
+            </div>
+            <div className="text-xs text-text-tertiary font-mono">{record.rollNumber}</div>
           </div>
         </div>
       ),
     },
-    { 
-      title: 'Branch', dataIndex: 'branchName', key: 'branchName', width: 140, 
+    {
+      title: 'Branch',
+      dataIndex: 'branchName',
+      key: 'branchName',
+      width: 120,
       render: (text) => (
-        <Tag bordered={false} className="rounded-md border border-border bg-background-tertiary text-text-secondary m-0 font-medium px-2 py-0.5 text-xs">
-          {text || 'N/A'}
-        </Tag>
-      )
+        <span className="text-sm text-text-secondary">{text || '-'}</span>
+      ),
     },
     {
-      title: 'Mentor', key: 'mentor', width: 180,
+      title: 'Mentor',
+      key: 'mentor',
+      width: 150,
       render: (_, record) => {
-        const mentor = record.mentor || record.mentorAssignments?.find(ma => ma.isActive)?.mentor;
-        return mentor ? (
+        const mentor = record.mentor || record.mentorAssignments?.find((ma) => ma.isActive)?.mentor;
+        if (!mentor) {
+          return <Tag color="error" className="m-0 rounded text-xs">Unassigned</Tag>;
+        }
+        return (
           <Tooltip title={mentor.email}>
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              <Text className="text-text-primary text-sm font-medium truncate max-w-[140px]">{mentor.name}</Text>
+              <div className="w-2 h-2 rounded-full bg-success" />
+              <span className="text-sm text-text-primary truncate">{mentor.name}</span>
             </div>
           </Tooltip>
-        ) : (
-          <Tag bordered={false} className="bg-error/5 text-error border-error/10 m-0 rounded-md text-xs font-bold uppercase tracking-wider">Unassigned</Tag>
         );
       },
     },
     {
-      title: 'Placement', key: 'company', width: 220,
+      title: 'Company',
+      key: 'company',
+      width: 180,
+      ellipsis: true,
       render: (_, record) => {
         const company = record.company;
         const selfId = record.selfIdentifiedData;
+        const name = company?.companyName || selfId?.companyName;
+        const isSelf = company?.isSelfIdentified || selfId?.companyName;
 
-        if (company?.companyName) {
-          return (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5">
-                <Text strong className="text-text-primary text-xs truncate max-w-[160px]">{company.companyName}</Text>
-                {company.isSelfIdentified && <Tag color="purple" className="text-[9px] px-1 m-0 border-0 leading-tight">Self</Tag>}
-              </div>
-              <Text className="text-[10px] text-text-tertiary truncate">{company.jobProfile || 'Internship'}</Text>
-            </div>
-          );
+        if (!name) {
+          return <span className="text-text-tertiary text-sm italic">Not Placed</span>;
         }
-        if (selfId?.companyName) {
-          return (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5">
-                <Text strong className="text-text-primary text-xs truncate max-w-[160px]">{selfId.companyName}</Text>
-                <Tag color="purple" className="text-[9px] px-1 m-0 border-0 leading-tight">Self</Tag>
-              </div>
-              <Text className="text-[10px] text-text-tertiary truncate">{selfId.jobProfile || 'Self-ID'}</Text>
-            </div>
-          );
-        }
-        return <Text type="secondary" className="text-xs italic opacity-60">Not Placed</Text>;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-text-primary truncate" title={name}>{name}</span>
+            {isSelf && <Tag color="purple" className="m-0 text-[10px] px-1 shrink-0">Self</Tag>}
+          </div>
+        );
       },
     },
     {
-      title: 'Compliance', key: 'status', width: 160,
-      render: (_, record) => (
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center px-1">
-            <Text className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest">Report</Text>
-            {record.currentMonthReport ? (
-              <Tag color={getStatusColor(record.currentMonthReport.status)} className="m-0 text-[10px] border-0 rounded py-0 px-1 font-bold">
-                {record.currentMonthReport.status}
-              </Tag>
-            ) : <Tag color="error" className="m-0 text-[10px] border-0 rounded py-0 px-1 font-bold">MISSING</Tag>}
-          </div>
-          <div className="flex justify-between items-center px-1">
-            <Text className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest">Visit</Text>
-            {record.lastFacultyVisit ? (
-              <Text className="text-[10px] font-bold text-success">{new Date(record.lastFacultyVisit.date).toLocaleDateString()}</Text>
-            ) : <Text className="text-[10px] font-bold text-text-tertiary">NONE</Text>}
-          </div>
-        </div>
-      ),
+      title: 'Report',
+      key: 'report',
+      width: 100,
+      align: 'center',
+      render: (_, record) => {
+        const status = record.currentMonthReport?.status;
+        if (!status) {
+          return <Tag color="error" className="m-0 rounded text-xs">Missing</Tag>;
+        }
+        return <Tag color={getStatusColor(status)} className="m-0 rounded text-xs">{status}</Tag>;
+      },
     },
-    { 
-      title: 'Action', key: 'action', width: 60, fixed: 'right', align: 'center',
+    {
+      title: 'Last Visit',
+      key: 'visit',
+      width: 100,
+      align: 'center',
+      render: (_, record) => {
+        if (!record.lastFacultyVisit?.date) {
+          return <span className="text-text-tertiary text-xs">None</span>;
+        }
+        return (
+          <span className="text-sm text-text-secondary">
+            {new Date(record.lastFacultyVisit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        );
+      },
+    },
+    {
+      title: '',
+      key: 'action',
+      width: 50,
+      fixed: 'right',
+      align: 'center',
       render: (_, record) => (
         <Dropdown menu={{ items: getStudentActionItems(record) }} trigger={['click']} placement="bottomRight">
-          <Button type="text" shape="circle" icon={<MoreOutlined />} className="text-text-tertiary hover:text-primary hover:bg-primary/5" />
+          <Button type="text" size="small" icon={<MoreOutlined />} className="text-text-tertiary hover:text-primary" />
         </Dropdown>
-      ) 
+      ),
     },
   ], [getStudentActionItems]);
 
@@ -877,26 +961,18 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       ),
     },
     {
-      title: 'Industry Info', key: 'industry', width: 180,
+      title: 'Industry', key: 'industry', width: 140,
       render: (_, record) => (
-        <div className="space-y-1">
-          <Tag
-            bordered={false}
-            className={`font-bold rounded-md m-0 px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-              record.isSelfIdentifiedCompany 
-                ? 'bg-purple-500/10 text-purple-600' 
-                : 'bg-cyan-500/10 text-cyan-600'
-            }`}
-          >
-            {record.industryType || 'General'}
-          </Tag>
-          <div className="text-[10px] text-text-tertiary flex items-center gap-1">
-            <GlobalOutlined className="text-[9px]" />
-            <span className="truncate max-w-[140px] italic">
-              {record.website || 'No website'}
-            </span>
-          </div>
-        </div>
+        <Tag
+          bordered={false}
+          className={`font-bold rounded-md m-0 px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+            record.isSelfIdentifiedCompany
+              ? 'bg-purple-500/10 text-purple-600'
+              : 'bg-cyan-500/10 text-cyan-600'
+          }`}
+        >
+          {record.industryType || 'General'}
+        </Tag>
       ),
     },
     {
@@ -951,45 +1027,124 @@ const InstituteDetailView = ({ defaultTab = null }) => {
     },
   ], [handleViewCompanyDetails]);
 
-  // No institute selected
+  // No institute selected - Enhanced empty state
   if (!selectedInstitute?.id) {
     return (
-      <div className="h-full flex items-center justify-center p-8 bg-background-secondary/50">
-        <Result
-          icon={<BankOutlined className="text-text-tertiary text-6xl opacity-50" />}
-          title={<span className="text-text-primary text-xl font-bold">Select an Institution</span>}
-          subTitle={<span className="text-text-secondary">Choose an institution from the side panel to view detailed information</span>}
-        />
+      <div className="h-full flex items-center justify-center p-8 bg-gradient-to-br from-background via-background-secondary to-background">
+        <div className="text-center max-w-md">
+          {/* Animated illustration */}
+          <div className="relative inline-block mb-8">
+            <div className="w-32 h-32 rounded-3xl bg-primary/5 flex items-center justify-center">
+              <BankOutlined className="text-5xl text-primary/40" />
+            </div>
+            {/* Decorative elements */}
+            <div className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success/20 flex items-center justify-center">
+              <CheckCircleOutlined className="text-success text-xs" />
+            </div>
+            <div className="absolute -bottom-2 -left-2 w-8 h-8 rounded-xl bg-info/20 flex items-center justify-center">
+              <TeamOutlined className="text-info text-sm" />
+            </div>
+          </div>
+
+          <Title level={3} className="!mb-2 !text-2xl font-bold text-text-primary">
+            Select an Institution
+          </Title>
+          <Text className="text-text-secondary block mb-6 text-base leading-relaxed">
+            Choose an institution from the sidebar to explore detailed analytics,
+            student data, company partnerships, and faculty information.
+          </Text>
+
+          {/* Feature hints */}
+          <div className="grid grid-cols-2 gap-3 text-left max-w-sm mx-auto">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <TeamOutlined className="text-primary text-sm" />
+              </div>
+              <Text className="text-xs text-text-secondary">View student enrollment & progress</Text>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
+              <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+                <BankOutlined className="text-success text-sm" />
+              </div>
+              <Text className="text-xs text-text-secondary">Explore company partnerships</Text>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
+              <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+                <SafetyCertificateOutlined className="text-warning text-sm" />
+              </div>
+              <Text className="text-xs text-text-secondary">Track compliance scores</Text>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
+              <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+                <UserOutlined className="text-info text-sm" />
+              </div>
+              <Text className="text-xs text-text-secondary">Manage faculty & mentors</Text>
+            </div>
+          </div>
+
+          {/* Arrow hint */}
+          <div className="mt-8 flex items-center justify-center gap-2 text-text-tertiary">
+            <span className="text-lg">←</span>
+            <Text className="text-sm">Select from sidebar</Text>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-6 h-full flex flex-col overflow-hidden bg-background">
-      {/* Header */}
+      {/* Enhanced Header */}
       <div className="mb-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-surface border border-border shadow-soft flex items-center justify-center text-primary">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-lg shadow-primary/10 flex items-center justify-center text-primary">
             <BankOutlined className="text-2xl" />
           </div>
           <div>
-            <Title level={4} className="!mb-0 !text-xl font-bold text-text-primary">{overview.data?.institution?.name || 'Loading...'}</Title>
-            <Text className="text-text-secondary flex items-center gap-2 text-sm mt-1">
-              <EnvironmentOutlined className="text-text-tertiary" /> {overview.data?.institution?.city}
-              {overview.data?.institution?.district && `, ${overview.data?.institution?.district}`}
-              <span className="w-1 h-1 rounded-full bg-text-tertiary opacity-50" />
-              <Tag className="font-mono text-xs bg-surface border-border m-0 rounded-md text-text-secondary">{overview.data?.institution?.code}</Tag>
-            </Text>
+            <div className="flex items-center gap-2">
+              <Title level={4} className="!mb-0 !text-xl font-bold text-text-primary">
+                {overview.data?.institution?.name || 'Loading...'}
+              </Title>
+              {overview.data?.complianceScore >= 80 && (
+                <Tooltip title="High compliance score">
+                  <CheckCircleOutlined className="text-success" />
+                </Tooltip>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-1.5">
+              <Tag className="font-mono text-xs bg-primary/10 text-primary border-0 m-0 rounded-md px-2">
+                {overview.data?.institution?.code}
+              </Tag>
+              <Text className="text-text-secondary flex items-center gap-1.5 text-sm">
+                <EnvironmentOutlined className="text-text-tertiary text-xs" />
+                {overview.data?.institution?.city}
+                {overview.data?.institution?.district && `, ${overview.data?.institution?.district}`}
+              </Text>
+              {overview.data?.complianceScore != null && (
+                <Badge
+                  count={`${overview.data.complianceScore}%`}
+                  style={{
+                    backgroundColor: overview.data.complianceScore >= 80 ? 'rgb(var(--color-success))' :
+                                     overview.data.complianceScore >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))'
+                  }}
+                  className="[&_.ant-badge-count]:text-[10px] [&_.ant-badge-count]:font-bold"
+                />
+              )}
+            </div>
           </div>
         </div>
-        <Button 
-          icon={<ReloadOutlined />} 
-          onClick={() => dispatch(fetchInstituteOverview(selectedInstitute.id))} 
-          loading={overview.loading}
-          className="rounded-xl h-10 font-bold border-border hover:border-primary hover:text-primary shadow-sm"
-        >
-          Refresh Data
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tooltip title="Refresh all data">
+            <Button
+              icon={<ReloadOutlined spin={overview.loading} />}
+              onClick={() => dispatch(fetchInstituteOverview(selectedInstitute.id))}
+              loading={overview.loading}
+              className="rounded-xl h-10 font-bold border-border hover:border-primary hover:text-primary shadow-sm"
+            >
+              Refresh
+            </Button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -1008,7 +1163,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
               key: 'students',
               label: <span className="flex items-center gap-2"><UserOutlined /> Students ({students.total})</span>,
               children: (
-                <div className="h-full flex flex-col p-6 space-y-4 overflow-hidden">
+                <div className="h-full flex flex-col p-6 gap-4 min-h-0">
                   <Card className="rounded-2xl border-border shadow-soft shrink-0 bg-surface" styles={{ body: { padding: '16px' } }}>
                     <div className="flex flex-wrap items-center gap-3">
                       <Input.Search
@@ -1064,24 +1219,27 @@ const InstituteDetailView = ({ defaultTab = null }) => {
                   
                   {students.error && <Alert type="error" title={students.error} className="rounded-xl border-error/20 bg-error/5" showIcon closable />}
                   
-                  <div className="rounded-2xl border border-border shadow-soft flex-1 overflow-hidden bg-surface">
-                    <div className="h-full flex flex-col">
-                      <Table 
-                        columns={studentColumns} 
-                        dataSource={students.list} 
-                        rowKey="id" 
-                        loading={students.loading} 
-                        pagination={false} 
-                        scroll={{ x: 1200, y: 'calc(100vh - 420px)' }} 
-                        size="middle" 
-                        className="custom-table flex-1 overflow-hidden"
+                  <div className="rounded-2xl border border-border shadow-soft flex-1 min-h-0 overflow-hidden bg-surface flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-auto">
+                      <Table
+                        columns={studentColumns}
+                        dataSource={students.list}
+                        rowKey="id"
+                        loading={students.loading}
+                        pagination={false}
+                        scroll={{ x: 950 }}
+                        size="middle"
+                        className="custom-table"
+                        sticky
                       />
-                      {students.hasMore && (
-                        <div className="text-center p-4 border-t border-border bg-background-tertiary/30">
-                          <Button onClick={handleLoadMore} loading={students.loadingMore} className="rounded-xl font-bold shadow-sm">Load More Students</Button>
-                        </div>
-                      )}
                     </div>
+                    {students.hasMore && (
+                      <div className="text-center p-4 border-t border-border bg-background-tertiary/30 shrink-0">
+                        <Button onClick={handleLoadMore} loading={students.loadingMore} className="rounded-xl font-bold shadow-sm">
+                          Load More Students
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ),

@@ -214,12 +214,13 @@ services:
       --keys_output_limit=12288
       --dbfilename=dump.rdb
       --save_schedule=*:30
+    # More tolerant healthcheck: retry PING in a loop for a short window, allow longer start period
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      test: ["CMD-SHELL", "sh -c 'for i in 1 2 3 4 5; do redis-cli ping 2>/dev/null | grep -q PONG && exit 0 || sleep 2; done; exit 1'"]
       interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   # ===========================================
   # MinIO - S3-compatible Object Storage

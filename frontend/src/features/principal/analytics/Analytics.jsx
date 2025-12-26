@@ -87,6 +87,7 @@ import {
   selectMentorCoverage,
   selectComplianceMetrics,
   selectInternshipStats,
+  selectInternshipStatsLoading,
 } from '../store/principalSlice';
 
 const { Title, Text } = Typography;
@@ -100,6 +101,7 @@ const Analytics = () => {
   const mentorCoverage = useSelector(selectMentorCoverage);
   const complianceMetrics = useSelector(selectComplianceMetrics);
   const internshipStats = useSelector(selectInternshipStats);
+  const internshipStatsLoading = useSelector(selectInternshipStatsLoading);
 
   // Chart colors
   const COLORS = [
@@ -204,7 +206,7 @@ const Analytics = () => {
     if (!previous || previous === 0) return { value: 0, direction: 'neutral' };
     const change = ((current - previous) / previous) * 100;
     return {
-      value: Math.abs(change).toFixed(1),
+      value: Math.round(Math.abs(change)),
       direction: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral',
     };
   };
@@ -386,13 +388,17 @@ const Analytics = () => {
   const renderInternshipsTab = () => {
     const statusData = internshipStats?.byStatus || [];
     const companyData = internshipStats?.byCompany || [];
-    const industryData = internshipStats?.byIndustry || [];
 
     // Calculate self-identified stats
     const totalInternships = analytics?.dashboard?.internships?.totalApplications || internshipStats?.totalApplications || 0;
     const ongoingCount = analytics?.dashboard?.internships?.ongoingInternships || 0;
     const completedCount = analytics?.dashboard?.internships?.completedInternships || 0;
     const completionRate = totalInternships > 0 ? Math.round((completedCount / totalInternships) * 100) : 0;
+
+    const handleInternshipsRefresh = () => {
+      dispatch(fetchInternshipStats({ forceRefresh: true }));
+      fetchAnalytics();
+    };
 
     return (
       <div className="space-y-6">
@@ -408,13 +414,21 @@ const Analytics = () => {
                 Students identify and register their own internships. All self-identified internships are auto-approved and tracked for compliance.
               </Text>
             </div>
-            <div className="flex gap-4">
+            <div className="flex items-center gap-4">
               <Statistic
                 title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Completion Rate</Text>}
                 value={completionRate}
                 suffix="%"
                 styles={{ content: { color: token.colorSuccess, fontWeight: 'bold', fontSize: 28 } }}
               />
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={handleInternshipsRefresh}
+                loading={internshipStatsLoading}
+                className="rounded-lg"
+              >
+                Refresh
+              </Button>
             </div>
           </div>
         </Card>
@@ -469,7 +483,7 @@ const Analytics = () => {
                 styles={{ content: { color: token.colorInfo, fontWeight: 'bold' } }}
               />
               <div className="mt-2 pt-2 border-t border-border/50">
-                <Text className="text-xs text-text-tertiary">{industryData.length || 0} industry sectors</Text>
+                <Text className="text-xs text-text-tertiary">Unique partner companies</Text>
               </div>
             </Card>
           </Col>
@@ -634,8 +648,28 @@ const Analytics = () => {
 
     const trendData = complianceMetrics?.trend || [];
 
+    const handleComplianceRefresh = () => {
+      dispatch(fetchComplianceMetrics({ forceRefresh: true }));
+      dispatch(fetchMentorCoverage({ forceRefresh: true }));
+    };
+
     return (
       <div className="space-y-6">
+        {/* Compliance Header with Refresh */}
+        <div className="flex justify-between items-center">
+          <div>
+            <Text className="text-lg font-semibold text-text-primary">Compliance Metrics</Text>
+            <Text className="text-text-secondary block text-sm">Track report submissions, faculty visits, and overall compliance</Text>
+          </div>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleComplianceRefresh}
+            className="rounded-lg"
+          >
+            Refresh
+          </Button>
+        </div>
+
         <Row gutter={[24, 24]}>
           {/* Compliance Radar */}
           <Col xs={24} lg={12}>
@@ -759,8 +793,27 @@ const Analytics = () => {
       studentCount: m.assignedStudents ?? m.studentCount ?? 0,
     }));
 
+    const handleMentorsRefresh = () => {
+      dispatch(fetchMentorCoverage({ forceRefresh: true }));
+    };
+
     return (
       <div className="space-y-6">
+        {/* Mentors Header with Refresh */}
+        <div className="flex justify-between items-center">
+          <div>
+            <Text className="text-lg font-semibold text-text-primary">Mentor Coverage</Text>
+            <Text className="text-text-secondary block text-sm">Track mentor assignments and student distribution</Text>
+          </div>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleMentorsRefresh}
+            className="rounded-lg"
+          >
+            Refresh
+          </Button>
+        </div>
+
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={8}>
             <Card className="rounded-2xl border-border shadow-sm text-center">

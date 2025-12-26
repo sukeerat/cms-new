@@ -14,7 +14,6 @@ import {
   approveApplication,
   rejectApplication,
   submitFeedback,
-  reviewMonthlyReport,
   selectDashboard,
   selectStudents,
   selectVisitLogs,
@@ -176,9 +175,12 @@ export const useFacultyDashboard = () => {
     return dispatch(submitFeedback({ applicationId, feedbackData })).unwrap();
   }, [dispatch]);
 
+  // Note: reviewMonthlyReport removed - auto-approval implemented
+  // This function is kept for backwards compatibility but is a no-op
   const handleReviewReport = useCallback(async (reportId, reviewData) => {
-    return dispatch(reviewMonthlyReport({ reportId, reviewData })).unwrap();
-  }, [dispatch]);
+    console.warn('handleReviewReport is deprecated - auto-approval is now implemented');
+    return Promise.resolve();
+  }, []);
 
   const refresh = useCallback(() => {
     setIsRevalidating(true);
@@ -195,8 +197,9 @@ export const useFacultyDashboard = () => {
   }, [joiningLetters.list]);
 
   // Get pending monthly reports
+  // With auto-approval, only DRAFT reports are considered pending
   const pendingMonthlyReports = useMemo(() => {
-    return monthlyReports.list.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED');
+    return monthlyReports.list.filter(r => r.status === 'DRAFT');
   }, [monthlyReports.list]);
 
   return {

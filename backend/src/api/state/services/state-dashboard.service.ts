@@ -166,23 +166,23 @@ export class StateDashboardService {
               },
             },
           }),
-          // Monthly reports - submitted this month
+          // Monthly reports - submitted this month (with auto-approval, all are APPROVED)
           this.prisma.monthlyReport.count({
             where: {
               reportMonth: currentMonth,
               reportYear: currentYear,
-              status: { in: ['SUBMITTED', 'APPROVED'] },
+              status: 'APPROVED',
             },
           }),
-          // Monthly reports - submitted last month
+          // Monthly reports - submitted last month (with auto-approval, all are APPROVED)
           this.prisma.monthlyReport.count({
             where: {
               reportMonth: prevMonth,
               reportYear: prevMonthYear,
-              status: { in: ['SUBMITTED', 'APPROVED'] },
+              status: 'APPROVED',
             },
           }),
-          // Monthly reports - pending review
+          // Monthly reports - pending review (should be 0 with auto-approval, kept for legacy)
           this.prisma.monthlyReport.count({ where: { status: 'SUBMITTED' } }),
           // Monthly reports - approved this month
           this.prisma.monthlyReport.count({
@@ -192,9 +192,9 @@ export class StateDashboardService {
               status: 'APPROVED',
             },
           }),
-          // Total reports submitted
+          // Total reports submitted (with auto-approval, all are APPROVED)
           this.prisma.monthlyReport.count({
-            where: { status: { in: ['SUBMITTED', 'APPROVED'] } },
+            where: { status: 'APPROVED' },
           }),
           // Recent activity
           this.prisma.internshipApplication.count({
@@ -293,7 +293,7 @@ export class StateDashboardService {
             total: totalApplications,
             accepted: acceptedApplications,
             approvalRate: totalApplications > 0
-              ? ((acceptedApplications / totalApplications) * 100).toFixed(2)
+              ? Math.round((acceptedApplications / totalApplications) * 100)
               : 0,
           },
           industries: {
@@ -320,7 +320,7 @@ export class StateDashboardService {
             pendingThisMonth: pendingVisitsThisMonth,
             // Return null when no data to show N/A on frontend
             completionRate: expectedVisitsThisMonth > 0
-              ? ((visitsThisMonth / expectedVisitsThisMonth) * 100).toFixed(1)
+              ? Math.round((visitsThisMonth / expectedVisitsThisMonth) * 100)
               : null,
           },
           // Monthly Reports Card with details
@@ -335,7 +335,7 @@ export class StateDashboardService {
             missingLastMonth: missingReportsLastMonth,
             // Return null when no data to show N/A on frontend
             submissionRate: expectedReportsThisMonth > 0
-              ? ((reportsSubmittedThisMonth / expectedReportsThisMonth) * 100).toFixed(1)
+              ? Math.round((reportsSubmittedThisMonth / expectedReportsThisMonth) * 100)
               : null,
           },
           compliance: {
@@ -410,6 +410,7 @@ export class StateDashboardService {
 
           // 3. Missing monthly reports (overdue by > 5 days since internship start)
           // Only check students whose internships started more than 5 days ago
+          // With auto-approval, all submitted reports are APPROVED
           this.prisma.student.findMany({
             where: {
               isActive: true,
@@ -424,7 +425,7 @@ export class StateDashboardService {
                 none: {
                   reportMonth: currentMonth,
                   reportYear: currentYear,
-                  status: { in: ['SUBMITTED', 'APPROVED'] },
+                  status: 'APPROVED',
                 },
               },
             },
@@ -588,6 +589,7 @@ export class StateDashboardService {
           getInstitutionsWithStats({ page: 1, limit: 100 }),
 
           // 3. Overdue compliance items
+          // With auto-approval, all submitted reports are APPROVED
           this.prisma.student.findMany({
             where: {
               isActive: true,
@@ -602,7 +604,7 @@ export class StateDashboardService {
                 none: {
                   reportMonth: currentMonth,
                   reportYear: currentYear,
-                  status: { in: ['SUBMITTED', 'APPROVED'] },
+                  status: 'APPROVED',
                 },
               },
             },
@@ -741,11 +743,12 @@ export class StateDashboardService {
           this.prisma.facultyVisitLog.count({
             where: { visitDate: { gte: startOfMonth } },
           }),
+          // With auto-approval, all submitted reports are APPROVED
           this.prisma.monthlyReport.count({
             where: {
               reportMonth: currentMonth,
               reportYear: currentYear,
-              status: { in: ['SUBMITTED', 'APPROVED'] },
+              status: 'APPROVED',
             },
           }),
           // Run institution stats in parallel with state-wide counts

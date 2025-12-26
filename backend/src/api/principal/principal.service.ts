@@ -12,6 +12,7 @@ import {
   calculateFourWeekCycles,
   getTotalExpectedCycles,
   getExpectedReportsAsOfToday,
+  getExpectedVisitsAsOfToday,
   FOUR_WEEK_CYCLE,
 } from '../../common/utils/four-week-cycle.util';
 import * as bcrypt from 'bcryptjs';
@@ -107,7 +108,7 @@ export class PrincipalService {
 
         // Completion rate for self-identified internships (auto-approved on submission)
         const completionRate = totalSelfIdentifiedInternships > 0
-          ? Number(((completedInternships / totalSelfIdentifiedInternships) * 100).toFixed(2))
+          ? Math.round((completedInternships / totalSelfIdentifiedInternships) * 100)
           : 0;
 
         return {
@@ -410,6 +411,9 @@ export class PrincipalService {
               internshipDuration: true,
               startDate: true,
               endDate: true,
+              // Pre-calculated expected values
+              totalExpectedReports: true,
+              totalExpectedVisits: true,
               facultyMentorName: true,
               facultyMentorEmail: true,
               facultyMentorContact: true,
@@ -458,6 +462,38 @@ export class PrincipalService {
       this.prisma.student.count({ where }),
     ]);
 
+    // Get application IDs for faculty visits query
+    const applicationIds = students
+      .map((s) => s.internshipApplications[0]?.id)
+      .filter(Boolean) as string[];
+
+    // Fetch faculty visits for all applications in a single query
+    const facultyVisits = applicationIds.length > 0
+      ? await this.prisma.facultyVisitLog.findMany({
+          where: { applicationId: { in: applicationIds } },
+          select: {
+            applicationId: true,
+            visitDate: true,
+          },
+          orderBy: { visitDate: 'desc' },
+        })
+      : [];
+
+    // Create a map of applicationId -> { count, lastVisit }
+    const facultyVisitsMap = new Map<string, { count: number; lastVisit: Date | null }>();
+    for (const visit of facultyVisits) {
+      const existing = facultyVisitsMap.get(visit.applicationId);
+      if (!existing) {
+        facultyVisitsMap.set(visit.applicationId, {
+          count: 1,
+          lastVisit: visit.visitDate,
+        });
+      } else {
+        existing.count++;
+        // lastVisit is already the most recent due to orderBy
+      }
+    }
+
     // Transform data for frontend
     const progressData = students.map((student) => {
       const application = student.internshipApplications[0];
@@ -465,31 +501,44 @@ export class PrincipalService {
       const reports = application?.monthlyReports || [];
 
       /**
-       * Calculate expected reports using 4-week cycles
+       * Get expected reports and visits - prefer stored values, fallback to calculation
+       * Uses utility functions for accurate "as of now" calculations
        * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V (Q47-49)
        */
       let totalExpectedReports = 0;
+      let totalExpectedVisits = 0;
+      let expectedReportsAsOfNow = 0;
+      let expectedVisitsAsOfNow = 0;
+
       if (application) {
         const startDate = (application as any).startDate || application.joiningDate;
         const endDate = (application as any).endDate || application.completionDate;
-        const now = new Date();
+
+        // Use stored values if available
+        const storedExpectedReports = (application as any).totalExpectedReports;
+        const storedExpectedVisits = (application as any).totalExpectedVisits;
 
         if (startDate) {
           const start = new Date(startDate);
-          // Only calculate if internship has started
-          if (start <= now) {
-            // Calculate using 4-week cycles
-            const effectiveEnd = endDate
-              ? new Date(endDate)
-              : new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000); // Default 6 months if no end date
+          const now = new Date();
 
-            // Get all 4-week cycles and count those where submission window has started
-            const cycles = calculateFourWeekCycles(start, effectiveEnd);
-            totalExpectedReports = cycles.filter(c => now >= c.submissionWindowStart).length;
-            totalExpectedReports = Math.max(1, totalExpectedReports);
-          }
+          // Default end date: 6 months from start if not specified
+          const effectiveEnd = endDate
+            ? new Date(endDate)
+            : new Date(start.getTime() + 180 * 24 * 60 * 60 * 1000);
+
+          // Use stored values if available, otherwise calculate total
+          totalExpectedReports = storedExpectedReports ?? getTotalExpectedCycles(start, effectiveEnd);
+          totalExpectedVisits = storedExpectedVisits ?? getTotalExpectedCycles(start, effectiveEnd);
+
+          // Calculate how many should be done by now using utility functions
+          expectedReportsAsOfNow = getExpectedReportsAsOfToday(start, effectiveEnd);
+          expectedVisitsAsOfNow = getExpectedVisitsAsOfToday(start, effectiveEnd);
+        } else if (storedExpectedReports || storedExpectedVisits) {
+          // Use stored values even if no startDate
+          totalExpectedReports = storedExpectedReports || 0;
+          totalExpectedVisits = storedExpectedVisits || 0;
         }
-        // If no startDate, expected reports remains 0 (cannot calculate without dates)
       }
 
       const submittedReports = reports.filter(
@@ -586,6 +635,9 @@ export class PrincipalService {
         }
       }
 
+      // Get faculty visits data from the map
+      const visitsData = application ? facultyVisitsMap.get(application.id) : null;
+
       return {
         id: student.id,
         name: student.name,
@@ -597,9 +649,15 @@ export class PrincipalService {
         internshipStatus,
         reportsSubmitted: submittedReports,
         totalReports: totalExpectedReports,
+        expectedReportsAsOfNow,
         completionPercentage,
         mentor: mentor?.name || null,
         mentorId: mentor?.id || null,
+        // Faculty visits data
+        facultyVisitsCount: visitsData?.count || 0,
+        totalExpectedVisits,
+        expectedVisitsAsOfNow,
+        lastFacultyVisit: visitsData?.lastVisit || null,
         timeline,
         application: application ? {
           id: application.id,

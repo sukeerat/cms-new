@@ -200,10 +200,8 @@ const AssignedStudentsList = ({
     const done = reports.length;
     const expected = calculateExpectedReports(internshipApp);
 
-    // Check for pending reports
-    const pendingCount = reports.filter(r =>
-      r.status === 'SUBMITTED' || r.status === 'PENDING'
-    ).length;
+    // Check for draft reports (with auto-approval, only DRAFT is pending)
+    const pendingCount = reports.filter(r => r.status === 'DRAFT').length;
 
     // Determine color based on completion
     let color = '#d9d9d9'; // grey - no progress
@@ -228,7 +226,7 @@ const AssignedStudentsList = ({
     }
 
     const tooltipText = pendingCount > 0
-      ? `${done}/${expected} reports (${pendingCount} pending review)`
+      ? `${done}/${expected} reports (${pendingCount} draft)`
       : `${done} of ${expected} reports submitted`;
 
     return (

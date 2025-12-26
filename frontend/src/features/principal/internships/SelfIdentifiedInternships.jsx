@@ -62,6 +62,7 @@ import { toast } from 'react-hot-toast';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import principalService from '../../../services/principal.service';
+import analyticsService from '../../../services/analytics.service';
 import {
   fetchInternshipStats,
   selectInternshipStats,
@@ -102,80 +103,79 @@ const SelfIdentifiedInternships = () => {
   const [assignMentorVisible, setAssignMentorVisible] = useState(false);
   const [selectedMentorId, setSelectedMentorId] = useState(null);
   const [mentorAssignLoading, setMentorAssignLoading] = useState(false);
+  const [singleAssignRecord, setSingleAssignRecord] = useState(null); // For single row mentor assignment
 
-  // Fetch internships
+  // Fetch internships using student progress API (includes reports, visits, completion data)
   const fetchInternships = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch all students with internships (use large limit for client-side filtering/pagination)
-      const response = await principalService.getStudents({
+      // Use getStudentProgress which returns comprehensive data including reports, visits, etc.
+      const response = await analyticsService.getStudentProgress({
         page: 1,
         limit: 500, // Fetch all for client-side filtering and pagination
-        hasInternship: 'true',
       });
 
-      // Response is already unwrapped by service, structure: { data: [...], total, page, limit }
-      const students = response?.data || [];
+      // Response structure: { students: [...], pagination, mentors, statusCounts }
+      const students = response?.students || [];
 
-      // Transform student data to internship format
-      // Filter for students who have self-identified internships in their internshipApplications array
+      // Transform student progress data to internship format
+      // Filter for students who have internship applications
       const internshipData = students
-        .filter(s => {
-          // Check both legacy selfIdentifiedInternship and new internshipApplications array
-          if (s.selfIdentifiedInternship) return true;
-          if (s.internshipApplications && Array.isArray(s.internshipApplications)) {
-            return s.internshipApplications.some(app => app.isSelfIdentified);
-          }
-          return false;
-        })
+        .filter(s => s.application && (s.application.isSelfIdentified || s.application.company))
         .map(student => {
-          // Get internship from either legacy format or from internshipApplications array
-          let internship = student.selfIdentifiedInternship;
-          if (!internship && student.internshipApplications) {
-            internship = student.internshipApplications.find(app => app.isSelfIdentified) || student.internshipApplications[0];
-          }
-
-          // Get mentor from mentorAssignments if available
-          // Backend returns: mentorAssignments[].mentor (not .faculty)
-          const mentorAssignment = student.mentorAssignments?.[0];
-          const mentor = mentorAssignment?.mentor || student.mentor;
+          const application = student.application;
+          const company = application?.company;
+          const facultyMentor = application?.facultyMentor;
 
           return {
-            id: internship?.id || student.id,
+            id: application?.id || student.id,
             studentId: student.id,
-            studentName: student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim(),
-            studentRollNumber: student.rollNumber || student.registrationNumber,
-            studentEmail: student.email || student.user?.email,
-            studentPhone: student.phone || student.user?.phoneNo,
-            studentBatch: student.batch?.name || student.batchName,
-            studentDepartment: student.branch?.name || student.department?.name || student.departmentName,
-            companyName: internship?.companyName || internship?.industry?.companyName || 'N/A',
-            companyAddress: internship?.companyAddress || internship?.industry?.address,
-            companyContact: internship?.companyContact || internship?.industry?.contactNumber,
-            companyEmail: internship?.companyEmail || internship?.industry?.email,
-            jobProfile: internship?.jobProfile || internship?.role || internship?.position,
-            stipend: internship?.stipend,
-            startDate: internship?.startDate,
-            endDate: internship?.endDate,
-            duration: internship?.internshipDuration || internship?.duration,
-            status: internship?.status || internship?.internshipStatus || 'APPROVED',
-            internshipStatus: internship?.internshipStatus,
-            mentorName: internship?.facultyMentorName || mentor?.name,
-            mentorEmail: internship?.facultyMentorEmail || mentor?.email,
-            mentorContact: internship?.facultyMentorContact || mentor?.phoneNo,
-            mentorDesignation: internship?.facultyMentorDesignation || mentor?.designation,
-            joiningLetterUrl: internship?.joiningLetterUrl,
-            joiningLetterUploadedAt: internship?.joiningLetterUploadedAt,
-            submittedAt: internship?.createdAt || internship?.appliedDate,
-            updatedAt: internship?.updatedAt,
-            isSelfIdentified: internship?.isSelfIdentified ?? true,
+            studentName: student.name,
+            studentRollNumber: student.rollNumber,
+            studentEmail: student.email,
+            studentPhone: student.phone,
+            studentBatch: student.batch,
+            studentDepartment: student.department,
+            companyName: company?.name || 'N/A',
+            companyAddress: company?.address,
+            companyContact: company?.contact || company?.phone,
+            companyEmail: company?.email,
+            jobProfile: application?.jobProfile || application?.internshipTitle,
+            stipend: application?.stipendAmount,
+            startDate: application?.startDate,
+            endDate: application?.endDate,
+            duration: application?.duration,
+            status: application?.status || 'APPROVED',
+            internshipStatus: application?.internshipStatus || student.internshipStatus,
+            mentorName: facultyMentor?.name || student.mentor,
+            mentorEmail: facultyMentor?.email,
+            mentorContact: facultyMentor?.contact,
+            mentorDesignation: facultyMentor?.designation,
+            mentorId: student.mentorId,
+            joiningLetterUrl: application?.joiningLetterUrl,
+            joiningLetterUploadedAt: application?.joiningLetterUploadedAt,
+            hasJoiningLetter: application?.hasJoiningLetter,
+            submittedAt: application?.joiningDate || student.createdAt,
+            updatedAt: application?.updatedAt,
+            isSelfIdentified: application?.isSelfIdentified ?? true,
+            // New fields from student progress API
+            reportsSubmitted: student.reportsSubmitted || 0,
+            totalReports: student.totalReports || 0,
+            expectedReportsAsOfNow: student.expectedReportsAsOfNow || 0,
+            completionPercentage: student.completionPercentage || 0,
+            facultyVisitsCount: student.facultyVisitsCount || 0,
+            totalExpectedVisits: student.totalExpectedVisits || 0,
+            expectedVisitsAsOfNow: student.expectedVisitsAsOfNow || 0,
+            lastFacultyVisit: student.lastFacultyVisit,
+            timeline: student.timeline || [],
+            monthlyReports: student.monthlyReports || [],
           };
         });
 
       setInternships(internshipData);
       setPagination(prev => ({
         ...prev,
-        total: response?.total || internshipData.length,
+        total: response?.pagination?.total || internshipData.length,
       }));
     } catch (error) {
       console.error('Failed to fetch internships:', error);
@@ -359,13 +359,43 @@ const SelfIdentifiedInternships = () => {
     toast.success('Data refreshed');
   };
 
-  // Bulk assign mentor
-  const handleBulkAssignMentor = async () => {
+  // Assign mentor (handles both bulk and single)
+  const handleAssignMentor = async () => {
     if (!selectedMentorId) {
       toast.error('Please select a mentor');
       return;
     }
 
+    // For single record assignment
+    if (singleAssignRecord) {
+      if (!singleAssignRecord.studentId) {
+        toast.error('Student ID not found');
+        return;
+      }
+
+      try {
+        setMentorAssignLoading(true);
+        const currentYear = new Date().getFullYear();
+        await principalService.assignMentor({
+          mentorId: selectedMentorId,
+          studentIds: [singleAssignRecord.studentId],
+          academicYear: `${currentYear}-${currentYear + 1}`,
+        });
+        toast.success(`Mentor ${singleAssignRecord.mentorName ? 'changed' : 'assigned'} successfully`);
+        setAssignMentorVisible(false);
+        setSelectedMentorId(null);
+        setSingleAssignRecord(null);
+        fetchInternships();
+      } catch (error) {
+        console.error('Failed to assign mentor:', error);
+        toast.error(error.message || 'Failed to assign mentor');
+      } finally {
+        setMentorAssignLoading(false);
+      }
+      return;
+    }
+
+    // For bulk assignment
     const selectedStudentIds = selectedRowKeys.map(key => {
       const internship = internships.find(i => i.id === key);
       return internship?.studentId;
@@ -421,6 +451,38 @@ const SelfIdentifiedInternships = () => {
     } finally {
       setBulkActionLoading(false);
     }
+  };
+
+  // Single row mentor assignment
+  const handleSingleMentorAssign = (record) => {
+    setSingleAssignRecord(record);
+    setSelectedMentorId(record.mentorId || null);
+    setAssignMentorVisible(true);
+  };
+
+  // Remove mentor from single student
+  const handleRemoveMentor = async (record) => {
+    if (!record.studentId) {
+      toast.error('Student ID not found');
+      return;
+    }
+
+    Modal.confirm({
+      title: 'Remove Mentor',
+      content: `Are you sure you want to remove the mentor from ${record.studentName}?`,
+      okText: 'Remove',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await principalService.bulkUnassignMentors([record.studentId]);
+          toast.success('Mentor removed successfully');
+          fetchInternships();
+        } catch (error) {
+          console.error('Failed to remove mentor:', error);
+          toast.error(error.message || 'Failed to remove mentor');
+        }
+      },
+    });
   };
 
   // Row selection for bulk actions
@@ -521,6 +583,81 @@ const SelfIdentifiedInternships = () => {
       ),
     },
     {
+      title: 'Reports',
+      key: 'reports',
+      width: 110,
+      render: (_, record) => {
+        const submitted = record.reportsSubmitted || 0;
+        const expectedNow = record.expectedReportsAsOfNow || 0;
+        const total = record.totalReports || 0;
+        const isOnTrack = submitted >= expectedNow;
+
+        return (
+          <div className="flex items-center gap-2">
+            <FileTextOutlined className="text-text-tertiary" />
+            <div className="flex items-center gap-1">
+              <Text className="text-sm font-medium" style={{ color: isOnTrack ? '#52c41a' : '#ff4d4f' }}>
+                {submitted}
+              </Text>
+              <Text className="text-text-tertiary text-sm">/</Text>
+              <Tooltip title={`${expectedNow} due by now`}>
+                <Text className="text-sm text-text-secondary">{total}</Text>
+              </Tooltip>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Completion',
+      key: 'completion',
+      width: 120,
+      render: (_, record) => (
+        <div className="w-full">
+          <Progress
+            percent={record.completionPercentage}
+            size="small"
+            strokeColor={
+              record.completionPercentage >= 80 ? '#52c41a' :
+              record.completionPercentage >= 50 ? '#1890ff' :
+              record.completionPercentage >= 30 ? '#faad14' : '#ff4d4f'
+            }
+            format={(percent) => <span className="text-xs">{percent}%</span>}
+          />
+        </div>
+      ),
+    },
+    {
+      title: 'Faculty Visits',
+      key: 'facultyVisits',
+      width: 130,
+      render: (_, record) => {
+        const completed = record.facultyVisitsCount || 0;
+        const expectedNow = record.expectedVisitsAsOfNow || 0;
+        const total = record.totalExpectedVisits || 0;
+        const isOnTrack = completed >= expectedNow;
+
+        return (
+          <div>
+            <div className="flex items-center gap-1">
+              <Text className="text-sm font-medium" style={{ color: isOnTrack ? '#52c41a' : '#ff4d4f' }}>
+                {completed}
+              </Text>
+              <Text className="text-text-tertiary text-sm">/</Text>
+              <Tooltip title={`${expectedNow} due by now`}>
+                <Text className="text-sm text-text-secondary">{total}</Text>
+              </Tooltip>
+            </div>
+            {record.lastFacultyVisit && (
+              <Text className="text-xs text-text-tertiary">
+                Last: {dayjs(record.lastFacultyVisit).format('DD MMM')}
+              </Text>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       title: 'Mentor',
       key: 'mentor',
       width: 150,
@@ -550,52 +687,69 @@ const SelfIdentifiedInternships = () => {
       },
     },
     {
-      title: 'Submitted',
-      key: 'submittedAt',
-      width: 120,
-      render: (_, record) => (
-        <Tooltip title={dayjs(record.submittedAt).format('DD MMM YYYY HH:mm')}>
-          <Text className="text-sm text-text-secondary">
-            {dayjs(record.submittedAt).fromNow()}
-          </Text>
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Actions',
+      title: '',
       key: 'actions',
-      width: 140,
+      width: 50,
       fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="View Details">
+      render: (_, record) => {
+        const menuItems = [
+          {
+            key: 'view',
+            label: 'View Details',
+            icon: <EyeOutlined />,
+            onClick: () => handleViewDetails(record),
+          },
+          {
+            key: 'edit',
+            label: 'Edit Internship',
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+          },
+          ...(record.joiningLetterUrl ? [{
+            key: 'joiningLetter',
+            label: 'View Joining Letter',
+            icon: <FilePdfOutlined />,
+            onClick: () => window.open(record.joiningLetterUrl, '_blank'),
+          }] : []),
+          { type: 'divider' },
+          ...(record.mentorName ? [
+            {
+              key: 'changeMentor',
+              label: 'Change Mentor',
+              icon: <EditOutlined />,
+              onClick: () => handleSingleMentorAssign(record),
+            },
+            {
+              key: 'removeMentor',
+              label: 'Remove Mentor',
+              icon: <UserDeleteOutlined />,
+              danger: true,
+              onClick: () => handleRemoveMentor(record),
+            },
+          ] : [
+            {
+              key: 'assignMentor',
+              label: 'Assign Mentor',
+              icon: <UserAddOutlined />,
+              onClick: () => handleSingleMentorAssign(record),
+            },
+          ]),
+        ];
+
+        return (
+          <Dropdown
+            menu={{ items: menuItems }}
+            trigger={['click']}
+            placement="bottomRight"
+          >
             <Button
               type="text"
-              icon={<EyeOutlined />}
-              onClick={() => handleViewDetails(record)}
-              className="text-primary hover:bg-primary/10"
+              icon={<MoreOutlined style={{ fontSize: '18px' }} />}
+              className="flex items-center justify-center"
             />
-          </Tooltip>
-          <Tooltip title="Edit Internship">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              className="text-warning hover:bg-warning/10"
-            />
-          </Tooltip>
-          {record.joiningLetterUrl && (
-            <Tooltip title="View Joining Letter">
-              <Button
-                type="text"
-                icon={<FilePdfOutlined />}
-                onClick={() => window.open(record.joiningLetterUrl, '_blank')}
-                className="text-success hover:bg-success/10"
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -811,7 +965,106 @@ const SelfIdentifiedInternships = () => {
           rowKey="id"
           loading={loading}
           rowSelection={rowSelection}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1600 }}
+          expandable={{
+            expandedRowRender: (record) => (
+              <div className="p-4 bg-background-secondary/30 rounded-lg space-y-4">
+                <Row gutter={[24, 16]}>
+                  {/* Monthly Reports Section */}
+                  <Col xs={24} lg={14}>
+                    <div>
+                      <Text className="text-xs uppercase font-bold text-text-tertiary block mb-3">
+                        <FileTextOutlined className="mr-1" />
+                        Monthly Reports ({record.reportsSubmitted}/{record.totalReports})
+                      </Text>
+                      {record.monthlyReports && record.monthlyReports.length > 0 ? (
+                        <Table
+                          dataSource={record.monthlyReports}
+                          rowKey="id"
+                          size="small"
+                          pagination={false}
+                          columns={[
+                            {
+                              title: 'Month',
+                              dataIndex: 'monthName',
+                              key: 'monthName',
+                              render: (text, r) => `${text} ${r.year}`,
+                            },
+                            {
+                              title: 'Status',
+                              dataIndex: 'status',
+                              key: 'status',
+                              render: (status) => (
+                                <Tag color={
+                                  status === 'APPROVED' ? 'success' :
+                                  status === 'SUBMITTED' ? 'processing' :
+                                  status === 'REJECTED' ? 'error' : 'default'
+                                }>
+                                  {status}
+                                </Tag>
+                              ),
+                            },
+                            {
+                              title: 'Submitted',
+                              dataIndex: 'submittedAt',
+                              key: 'submittedAt',
+                              render: (date) => date ? dayjs(date).format('DD MMM YYYY') : '-',
+                            },
+                            {
+                              title: 'Report',
+                              key: 'report',
+                              render: (_, r) => r.reportFileUrl ? (
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  icon={<FilePdfOutlined />}
+                                  onClick={() => window.open(r.reportFileUrl, '_blank')}
+                                >
+                                  View
+                                </Button>
+                              ) : '-',
+                            },
+                          ]}
+                        />
+                      ) : (
+                        <Empty
+                          description="No reports submitted yet"
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          className="py-4"
+                        />
+                      )}
+                    </div>
+                  </Col>
+
+                  {/* Timeline Section */}
+                  <Col xs={24} lg={10}>
+                    <div>
+                      <Text className="text-xs uppercase font-bold text-text-tertiary block mb-3">
+                        <ClockCircleOutlined className="mr-1" />
+                        Progress Timeline
+                      </Text>
+                      {record.timeline && record.timeline.length > 0 ? (
+                        <Timeline
+                          items={record.timeline.map((item, index) => ({
+                            key: index,
+                            color: item.color,
+                            children: item.children,
+                          }))}
+                        />
+                      ) : (
+                        <Empty
+                          description="No timeline events yet"
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          className="py-4"
+                        />
+                      )}
+                    </div>
+                  </Col>
+                </Row>
+              </div>
+            ),
+            rowExpandable: (record) => record.monthlyReports?.length > 0 || record.timeline?.length > 0,
+          }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
@@ -1182,13 +1435,18 @@ const SelfIdentifiedInternships = () => {
         title={
           <div className="flex items-center gap-2 text-text-primary">
             <UserAddOutlined className="text-green-500" />
-            <span>Assign Mentor to Selected Students</span>
+            <span>
+              {singleAssignRecord
+                ? (singleAssignRecord.mentorName ? 'Change Mentor' : 'Assign Mentor')
+                : 'Assign Mentor to Selected Students'}
+            </span>
           </div>
         }
         open={assignMentorVisible}
         onCancel={() => {
           setAssignMentorVisible(false);
           setSelectedMentorId(null);
+          setSingleAssignRecord(null);
         }}
         footer={[
           <Button
@@ -1196,6 +1454,7 @@ const SelfIdentifiedInternships = () => {
             onClick={() => {
               setAssignMentorVisible(false);
               setSelectedMentorId(null);
+              setSingleAssignRecord(null);
             }}
           >
             Cancel
@@ -1204,11 +1463,11 @@ const SelfIdentifiedInternships = () => {
             key="assign"
             type="primary"
             loading={mentorAssignLoading}
-            onClick={handleBulkAssignMentor}
+            onClick={handleAssignMentor}
             disabled={!selectedMentorId}
             icon={<UserAddOutlined />}
           >
-            Assign Mentor
+            {singleAssignRecord?.mentorName ? 'Change Mentor' : 'Assign Mentor'}
           </Button>,
         ]}
         width={500}
@@ -1216,7 +1475,11 @@ const SelfIdentifiedInternships = () => {
         <div className="space-y-4 py-4">
           <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
             <Text className="text-sm text-blue-700">
-              <strong>{selectedRowKeys.length}</strong> student(s) selected for mentor assignment
+              {singleAssignRecord ? (
+                <>Assigning mentor to <strong>{singleAssignRecord.studentName}</strong></>
+              ) : (
+                <><strong>{selectedRowKeys.length}</strong> student(s) selected for mentor assignment</>
+              )}
             </Text>
           </div>
 
@@ -1275,6 +1538,11 @@ const generateMockData = () => {
 
   return Array.from({ length: 12 }, (_, i) => {
     const company = companies[i % companies.length];
+    const reportsSubmitted = Math.floor(Math.random() * 4);
+    const totalReports = Math.max(reportsSubmitted, 3 + Math.floor(Math.random() * 3));
+    const completionPercentage = totalReports > 0 ? Math.round((reportsSubmitted / totalReports) * 100) : 0;
+    const facultyVisitsCount = Math.floor(Math.random() * 5);
+
     return {
       id: `INT-${1000 + i}`,
       studentId: `STU-${100 + i}`,
@@ -1295,6 +1563,25 @@ const generateMockData = () => {
       mentorEmail: i % 2 === 0 ? `faculty${i + 1}@college.edu` : null,
       submittedAt: dayjs().subtract(i * 7, 'day').toISOString(),
       isSelfIdentified: true,
+      // New fields
+      reportsSubmitted,
+      totalReports,
+      completionPercentage,
+      facultyVisitsCount,
+      lastFacultyVisit: facultyVisitsCount > 0 ? dayjs().subtract(i * 3, 'day').toISOString() : null,
+      timeline: [
+        { children: `Internship started - ${dayjs().subtract(i * 15, 'day').format('DD/MM/YYYY')}`, color: 'green' },
+        ...(reportsSubmitted > 0 ? [{ children: 'Report 1 submitted', color: 'blue' }] : []),
+      ],
+      monthlyReports: Array.from({ length: reportsSubmitted }, (_, j) => ({
+        id: `RPT-${i}-${j}`,
+        month: j + 1,
+        year: 2024,
+        monthName: dayjs().subtract(j, 'month').format('MMMM'),
+        status: j === 0 ? 'APPROVED' : 'SUBMITTED',
+        submittedAt: dayjs().subtract(j * 30, 'day').toISOString(),
+        reportFileUrl: null,
+      })),
     };
   });
 };

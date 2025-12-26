@@ -14,11 +14,7 @@ const { Text } = Typography;
 const getStatusConfig = (status) => {
   const configs = {
     DRAFT: { color: 'default', icon: <ClockCircleOutlined />, label: 'Draft' },
-    SUBMITTED: { color: 'blue', icon: <ClockCircleOutlined />, label: 'Submitted' },
-    UNDER_REVIEW: { color: 'gold', icon: <ClockCircleOutlined />, label: 'Under Review' },
     APPROVED: { color: 'green', icon: <CheckCircleOutlined />, label: 'Approved' },
-    REJECTED: { color: 'red', icon: <ExclamationCircleOutlined />, label: 'Rejected' },
-    REVISION_REQUIRED: { color: 'orange', icon: <ExclamationCircleOutlined />, label: 'Revision Required' },
   };
   return configs[status] || { color: 'default', icon: <ClockCircleOutlined />, label: status };
 };

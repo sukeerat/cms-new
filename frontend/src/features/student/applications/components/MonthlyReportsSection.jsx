@@ -57,7 +57,6 @@ const MonthlyReportsSection = ({
   const calculatedProgress = {
     total: progress.total || reports.length,
     approved: progress.approved || reports.filter((r) => r.status === 'APPROVED').length,
-    submitted: progress.submitted || reports.filter((r) => r.status === 'SUBMITTED').length,
     draft: progress.draft || reports.filter((r) => r.status === 'DRAFT').length,
     overdue: progress.overdue || 0,
     percentage: progress.percentage || 0,

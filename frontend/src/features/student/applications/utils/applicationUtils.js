@@ -166,17 +166,6 @@ export const getReportSubmissionStatus = (report) => {
     };
   }
 
-  // If report is submitted (waiting for approval - though we auto-approve)
-  if (report.status === 'SUBMITTED') {
-    return {
-      status: 'SUBMITTED',
-      label: 'Submitted',
-      color: 'blue',
-      canSubmit: false,
-      sublabel: report.submittedAt ? `Submitted on ${dayjs(report.submittedAt).format('MMM D')}` : null,
-    };
-  }
-
   // Calculate submission window
   let windowStart, windowEnd;
 
@@ -269,38 +258,51 @@ export const calculateExpectedReports = (startDate, endDate) => {
   return periods;
 };
 
+// Visit grace period constant (should match backend VISIT_GRACE_DAYS)
+const VISIT_GRACE_DAYS = 5;
+
 /**
- * Get faculty visit due date (last day of month or internship end, whichever is earlier)
+ * Get faculty visit due date (cycle end date + 5 days grace period)
+ * NOTE: This is now deprecated for new 4-week cycle system.
+ *       The backend calculates requiredByDate with grace period included.
+ *       This function is kept for backward compatibility with monthly cycles.
  * @param {number} month - Month (1-12)
  * @param {number} year - Year
  * @param {Date|string} internshipEndDate - Internship end date
- * @returns {Date} - Due date for the visit
+ * @returns {Date} - Due date for the visit (includes 5-day grace period)
  */
 export const getVisitDueDate = (month, year, internshipEndDate) => {
   const lastDayOfMonth = dayjs(`${year}-${String(month).padStart(2, '0')}-01`).endOf('month');
 
+  let baseDate;
   if (!internshipEndDate) {
-    return lastDayOfMonth.toDate();
+    baseDate = lastDayOfMonth;
+  } else {
+    const endDate = dayjs(internshipEndDate);
+    // If internship ends in this month, base date is the internship end date
+    if (endDate.year() === year && endDate.month() + 1 === month) {
+      baseDate = endDate;
+    } else {
+      baseDate = lastDayOfMonth;
+    }
   }
 
-  const endDate = dayjs(internshipEndDate);
-
-  // If internship ends in this month, due date is the internship end date
-  if (endDate.year() === year && endDate.month() + 1 === month) {
-    return endDate.toDate();
-  }
-
-  return lastDayOfMonth.toDate();
+  // Add 5-day grace period
+  return baseDate.add(VISIT_GRACE_DAYS, 'day').endOf('day').toDate();
 };
 
 /**
  * Get visit status for faculty visits
- * @param {Object} visit - The visit object
+ * NOTE: The backend provides requiredByDate which already includes the 5-day grace period.
+ *       A visit is only considered overdue after the grace period has passed.
+ * @param {Object} visit - The visit object (with requiredByDate, cycleStartDate, cycleEndDate from backend)
  * @returns {Object} - { status, label, color, sublabel }
  */
 export const getVisitStatus = (visit) => {
   const now = dayjs();
   const requiredByDate = visit.requiredByDate ? dayjs(visit.requiredByDate) : null;
+  const cycleEndDate = visit.cycleEndDate ? dayjs(visit.cycleEndDate) : null;
+  const cycleStartDate = visit.cycleStartDate ? dayjs(visit.cycleStartDate) : null;
 
   // If visit is completed
   if (visit.status === 'COMPLETED') {
@@ -320,7 +322,7 @@ export const getVisitStatus = (visit) => {
     };
   }
 
-  // Check if overdue
+  // Check if overdue (past requiredByDate which includes 5-day grace period)
   if (now.isAfter(requiredByDate)) {
     const daysOverdue = Math.floor((now.toDate().getTime() - requiredByDate.toDate().getTime()) / (1000 * 60 * 60 * 24));
     return {
@@ -331,7 +333,40 @@ export const getVisitStatus = (visit) => {
     };
   }
 
-  // Check if current month (pending)
+  // Check if in grace period (between cycleEnd and requiredByDate)
+  if (cycleEndDate && now.isAfter(cycleEndDate) && now.isSameOrBefore(requiredByDate)) {
+    const daysLeft = Math.ceil((requiredByDate.toDate().getTime() - now.toDate().getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'PENDING',
+      label: 'Grace Period',
+      color: 'orange',
+      sublabel: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to complete`,
+    };
+  }
+
+  // Check if in current cycle (between cycleStart and cycleEnd)
+  if (cycleStartDate && cycleEndDate && now.isSameOrAfter(cycleStartDate) && now.isSameOrBefore(cycleEndDate)) {
+    const daysLeft = Math.ceil((cycleEndDate.toDate().getTime() - now.toDate().getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'PENDING',
+      label: 'Due This Cycle',
+      color: 'blue',
+      sublabel: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left in cycle`,
+    };
+  }
+
+  // Future cycle
+  if (cycleStartDate && now.isBefore(cycleStartDate)) {
+    const daysUntil = Math.ceil((cycleStartDate.toDate().getTime() - now.toDate().getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'UPCOMING',
+      label: 'Upcoming',
+      color: 'gray',
+      sublabel: `Cycle starts in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`,
+    };
+  }
+
+  // Fallback: Check if current month (for backward compatibility with old visits)
   const currentMonth = now.month() + 1; // dayjs months are 0-indexed
   const currentYear = now.year();
   if (visit.visitMonth === currentMonth && visit.visitYear === currentYear) {

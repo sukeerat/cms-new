@@ -13,6 +13,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import { Readable } from 'stream';
+import sharp from 'sharp';
 
 export interface FileUploadOptions {
   folder?: string;
@@ -20,6 +21,15 @@ export interface FileUploadOptions {
   filename?: string;
   contentType?: string;
   metadata?: Record<string, string>;
+  optimizeImage?: boolean;
+  imageOptions?: ImageOptimizationOptions;
+}
+
+export interface ImageOptimizationOptions {
+  maxWidth?: number;
+  maxHeight?: number;
+  quality?: number;
+  format?: 'webp' | 'jpeg' | 'png';
 }
 
 export interface StudentDocumentOptions {
@@ -557,5 +567,190 @@ export class FileStorageService implements OnModuleInit {
       zip: 'application/zip',
     };
     return types[ext] || 'application/octet-stream';
+  }
+
+  // ============================================
+  // Image Optimization
+  // ============================================
+
+  private isImageFile(filename: string): boolean {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '');
+  }
+
+  /**
+   * Optimize image buffer using sharp
+   * - Resizes to max dimensions while maintaining aspect ratio
+   * - Converts to WebP format for better compression
+   * - Applies quality settings
+   */
+  async optimizeImage(
+    buffer: Buffer,
+    options: ImageOptimizationOptions = {},
+  ): Promise<{ buffer: Buffer; format: string; contentType: string }> {
+    const {
+      maxWidth = 800,
+      maxHeight = 800,
+      quality = 80,
+      format = 'webp',
+    } = options;
+
+    try {
+      let sharpInstance = sharp(buffer);
+
+      // Get metadata to check if resize is needed
+      const metadata = await sharpInstance.metadata();
+
+      // Resize if image exceeds max dimensions
+      if ((metadata.width && metadata.width > maxWidth) ||
+          (metadata.height && metadata.height > maxHeight)) {
+        sharpInstance = sharpInstance.resize(maxWidth, maxHeight, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        });
+      }
+
+      // Convert to specified format with quality settings
+      let outputBuffer: Buffer;
+      let contentType: string;
+
+      switch (format) {
+        case 'jpeg':
+          outputBuffer = await sharpInstance.jpeg({ quality, mozjpeg: true }).toBuffer();
+          contentType = 'image/jpeg';
+          break;
+        case 'png':
+          outputBuffer = await sharpInstance.png({ quality, compressionLevel: 9 }).toBuffer();
+          contentType = 'image/png';
+          break;
+        case 'webp':
+        default:
+          outputBuffer = await sharpInstance.webp({ quality }).toBuffer();
+          contentType = 'image/webp';
+          break;
+      }
+
+      const originalSize = buffer.length;
+      const optimizedSize = outputBuffer.length;
+      const savings = ((originalSize - optimizedSize) / originalSize * 100).toFixed(1);
+
+      this.logger.log(
+        `Image optimized: ${(originalSize / 1024).toFixed(1)}KB -> ${(optimizedSize / 1024).toFixed(1)}KB (${savings}% reduction)`,
+      );
+
+      return { buffer: outputBuffer, format, contentType };
+    } catch (error) {
+      this.logger.warn(`Image optimization failed, using original: ${error.message}`);
+      return { buffer, format: 'original', contentType: 'image/jpeg' };
+    }
+  }
+
+  /**
+   * Upload an optimized image
+   * Automatically compresses and converts to WebP
+   */
+  async uploadOptimizedImage(
+    buffer: Buffer,
+    originalName: string,
+    options: FileUploadOptions = {},
+  ): Promise<UploadResult> {
+    this.ensureConnected();
+
+    // Optimize the image
+    const { buffer: optimizedBuffer, contentType } = await this.optimizeImage(
+      buffer,
+      options.imageOptions || { maxWidth: 800, maxHeight: 800, quality: 80, format: 'webp' },
+    );
+
+    // Update filename to use .webp extension if converted
+    const baseName = originalName.replace(/\.[^.]+$/, '');
+    const optimizedName = `${baseName}.webp`;
+
+    const key = this.buildFilePath(optimizedName, options);
+
+    try {
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: optimizedBuffer,
+          ContentType: contentType,
+          Metadata: options.metadata,
+        }),
+      );
+
+      const url = `${this.endpoint}/${this.bucket}/${key}`;
+      this.logger.log(`Optimized image uploaded: ${key}`);
+
+      return {
+        key,
+        url,
+        filename: key.split('/').pop(),
+        size: optimizedBuffer.length,
+        contentType,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to upload optimized image: ${error.message}`);
+      throw new Error(`Failed to upload optimized image: ${error.message}`);
+    }
+  }
+
+  /**
+   * Upload profile image with optimization
+   * Path: institutions/{institutionId}/students/{studentId}/profile/{filename}
+   */
+  async uploadProfileImage(
+    buffer: Buffer,
+    originalName: string,
+    institutionId: string,
+    studentId: string,
+    options: ImageOptimizationOptions = {},
+  ): Promise<UploadResult> {
+    this.ensureConnected();
+
+    // Profile images should be smaller - optimize for avatars
+    const profileOptions: ImageOptimizationOptions = {
+      maxWidth: options.maxWidth || 400,
+      maxHeight: options.maxHeight || 400,
+      quality: options.quality || 85,
+      format: options.format || 'webp',
+    };
+
+    const { buffer: optimizedBuffer, contentType } = await this.optimizeImage(
+      buffer,
+      profileOptions,
+    );
+
+    const key = `institutions/${institutionId}/students/${studentId}/profile/profile.webp`;
+
+    try {
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: optimizedBuffer,
+          ContentType: contentType,
+          Metadata: {
+            studentId,
+            institutionId,
+            type: 'profile',
+          },
+        }),
+      );
+
+      const url = `${this.endpoint}/${this.bucket}/${key}`;
+      this.logger.log(`Profile image uploaded: ${key}`);
+
+      return {
+        key,
+        url,
+        filename: 'profile.webp',
+        size: optimizedBuffer.length,
+        contentType,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to upload profile image: ${error.message}`);
+      throw new Error(`Failed to upload profile image: ${error.message}`);
+    }
   }
 }

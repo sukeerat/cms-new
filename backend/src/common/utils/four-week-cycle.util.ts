@@ -16,7 +16,8 @@
 
 // Constants
 const CYCLE_DURATION_DAYS = 28; // 4 weeks = 28 days
-const SUBMISSION_GRACE_DAYS = 5; // 5 days to submit after cycle ends
+const SUBMISSION_GRACE_DAYS = 5; // 5 days to submit report after cycle ends
+const VISIT_GRACE_DAYS = 5; // 5 days grace period for faculty visits after cycle ends
 const MAX_CYCLES = 26; // Max ~2 years of internship
 
 /**
@@ -559,6 +560,8 @@ export function getExpectedReportsAsOfToday(startDate: Date, endDate: Date): num
  * Calculate expected visits count as of today
  * Returns how many visits should have been completed by now
  * Optimized version without building full cycle objects
+ *
+ * NOTE: Visits have a 5-day grace period after cycle ends
  */
 export function getExpectedVisitsAsOfToday(startDate: Date, endDate: Date): number {
   // Validate inputs
@@ -596,8 +599,13 @@ export function getExpectedVisitsAsOfToday(startDate: Date, endDate: Date): numb
     const cycleEndDate = naturalCycleEnd > end ? new Date(end) : naturalCycleEnd;
     const isFinalCycle = cycleEndDate.getTime() >= end.getTime() || naturalCycleEnd.getTime() >= end.getTime();
 
-    // A visit is expected if we're past the cycle end date
-    if (now > cycleEndDate) {
+    // Calculate visit due date (cycle end + grace period)
+    const visitDueDate = new Date(cycleEndDate);
+    visitDueDate.setDate(visitDueDate.getDate() + VISIT_GRACE_DAYS);
+    visitDueDate.setHours(23, 59, 59, 999);
+
+    // A visit is expected if we're past the visit due date (cycle end + grace period)
+    if (now > visitDueDate) {
       expectedCount++;
     }
 
@@ -619,5 +627,6 @@ export function getExpectedVisitsAsOfToday(startDate: Date, endDate: Date): numb
 export const FOUR_WEEK_CYCLE = {
   DURATION_DAYS: CYCLE_DURATION_DAYS,
   GRACE_DAYS: SUBMISSION_GRACE_DAYS,
+  VISIT_GRACE_DAYS: VISIT_GRACE_DAYS,
   MAX_CYCLES,
 };

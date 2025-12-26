@@ -46,37 +46,46 @@ export interface VisitWithStatus {
  * UPDATED: Now uses 4-week cycles (aligned with report cycles)
  * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V
  *
- * Example:
+ * Example (with 5-day grace period):
  * - Internship Start: Dec 15, 2025
- * - Visit 1 due: Jan 11 (end of 4-week cycle 1)
- * - Visit 2 due: Feb 8 (end of 4-week cycle 2)
- * - Visit 3 due: Mar 8 (end of 4-week cycle 3)
+ * - Visit 1 cycle ends: Jan 11 → Due by Jan 16 (5 days grace)
+ * - Visit 2 cycle ends: Feb 8 → Due by Feb 13 (5 days grace)
+ * - Visit 3 cycle ends: Mar 8 → Due by Mar 13 (5 days grace)
  */
 function calculateExpectedVisitPeriods(startDate: Date, endDate: Date): VisitPeriod[] {
   const cycles = calculateFourWeekCycles(startDate, endDate);
 
-  return cycles.map((cycle: FourWeekCycle) => ({
-    cycleNumber: cycle.cycleNumber,
-    // For backward compatibility, use cycle end date for month/year reference
-    month: cycle.cycleEndDate.getMonth() + 1,
-    year: cycle.cycleEndDate.getFullYear(),
-    // Visit should be completed by end of cycle (not submission window)
-    requiredByDate: cycle.cycleEndDate,
-    cycleStartDate: cycle.cycleStartDate,
-    cycleEndDate: cycle.cycleEndDate,
-    isPartialMonth: cycle.daysInCycle < FOUR_WEEK_CYCLE.DURATION_DAYS,
-    daysInCycle: cycle.daysInCycle,
-  }));
+  return cycles.map((cycle: FourWeekCycle) => {
+    // Calculate visit due date: cycle end + 5 days grace period
+    const visitDueDate = new Date(cycle.cycleEndDate);
+    visitDueDate.setDate(visitDueDate.getDate() + FOUR_WEEK_CYCLE.VISIT_GRACE_DAYS);
+    visitDueDate.setHours(23, 59, 59, 999);
+
+    return {
+      cycleNumber: cycle.cycleNumber,
+      // For backward compatibility, use cycle end date for month/year reference
+      month: cycle.cycleEndDate.getMonth() + 1,
+      year: cycle.cycleEndDate.getFullYear(),
+      // Visit should be completed by cycle end + 5 days grace period
+      requiredByDate: visitDueDate,
+      cycleStartDate: cycle.cycleStartDate,
+      cycleEndDate: cycle.cycleEndDate,
+      isPartialMonth: cycle.daysInCycle < FOUR_WEEK_CYCLE.DURATION_DAYS,
+      daysInCycle: cycle.daysInCycle,
+    };
+  });
 }
 
 /**
  * Get visit submission status based on 4-week cycles
+ * NOTE: requiredByDate now includes 5-day grace period after cycle ends
  * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V
  */
 function getVisitSubmissionStatus(visit: any): { status: VisitStatusType; label: string; color: string; sublabel?: string } {
   const now = new Date();
   const requiredByDate = visit.requiredByDate ? new Date(visit.requiredByDate) : null;
   const cycleStartDate = visit.cycleStartDate ? new Date(visit.cycleStartDate) : null;
+  const cycleEndDate = visit.cycleEndDate ? new Date(visit.cycleEndDate) : null;
 
   // If visit is completed
   if (visit.status === VisitLogStatus.COMPLETED) {
@@ -92,7 +101,7 @@ function getVisitSubmissionStatus(visit: any): { status: VisitStatusType; label:
     return { status: 'PENDING', label: 'Pending', color: 'blue' };
   }
 
-  // Check if overdue (past cycle end date)
+  // Check if overdue (past requiredByDate which includes 5-day grace period)
   if (now > requiredByDate) {
     const daysOverdue = Math.floor((now.getTime() - requiredByDate.getTime()) / (1000 * 60 * 60 * 24));
     return {
@@ -103,9 +112,20 @@ function getVisitSubmissionStatus(visit: any): { status: VisitStatusType; label:
     };
   }
 
-  // Check if we're in the current cycle (between cycleStart and cycleEnd)
-  if (cycleStartDate && now >= cycleStartDate && now <= requiredByDate) {
+  // Check if we're in grace period (between cycleEnd and requiredByDate)
+  if (cycleEndDate && now > cycleEndDate && now <= requiredByDate) {
     const daysLeft = Math.ceil((requiredByDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      status: 'PENDING',
+      label: 'Grace Period',
+      color: 'orange',
+      sublabel: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to complete`,
+    };
+  }
+
+  // Check if we're in the current cycle (between cycleStart and cycleEnd)
+  if (cycleStartDate && cycleEndDate && now >= cycleStartDate && now <= cycleEndDate) {
+    const daysLeft = Math.ceil((cycleEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return {
       status: 'PENDING',
       label: 'Due This Cycle',

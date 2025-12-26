@@ -18,13 +18,10 @@ const { TextArea } = Input;
 
 const getStatusConfig = (status) => {
   const configs = {
-    PENDING: { color: 'orange', label: 'Pending Review', icon: <ClockCircleOutlined /> },
-    SUBMITTED: { color: 'blue', label: 'Submitted', icon: <FileTextOutlined /> },
-    APPROVED: { color: 'green', label: 'Approved', icon: <CheckCircleOutlined /> },
-    REJECTED: { color: 'red', label: 'Rejected', icon: <CloseCircleOutlined /> },
     DRAFT: { color: 'default', label: 'Draft', icon: <FileTextOutlined /> },
+    APPROVED: { color: 'green', label: 'Approved', icon: <CheckCircleOutlined /> },
   };
-  return configs[status] || configs.PENDING;
+  return configs[status] || configs.DRAFT;
 };
 
 const MonthlyReportsCard = ({ reports = [], loading, onRefresh, onViewAll }) => {
@@ -84,9 +81,9 @@ const MonthlyReportsCard = ({ reports = [], loading, onRefresh, onViewAll }) => 
     }
   };
 
-  // FIXED: Only count reports that are after internship start date
+  // With auto-approval, only DRAFT reports are considered pending
   const pendingCount = reports.filter(r => {
-    const isPending = r.status === 'PENDING' || r.status === 'SUBMITTED';
+    const isPending = r.status === 'DRAFT';
     if (!isPending) return false;
 
     // Check if report is after internship start date
@@ -179,26 +176,6 @@ const MonthlyReportsCard = ({ reports = [], loading, onRefresh, onViewAll }) => 
                               onClick={() => handleDownload(report)}
                             />
                           </Tooltip>
-                        )}
-                        {(report.status === 'PENDING' || report.status === 'SUBMITTED') && (
-                          <>
-                            <Tooltip title="Approve">
-                              <Button
-                                type="text"
-                                size="small"
-                                icon={<CheckCircleOutlined className="text-green-500" />}
-                                onClick={() => setReviewModal({ visible: true, report, action: 'approve' })}
-                              />
-                            </Tooltip>
-                            <Tooltip title="Reject">
-                              <Button
-                                type="text"
-                                size="small"
-                                icon={<CloseCircleOutlined className="text-red-500" />}
-                                onClick={() => setReviewModal({ visible: true, report, action: 'reject' })}
-                              />
-                            </Tooltip>
-                          </>
                         )}
                       </Space>
                     </div>

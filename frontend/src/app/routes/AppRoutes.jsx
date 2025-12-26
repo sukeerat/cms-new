@@ -62,12 +62,10 @@ import { HelpCenter, MyQueries, SupportDashboard } from '../../features/help-sup
 // Principal
 import PrincipalDashboard from '../../features/principal/dashboard/PrincipalDashboard';
 import StudentList from '../../features/principal/students/StudentList';
-import StudentProgress from '../../features/principal/students/StudentProgress';
 import StaffList from '../../features/principal/staff/StaffList';
 import MentorAssignment from '../../features/principal/mentors/MentorAssignment';
 import BulkUpload from '../../features/principal/bulk/BulkUpload';
 import Analytics from '../../features/principal/analytics/Analytics';
-import FacultyReports from '../../features/principal/reports/FacultyReports';
 import FacultyProgress from '../../features/principal/faculty/FacultyProgress';
 import Grievances from '../../features/principal/grievances/Grievances';
 import SelfIdentifiedInternships from '../../features/principal/internships/SelfIdentifiedInternships';
@@ -317,22 +315,6 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
               <Analytics />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="student-progress"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <StudentProgress />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="faculty-reports"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.PRINCIPAL]}>
-              <FacultyReports />
             </ProtectedRoute>
           }
         />

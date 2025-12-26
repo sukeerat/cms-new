@@ -175,13 +175,11 @@ export const selectMonthlyReportsError = createSelector(
 
 /**
  * Memoized selector to get pending monthly reports
- * Filters reports that have status 'PENDING' or 'SUBMITTED'
+ * With auto-approval, only DRAFT reports are considered pending
  */
 export const selectPendingMonthlyReports = createSelector(
   [selectMonthlyReportsList],
-  (reports) => reports.filter((report) =>
-    report.status === 'PENDING' || report.status === 'SUBMITTED'
-  )
+  (reports) => reports.filter((report) => report.status === 'DRAFT')
 );
 
 // ============= APPLICATIONS SELECTORS =============

@@ -1,130 +1,135 @@
-# Implementation Tracker - Compliance Score Update
+# Implementation Tracker
 
-## Specification Reference
-See: `COMPLIANCE_CALCULATION_ANALYSIS.md` Section 11 (Final Specification)
-
----
-
-## New Compliance Formula
-```
-Compliance Score = (MentorRate + JoiningLetterRate) / 2
-
-Where:
-- MentorRate = (studentsWithActiveMentors / activeStudents) * 100
-- JoiningLetterRate = (joiningLettersUploaded / activeStudents) * 100
-```
+## Status: COMPLETED
+**Started:** December 26, 2025
+**Completed:** December 26, 2025
 
 ---
 
-## Implementation Tasks Status
+## Phase 1: Report Auto-Approval
 
-### Backend Services
+### Backend Tasks
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 1.1 | Update MonthlyReportStatus enum | COMPLETED | Schema unchanged; auto-approve on submission |
+| 1.2 | Update submitReport() method | COMPLETED | Sets status=APPROVED, isApproved=true, approvedAt on submit |
+| 1.3 | Remove/deprecate reviewReport() | COMPLETED | Method deprecated, returns report without changes |
+| 1.4 | Update getReportStatistics() | COMPLETED | Updated comments to reflect auto-approval |
+| 1.5 | Update state-dashboard.service.ts | COMPLETED | All status filters use 'APPROVED' only |
+| 1.6 | Update state-institution.service.ts | COMPLETED | Fixed line 735 status filter to 'APPROVED' |
 
-| # | Task | File | Status | Agent | Notes |
-|---|------|------|--------|-------|-------|
-| 1 | Update compliance formula to 2 metrics | `state-institution.service.ts` | COMPLETED | Agent-1 | Removed monthlyReportRate from formula; uses activeStudents denominator |
-| 2 | Update compliance summary & action items | `state-dashboard.service.ts` | COMPLETED | Agent-2 | Updated to 2-metric formula with activeStudents denominator |
-| 3 | Align with state dashboard formula | `principal.service.ts` | COMPLETED | Agent-3 | Use same 2-metric formula |
-| 4 | Remove performance score | `state-report.service.ts` | COMPLETED | Agent-4 | Removed performanceScore calculation and method |
-
-### Database Schema
-
-| # | Task | File | Status | Agent | Notes |
-|---|------|------|--------|-------|-------|
-| 5 | Add isLateSubmission, daysLate fields | `schema.prisma` (MonthlyReport) | COMPLETED | Agent-5 | New fields for late tracking |
-| 6 | Update hasJoined auto-set logic | `self-identified.service.ts` | COMPLETED | Agent-5 | Auto-approve joining letter |
-
-### Frontend Components
-
-| # | Task | File | Status | Agent | Notes |
-|---|------|------|--------|-------|-------|
-| 7 | Update dashboard cards layout | `StatisticsCards.jsx` | COMPLETED | Agent-6 | Added ComplianceScoreCard with color thresholds, separate StatusCards for Reports/Visits (no color) |
-| 8 | Update compliance display | `TopPerformers.jsx` | COMPLETED | Agent-6 | Updated tooltip and comments to reflect 2-metric formula |
+### Frontend Tasks
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 1.7 | Remove faculty review UI | COMPLETED | Removed approve/reject buttons, review modal |
+| 1.8 | Update frontend report service | COMPLETED | Commented out review-related API functions |
 
 ---
 
-## Changes Required Per File
+## Phase 2: Visit Grace Period
 
-### 1. state-institution.service.ts
-**Current (3 metrics):**
-```typescript
-const validRates = [mentorAssignmentRate, joiningLetterRate, monthlyReportRate].filter(r => r !== null);
-const complianceScore = validRates.length > 0 ? Math.round(validRates.reduce((a, b) => a + b, 0) / validRates.length) : null;
-```
-
-**New (2 metrics):**
-```typescript
-// Compliance = (MentorRate + JoiningLetterRate) / 2
-// Denominator: activeStudents for both
-const mentorAssignmentRate = activeStudents > 0
-  ? Math.min((activeAssignments / activeStudents) * 100, 100)
-  : null;
-const joiningLetterRate = activeStudents > 0
-  ? Math.min((joiningLettersSubmitted / activeStudents) * 100, 100)
-  : null;
-const validRates = [mentorAssignmentRate, joiningLetterRate].filter(r => r !== null);
-const complianceScore = validRates.length > 0 ? Math.round(validRates.reduce((a, b) => a + b, 0) / validRates.length) : null;
-```
-
-### 2. state-dashboard.service.ts
-- Update `getComplianceSummary()` to use 2-metric formula
-- Update `getActionItems()` denominator to `activeStudents`
-- Keep reports/visits as separate metrics (not in compliance)
-
-### 3. principal.service.ts
-- Update `getComplianceMetrics()` to match state formula
-- Remove visit/report from compliance calculation
-- Show reports/visits as separate informational metrics
-
-### 4. state-report.service.ts
-- Remove `performanceScore` calculation entirely
-- Remove weighted formula (40% internship + 30% completion + 30% report)
-
-### 5. schema.prisma (MonthlyReport model)
-**Add fields:**
-```prisma
-model MonthlyReport {
-  // ... existing fields ...
-  isLateSubmission Boolean @default(false)
-  daysLate        Int?
-}
-```
-
-### 6. self-identified.service.ts
-- When `joiningLetterUrl` is uploaded, auto-set `hasJoined = true`
-- Set `reviewedBy` to "SYSTEM" or uploading user ID
-
-### 7. Frontend Components
-- StatisticsCards: Add separate cards for Reports and Visits (no color)
-- TopPerformers: Display compliance based on 2 metrics only
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 2.1 | Update four-week-cycle.util.ts | COMPLETED | Added VISIT_GRACE_DAYS = 5 constant |
+| 2.2 | Update generateExpectedVisits() | COMPLETED | Visit due dates now include 5-day grace |
+| 2.3 | Update getVisitSubmissionStatus() | COMPLETED | Added 'Grace Period' status (orange) |
+| 2.4 | Update frontend visit status utils | COMPLETED | Added VISIT_GRACE_DAYS, updated getVisitStatus() |
 
 ---
 
-## Thresholds (No Change Needed)
-| Level | Range | Color |
-|-------|-------|-------|
-| Excellent | >= 90% | Green |
-| Good | 70% - 89% | Blue |
-| Warning | 50% - 69% | Yellow |
-| Critical | 30% - 49% | Orange |
-| Intervention Required | < 30% | Red |
+## Phase 3: Rounding Standardization
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 3.1 | state-dashboard.service.ts | COMPLETED | 14 Math.round() calls, 0 toFixed() |
+| 3.2 | principal.service.ts | COMPLETED | 22 Math.round() calls, 0 toFixed() |
+| 3.3 | state-institution.service.ts | COMPLETED | 9 Math.round() calls, 0 toFixed() |
 
 ---
 
-## Completion Log
+## Phase 4: Database Migration Scripts
 
-| Timestamp | Agent | Task | Status | Details |
-|-----------|-------|------|--------|---------|
-| 2025-12-26 | Agent-1 | Task #1 | COMPLETED | Updated state-institution.service.ts: (1) getInstitutionsWithStats() - Added activeStudentCounts query (isActive=true), changed compliance to 2-metric formula (MentorRate + JoiningLetterRate) / 2, uses activeStudents as denominator, monthlyReportRate kept but NOT in compliance; (2) getInstitutionOverview() - Added activeStudents query, same 2-metric formula, rates capped at 100% using Math.min(), returns null when activeStudents=0 |
-| 2025-12-26 | Agent-4 | Task #4 | COMPLETED | Removed calculatePerformanceScore method and performanceScore field from getInstitutionPerformance; updated sort to use activeInternships instead |
-| 2025-12-26 | Agent-3 | Task #3 | COMPLETED | Updated getComplianceMetrics() to use new formula: Compliance = (MentorRate + JoiningLetterRate) / 2. Uses activeStudents as denominator. Visits and reports kept as separate informational metrics. Returns null when activeStudents = 0. Rates capped at 100% using Math.min(). |
-| 2025-12-26 | Agent-2 | Task #2 | COMPLETED | Updated state-dashboard.service.ts: (1) getComplianceSummary() now uses 2-metric formula (MentorCoverage + JoiningLetterRate) / 2 with activeStudents denominator, visits/reports tracked separately; (2) getActionItems() intervention check uses activeStudents denominator and 2-metric formula; (3) Distribution thresholds updated to match spec (90/70/50/30); (4) Added joiningLetterRate and activeStudents to response objects |
-| 2025-12-26 | Agent-6 | Task #7 | COMPLETED | Updated StatisticsCards.jsx: (1) Added ComplianceScoreCard component with color-coded thresholds (Excellent/Good/Warning/Critical/Intervention); (2) Added StatusCard component for Report and Visit status (no color indicators); (3) Compliance Score shows 2-metric formula result with breakdown modal; (4) Report Status shows "X / Y Reports"; (5) Visit Status shows "X / Y Visits"; (6) Reports and Visits are NOT part of compliance score |
-| 2025-12-26 | Agent-6 | Task #8 | COMPLETED | Updated TopPerformers.jsx: (1) Updated comments to document 2-metric formula; (2) Updated tooltip to show correct formula "(Mentor Assignment Rate + Joining Letter Rate) / 2. Reports and Visits are tracked separately."; (3) No recalculation needed - uses backend-calculated complianceScore |
-| 2025-12-26 | Agent-5 | Task #5 | COMPLETED | Added isLateSubmission (Boolean @default(false)) and daysLate (Int?) fields to MonthlyReport model in schema.prisma for late submission tracking |
-| 2025-12-26 | Agent-5 | Task #6 | COMPLETED | Implemented auto-approve joining letter: (1) faculty.service.ts uploadJoiningLetter() - sets hasJoined=true, reviewedBy=facultyId on upload; deleteJoiningLetter() - resets hasJoined=false; (2) student.service.ts submitSelfIdentified() - auto-sets hasJoined=true, reviewedBy='SYSTEM' when joiningLetterUrl provided; (3) bulk-self-internship.service.ts - auto-sets hasJoined=true, reviewedBy='SYSTEM' when joiningLetterUrl provided in bulk import |
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 4.1 | Create report migration script | COMPLETED | migrate-reports-to-approved.ts (DRY_RUN support) |
+| 4.2 | Create visit migration script | COMPLETED | migrate-visit-grace-period.ts (idempotent tracking) |
 
 ---
 
-*Document created: 2025-12-26*
-*Last updated: 2025-12-26 (Tasks #5 and #6 completed)*
+## Phase 5: Verification
+
+| Task | Description | Status | Notes |
+|------|-------------|--------|-------|
+| 5.1 | Cross-check all changes | COMPLETED | 5 parallel verification agents run |
+| 5.2 | Verify consistency | COMPLETED | 1 issue found and fixed (line 735) |
+
+---
+
+## Verification Results
+
+### Phase 1 Backend
+- submitReport() correctly sets APPROVED status
+- reviewReport() properly deprecated
+- All status filters updated to use 'APPROVED' only
+- **Issue Fixed:** state-institution.service.ts:735 changed from 'SUBMITTED' to 'APPROVED'
+
+### Phase 1 Frontend
+- No approve/reject buttons in UI
+- No review modal exists
+- Page is view-only
+- Redux thunks and service functions commented out
+
+### Phase 2 Visit Grace Period
+- Backend: VISIT_GRACE_DAYS = 5 in FOUR_WEEK_CYCLE constant
+- Backend: getVisitSubmissionStatus() handles grace period status
+- Frontend: VISIT_GRACE_DAYS constant matches backend
+- Frontend: getVisitStatus() includes grace period handling
+
+### Phase 3 Rounding
+- **Total Math.round() calls:** 45
+- **Total toFixed() calls:** 0
+- All services fully standardized
+
+### Phase 4 Migrations
+- migrate-reports-to-approved.ts: Complete with DRY_RUN support
+- migrate-visit-grace-period.ts: Complete with AuditLog tracking
+
+---
+
+## Summary
+
+| Phase | Total Tasks | Completed | In Progress | Pending |
+|-------|-------------|-----------|-------------|---------|
+| Phase 1 Backend | 6 | 6 | 0 | 0 |
+| Phase 1 Frontend | 2 | 2 | 0 | 0 |
+| Phase 2 | 4 | 4 | 0 | 0 |
+| Phase 3 | 3 | 3 | 0 | 0 |
+| Phase 4 | 2 | 2 | 0 | 0 |
+| Phase 5 | 2 | 2 | 0 | 0 |
+| **TOTAL** | **19** | **19** | **0** | **0** |
+
+---
+
+## Files Modified
+
+### Backend
+- `backend/src/domain/report/monthly/monthly-report.service.ts`
+- `backend/src/domain/report/faculty-visit/faculty-visit.service.ts`
+- `backend/src/common/utils/four-week-cycle.util.ts`
+- `backend/src/api/state/services/state-dashboard.service.ts`
+- `backend/src/api/state/services/state-institution.service.ts`
+- `backend/src/api/principal/principal.service.ts`
+
+### Frontend
+- `frontend/src/features/faculty/reports/MonthlyReportsPage.jsx`
+- `frontend/src/features/faculty/store/facultySlice.js`
+- `frontend/src/services/faculty.service.js`
+- `frontend/src/features/student/applications/utils/applicationUtils.js`
+
+### New Files Created
+- `backend/scripts/migrate-reports-to-approved.ts`
+- `backend/scripts/migrate-visit-grace-period.ts`
+
+---
+
+*Implementation completed: December 26, 2025*

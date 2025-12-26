@@ -679,7 +679,7 @@ export const selectHasActiveInternship = createSelector(
  */
 export const selectPendingReports = createSelector(
   [selectReportsList],
-  (reports) => reports.filter((report) => report.status === 'pending' || report.status === 'draft')
+  (reports) => reports.filter((report) => report.status === 'draft')
 );
 
 /**

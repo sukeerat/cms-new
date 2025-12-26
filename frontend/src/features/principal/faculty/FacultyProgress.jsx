@@ -24,6 +24,8 @@ import {
   InputNumber,
   Divider,
   Tooltip,
+  Calendar,
+  Popconfirm,
 } from 'antd';
 import {
   UserOutlined,
@@ -43,6 +45,10 @@ import {
   EditOutlined,
   SaveOutlined,
   CloseOutlined,
+  StarOutlined,
+  EyeOutlined,
+  DownloadOutlined,
+  TableOutlined,
 } from '@ant-design/icons';
 import { toast } from 'react-hot-toast';
 import { debounce } from 'lodash';
@@ -51,6 +57,8 @@ import analyticsService from '../../../services/analytics.service';
 import principalService from '../../../services/principal.service';
 
 const { Title, Text } = Typography;
+
+const { RangePicker } = DatePicker;
 
 const FacultyProgress = () => {
   // State
@@ -61,6 +69,15 @@ const FacultyProgress = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('students');
+
+  // Visit view state (table vs calendar)
+  const [visitViewMode, setVisitViewMode] = useState('table');
+  const [visitDateRange, setVisitDateRange] = useState(null);
+  const [visitStatusFilter, setVisitStatusFilter] = useState('all');
+
+  // Report details modal
+  const [reportDetailsVisible, setReportDetailsVisible] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
 
   // Edit internship state
   const [editVisible, setEditVisible] = useState(false);
@@ -134,6 +151,41 @@ const FacultyProgress = () => {
         f.employeeId?.toLowerCase().includes(lower)
     );
   }, [facultyList, searchText]);
+
+  // Filtered visits based on date range and status
+  const filteredVisits = useMemo(() => {
+    let visits = facultyDetails?.visits || [];
+
+    // Filter by status
+    if (visitStatusFilter !== 'all') {
+      visits = visits.filter((v) => v.status === visitStatusFilter);
+    }
+
+    // Filter by date range
+    if (visitDateRange && visitDateRange.length === 2 && visitDateRange[0] && visitDateRange[1]) {
+      visits = visits.filter((v) => {
+        const visitDate = dayjs(v.visitDate);
+        return visitDate.isAfter(visitDateRange[0]) && visitDate.isBefore(visitDateRange[1].add(1, 'day'));
+      });
+    }
+
+    return visits;
+  }, [facultyDetails?.visits, visitStatusFilter, visitDateRange]);
+
+  // Calculate average rating
+  const averageRating = useMemo(() => {
+    const visits = facultyDetails?.visits || [];
+    const ratedVisits = visits.filter((v) => v.overallRating > 0);
+    if (ratedVisits.length === 0) return 0;
+    const sum = ratedVisits.reduce((acc, v) => acc + v.overallRating, 0);
+    return (sum / ratedVisits.length).toFixed(1);
+  }, [facultyDetails?.visits]);
+
+  // Handle view report details
+  const handleViewReportDetails = (visit) => {
+    setSelectedReport(visit);
+    setReportDetailsVisible(true);
+  };
 
   // Get visit type icon
   const getVisitTypeIcon = (type) => {
@@ -396,6 +448,21 @@ const FacultyProgress = () => {
         </Tag>
       ),
     },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 80,
+      render: (_, record) => (
+        <Tooltip title="View Details">
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewReportDetails(record)}
+            className="text-primary hover:bg-primary/10"
+          />
+        </Tooltip>
+      ),
+    },
   ];
 
   // Render faculty sidebar
@@ -560,6 +627,20 @@ const FacultyProgress = () => {
                   <Text className="text-[10px] uppercase font-bold text-text-tertiary">Missed</Text>
                 </div>
               </Col>
+              <Col xs={12} sm={8} lg={4}>
+                <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
+                  <div className="flex items-center justify-center gap-1">
+                    <StarOutlined className="text-yellow-500" />
+                    <Statistic
+                      value={averageRating}
+                      precision={1}
+                      suffix="/ 5"
+                      styles={{ content: { color: 'var(--ant-warning-color)', fontSize: 20, fontWeight: 'bold' } }}
+                    />
+                  </div>
+                  <Text className="text-[10px] uppercase font-bold text-text-tertiary">Avg Rating</Text>
+                </div>
+              </Col>
             </Row>
           </div>
         </div>
@@ -598,9 +679,79 @@ const FacultyProgress = () => {
     </Card>
   );
 
+  // Calendar cell renderer for visits
+  const dateCellRender = (value) => {
+    const dateStr = value.format('YYYY-MM-DD');
+    const dayVisits = filteredVisits.filter(
+      (v) => dayjs(v.visitDate).format('YYYY-MM-DD') === dateStr
+    );
+
+    return (
+      <ul className="list-none p-0 m-0">
+        {dayVisits.map((visit, index) => (
+          <li key={index} className="mb-1">
+            <Badge
+              status={visit.status === 'COMPLETED' ? 'success' : visit.status === 'SCHEDULED' ? 'processing' : 'warning'}
+              text={
+                <span className="text-xs cursor-pointer" onClick={() => handleViewReportDetails(visit)}>
+                  {visit.studentName?.split(' ')[0]}
+                </span>
+              }
+            />
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   // Render visits tab
   const renderVisitsTab = () => (
     <div className="space-y-6">
+      {/* Filters and View Toggle */}
+      <Card className="rounded-2xl border-border shadow-sm">
+        <div className="flex flex-wrap gap-4 items-center justify-between">
+          <Space wrap>
+            <Select
+              value={visitStatusFilter}
+              onChange={setVisitStatusFilter}
+              className="w-40"
+              placeholder="Status"
+            >
+              <Select.Option value="all">All Status</Select.Option>
+              <Select.Option value="COMPLETED">Completed</Select.Option>
+              <Select.Option value="SCHEDULED">Scheduled</Select.Option>
+              <Select.Option value="CANCELLED">Cancelled</Select.Option>
+              <Select.Option value="MISSED">Missed</Select.Option>
+            </Select>
+            <RangePicker
+              value={visitDateRange}
+              onChange={setVisitDateRange}
+              format="DD/MM/YYYY"
+              className="w-64"
+              placeholder={['Start Date', 'End Date']}
+            />
+            {(visitStatusFilter !== 'all' || visitDateRange) && (
+              <Button
+                onClick={() => {
+                  setVisitStatusFilter('all');
+                  setVisitDateRange(null);
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
+          </Space>
+          <Space>
+            <Button
+              icon={visitViewMode === 'table' ? <CalendarOutlined /> : <TableOutlined />}
+              onClick={() => setVisitViewMode(visitViewMode === 'table' ? 'calendar' : 'table')}
+            >
+              {visitViewMode === 'table' ? 'Calendar View' : 'Table View'}
+            </Button>
+          </Space>
+        </div>
+      </Card>
+
       {/* Visit Summary */}
       {facultyDetails?.visitSummary && (
         <Card className="rounded-2xl border-border shadow-sm">
@@ -643,77 +794,90 @@ const FacultyProgress = () => {
         </Card>
       )}
 
-      {/* Detailed Visits Table */}
-      <Card className="rounded-2xl border-border shadow-sm" styles={{ body: { padding: 0 } }}>
-        <div className="p-4 border-b border-border flex justify-between items-center">
-          <Title level={5} className="!mb-0 !text-text-primary flex items-center gap-2">
-            <FileTextOutlined className="text-primary" />
-            Visit Details
-          </Title>
-          <Text className="text-text-tertiary">
-            {facultyDetails?.visits?.length || 0} visits
-          </Text>
-        </div>
-        <Table
-          columns={visitColumns}
-          dataSource={facultyDetails?.visits || []}
-          rowKey="id"
-          loading={detailsLoading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visits`,
-          }}
-          scroll={{ x: 900 }}
-          className="custom-table"
-          expandable={{
-            expandedRowRender: (record) => (
-              <div className="p-4 bg-background-tertiary/30 rounded-xl mx-4 my-2">
-                <Row gutter={[24, 16]}>
-                  <Col xs={24} md={12}>
-                    <Descriptions
-                      column={1}
-                      size="small"
-                      className="bg-background rounded-lg p-3"
-                    >
-                      <Descriptions.Item label="Duration">
-                        {record.visitDuration || 'N/A'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Student Performance">
-                        {record.studentPerformance || 'N/A'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Work Environment">
-                        {record.workEnvironment || 'N/A'}
-                      </Descriptions.Item>
-                    </Descriptions>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Descriptions
-                      column={1}
-                      size="small"
-                      className="bg-background rounded-lg p-3"
-                    >
-                      <Descriptions.Item label="Industry Support">
-                        {record.industrySupport || 'N/A'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Skills Development">
-                        {record.skillsDevelopment || 'N/A'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Remarks">
-                        {record.remarks || 'N/A'}
-                      </Descriptions.Item>
-                    </Descriptions>
-                  </Col>
-                </Row>
-              </div>
-            ),
-            rowExpandable: () => true,
-          }}
-          locale={{
-            emptyText: <Empty description="No visits recorded" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-          }}
-        />
-      </Card>
+      {/* Detailed Visits - Table or Calendar View */}
+      {visitViewMode === 'table' ? (
+        <Card className="rounded-2xl border-border shadow-sm" styles={{ body: { padding: 0 } }}>
+          <div className="p-4 border-b border-border flex justify-between items-center">
+            <Title level={5} className="!mb-0 !text-text-primary flex items-center gap-2">
+              <FileTextOutlined className="text-primary" />
+              Visit Details
+            </Title>
+            <Text className="text-text-tertiary">
+              {filteredVisits.length} visits
+            </Text>
+          </div>
+          <Table
+            columns={visitColumns}
+            dataSource={filteredVisits}
+            rowKey="id"
+            loading={detailsLoading}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visits`,
+            }}
+            scroll={{ x: 1000 }}
+            className="custom-table"
+            expandable={{
+              expandedRowRender: (record) => (
+                <div className="p-4 bg-background-tertiary/30 rounded-xl mx-4 my-2">
+                  <Row gutter={[24, 16]}>
+                    <Col xs={24} md={12}>
+                      <Descriptions
+                        column={1}
+                        size="small"
+                        className="bg-background rounded-lg p-3"
+                      >
+                        <Descriptions.Item label="Duration">
+                          {record.visitDuration || 'N/A'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Student Performance">
+                          {record.studentPerformance || 'N/A'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Work Environment">
+                          {record.workEnvironment || 'N/A'}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Descriptions
+                        column={1}
+                        size="small"
+                        className="bg-background rounded-lg p-3"
+                      >
+                        <Descriptions.Item label="Industry Support">
+                          {record.industrySupport || 'N/A'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Skills Development">
+                          {record.skillsDevelopment || 'N/A'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Remarks">
+                          {record.remarks || 'N/A'}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </Col>
+                  </Row>
+                </div>
+              ),
+              rowExpandable: () => true,
+            }}
+            locale={{
+              emptyText: <Empty description="No visits recorded" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+            }}
+          />
+        </Card>
+      ) : (
+        <Card className="rounded-2xl border-border shadow-sm">
+          <Calendar
+            cellRender={(current, info) => {
+              if (info.type === 'date') {
+                return dateCellRender(current);
+              }
+              return info.originNode;
+            }}
+          />
+        </Card>
+      )}
     </div>
   );
 
@@ -909,6 +1073,119 @@ const FacultyProgress = () => {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* Visit Report Details Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-text-primary">
+            <EyeOutlined className="text-primary" />
+            <span>Visit Report Details</span>
+          </div>
+        }
+        open={reportDetailsVisible}
+        onCancel={() => {
+          setReportDetailsVisible(false);
+          setSelectedReport(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => setReportDetailsVisible(false)}>
+            Close
+          </Button>,
+        ]}
+        width={700}
+      >
+        {selectedReport && (
+          <div className="space-y-4">
+            {/* Visit Header */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-secondary/5">
+              <Row gutter={[16, 8]}>
+                <Col xs={12}>
+                  <Text className="text-xs text-text-tertiary block">Faculty</Text>
+                  <Text className="font-medium text-text-primary">{selectedFaculty?.name}</Text>
+                </Col>
+                <Col xs={12}>
+                  <Text className="text-xs text-text-tertiary block">Visit Date</Text>
+                  <Text className="font-medium text-text-primary">
+                    {dayjs(selectedReport.visitDate).format('DD MMM YYYY')}
+                  </Text>
+                </Col>
+                <Col xs={12}>
+                  <Text className="text-xs text-text-tertiary block">Student</Text>
+                  <Text className="font-medium text-text-primary">{selectedReport.studentName}</Text>
+                  <Text className="text-xs text-text-secondary block">{selectedReport.studentRollNumber}</Text>
+                </Col>
+                <Col xs={12}>
+                  <Text className="text-xs text-text-tertiary block">Visit Type</Text>
+                  <Space>
+                    {getVisitTypeIcon(selectedReport.visitType)}
+                    <Text className="text-text-primary">{selectedReport.visitType}</Text>
+                  </Space>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Visit Details */}
+            <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
+              <Descriptions.Item label="Company">
+                {selectedReport.companyName || 'N/A'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Location">
+                {selectedReport.visitLocation || 'N/A'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Duration">
+                {selectedReport.visitDuration || 'N/A'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Status">
+                <Tag color={getVisitStatusColor(selectedReport.status)}>
+                  {selectedReport.status || 'Completed'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Overall Rating" span={2}>
+                {selectedReport.overallRating ? (
+                  <Rate disabled value={selectedReport.overallRating} />
+                ) : (
+                  <Text className="text-text-tertiary">Not rated</Text>
+                )}
+              </Descriptions.Item>
+              {selectedReport.studentPerformance && (
+                <Descriptions.Item label="Student Performance" span={2}>
+                  {selectedReport.studentPerformance}
+                </Descriptions.Item>
+              )}
+              {selectedReport.workEnvironment && (
+                <Descriptions.Item label="Work Environment" span={2}>
+                  {selectedReport.workEnvironment}
+                </Descriptions.Item>
+              )}
+              {selectedReport.industrySupport && (
+                <Descriptions.Item label="Industry Support" span={2}>
+                  {selectedReport.industrySupport}
+                </Descriptions.Item>
+              )}
+              {selectedReport.skillsDevelopment && (
+                <Descriptions.Item label="Skills Development" span={2}>
+                  {selectedReport.skillsDevelopment}
+                </Descriptions.Item>
+              )}
+              {selectedReport.remarks && (
+                <Descriptions.Item label="Remarks" span={2}>
+                  <pre className="whitespace-pre-wrap text-sm m-0">{selectedReport.remarks}</pre>
+                </Descriptions.Item>
+              )}
+              {selectedReport.recommendations && (
+                <Descriptions.Item label="Recommendations" span={2}>
+                  {selectedReport.recommendations}
+                </Descriptions.Item>
+              )}
+              {selectedReport.issuesIdentified && (
+                <Descriptions.Item label="Issues Identified" span={2}>
+                  {selectedReport.issuesIdentified}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+          </div>
+        )}
       </Modal>
     </div>
   );

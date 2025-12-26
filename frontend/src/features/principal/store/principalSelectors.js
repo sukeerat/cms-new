@@ -781,7 +781,7 @@ export const selectSummaryStats = createSelector(
     studentsWithMentor: studentsWithMentor.length,
     studentsWithoutMentor: studentsWithoutMentor.length,
     mentorCoveragePercentage: totalStudents > 0
-      ? ((studentsWithMentor.length / totalStudents) * 100).toFixed(2)
+      ? Math.round((studentsWithMentor.length / totalStudents) * 100)
       : 0,
   })
 );

@@ -113,9 +113,6 @@ const StudentDetailsModal = ({
       APPROVED: 'green',
       VERIFIED: 'green',
       ACTIVE: 'green',
-      PENDING: 'orange',
-      SUBMITTED: 'blue',
-      REJECTED: 'red',
       DRAFT: 'default',
     };
     return colors[status] || 'default';
@@ -499,9 +496,9 @@ const StudentDetailsModal = ({
             </Card>
             <Card size="small" className="text-center border-border">
               <div className="text-2xl font-bold text-warning">
-                {monthlyReports.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED').length}
+                {monthlyReports.filter(r => r.status === 'DRAFT').length}
               </div>
-              <Text type="secondary" className="text-xs">Pending Review</Text>
+              <Text type="secondary" className="text-xs">Draft Reports</Text>
             </Card>
           </div>
         </div>

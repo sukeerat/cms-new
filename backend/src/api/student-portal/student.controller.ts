@@ -68,18 +68,25 @@ export class StudentController {
       throw new BadRequestException('No file provided');
     }
 
+    // Validate file type
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.');
+    }
+
     // Get student info for proper file path
     const profile = await this.studentService.getProfile(req.user.userId);
 
-    // Upload to MinIO
-    const result = await this.fileStorageService.uploadStudentDocument(file, {
-      institutionId: profile.institutionId || 'default',
-      studentId: profile.id,
-      documentType: 'other',
-      customName: 'profile-image',
-    });
+    // Upload to MinIO with automatic optimization (resizes, converts to WebP)
+    const result = await this.fileStorageService.uploadProfileImage(
+      file.buffer,
+      file.originalname,
+      profile.institutionId || 'default',
+      profile.id,
+    );
 
-    return this.studentService.uploadProfileImage(req.user.userId, result.url);
+    // Store the relative key (not full URL) in database
+    return this.studentService.uploadProfileImage(req.user.userId, result.key);
   }
 
   // Internships

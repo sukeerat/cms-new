@@ -291,12 +291,13 @@ export class StateInstitutionService {
       }),
 
       // 7. Monthly reports submitted this month per institution (count reports, not unique students - matches getInstitutionOverview)
+      // With auto-approval, all submitted reports are APPROVED
       this.prisma.monthlyReport.findMany({
         where: {
           student: { institutionId: { in: institutionIds } },
           reportMonth: currentMonth,
           reportYear: currentYear,
-          status: { in: ['SUBMITTED', 'APPROVED'] },
+          status: 'APPROVED',
         },
         select: {
           student: { select: { institutionId: true } },
@@ -731,7 +732,7 @@ export class StateInstitutionService {
           },
           reportMonth: currentMonth,
           reportYear: currentYear,
-          status: 'SUBMITTED',
+          status: 'APPROVED', // Auto-approval: all submitted reports are APPROVED
         },
       }),
 
@@ -1101,13 +1102,14 @@ export class StateInstitutionService {
     }
 
     // Apply report status filter
+    // With auto-approval, all submitted reports are APPROVED
     if (reportStatus && reportStatus !== 'all') {
       if (reportStatus === 'submitted') {
         where.monthlyReports = {
           some: {
             reportMonth: currentMonth,
             reportYear: currentYear,
-            status: { in: ['SUBMITTED', 'APPROVED'] },
+            status: 'APPROVED',
           },
         };
       } else if (reportStatus === 'pending') {

@@ -7,7 +7,7 @@ import {
   Button,
   Tag,
   Space,
-  Modal,
+  // Removed: Auto-approval implemented - Modal no longer needed
   Input,
   message,
   Badge,
@@ -17,8 +17,6 @@ import {
   Tooltip,
   Drawer,
   Descriptions,
-  Empty,
-  Spin,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -37,26 +35,21 @@ import {
 import dayjs from 'dayjs';
 import {
   fetchMonthlyReports,
-  approveMonthlyReport,
-  rejectMonthlyReport,
+  // Removed: Auto-approval implemented - approveMonthlyReport,
+  // Removed: Auto-approval implemented - rejectMonthlyReport,
   selectMonthlyReports,
 } from '../store/facultySlice';
 import facultyService from '../../../services/faculty.service';
 
 const { Title, Text, Paragraph } = Typography;
-const { TextArea } = Input;
+// Removed: Auto-approval implemented - TextArea no longer needed for review remarks
 
 const getStatusConfig = (status) => {
   const configs = {
-    PENDING: { color: 'orange', label: 'Pending Review', icon: <ClockCircleOutlined /> },
-    SUBMITTED: { color: 'blue', label: 'Submitted', icon: <FileTextOutlined /> },
-    UNDER_REVIEW: { color: 'processing', label: 'Under Review', icon: <ClockCircleOutlined /> },
-    APPROVED: { color: 'green', label: 'Approved', icon: <CheckCircleOutlined /> },
-    REJECTED: { color: 'red', label: 'Rejected', icon: <CloseCircleOutlined /> },
-    REVISION_REQUIRED: { color: 'warning', label: 'Revision Required', icon: <ClockCircleOutlined /> },
     DRAFT: { color: 'default', label: 'Draft', icon: <FileTextOutlined /> },
+    APPROVED: { color: 'green', label: 'Approved', icon: <CheckCircleOutlined /> },
   };
-  return configs[status] || configs.PENDING;
+  return configs[status] || configs.DRAFT;
 };
 
 const MonthlyReportsPage = () => {
@@ -66,9 +59,10 @@ const MonthlyReportsPage = () => {
 
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  const [reviewModal, setReviewModal] = useState({ visible: false, report: null, action: null });
-  const [remarks, setRemarks] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  // Removed: Auto-approval implemented - review modal state no longer needed
+  // const [reviewModal, setReviewModal] = useState({ visible: false, report: null, action: null });
+  // const [remarks, setRemarks] = useState('');
+  // const [actionLoading, setActionLoading] = useState(false);
   const [detailDrawer, setDetailDrawer] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
 
@@ -80,40 +74,8 @@ const MonthlyReportsPage = () => {
     dispatch(fetchMonthlyReports({ forceRefresh: true }));
   };
 
-  const handleApprove = async () => {
-    if (!reviewModal.report) return;
-    setActionLoading(true);
-    try {
-      await dispatch(approveMonthlyReport({ reportId: reviewModal.report.id, remarks })).unwrap();
-      message.success('Report approved successfully');
-      setReviewModal({ visible: false, report: null, action: null });
-      setRemarks('');
-      handleRefresh();
-    } catch (error) {
-      message.error(error || 'Failed to approve report');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!reviewModal.report || !remarks.trim()) {
-      message.warning('Please provide a reason for rejection');
-      return;
-    }
-    setActionLoading(true);
-    try {
-      await dispatch(rejectMonthlyReport({ reportId: reviewModal.report.id, reason: remarks })).unwrap();
-      message.success('Report rejected');
-      setReviewModal({ visible: false, report: null, action: null });
-      setRemarks('');
-      handleRefresh();
-    } catch (error) {
-      message.error(error || 'Failed to reject report');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  // Removed: Auto-approval implemented - handleApprove and handleReject no longer needed
+  // Reports are now automatically approved upon submission
 
   const handleDownload = async (report) => {
     try {
@@ -140,12 +102,10 @@ const MonthlyReportsPage = () => {
   const getFilteredReports = () => {
     let filtered = reports;
 
-    if (activeTab === 'pending') {
-      filtered = reports.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED');
+    if (activeTab === 'draft') {
+      filtered = reports.filter(r => r.status === 'DRAFT');
     } else if (activeTab === 'approved') {
       filtered = reports.filter(r => r.status === 'APPROVED');
-    } else if (activeTab === 'rejected') {
-      filtered = reports.filter(r => r.status === 'REJECTED' || r.status === 'REVISION_REQUIRED');
     }
 
     if (searchText) {
@@ -158,9 +118,8 @@ const MonthlyReportsPage = () => {
     return filtered;
   };
 
-  const pendingCount = reports.filter(r => r.status === 'PENDING' || r.status === 'SUBMITTED').length;
+  const draftCount = reports.filter(r => r.status === 'DRAFT').length;
   const approvedCount = reports.filter(r => r.status === 'APPROVED').length;
-  const rejectedCount = reports.filter(r => r.status === 'REJECTED' || r.status === 'REVISION_REQUIRED').length;
 
   const columns = [
     {
@@ -235,10 +194,8 @@ const MonthlyReportsPage = () => {
         );
       },
       filters: [
-        { text: 'Pending', value: 'PENDING' },
-        { text: 'Submitted', value: 'SUBMITTED' },
+        { text: 'Draft', value: 'DRAFT' },
         { text: 'Approved', value: 'APPROVED' },
-        { text: 'Rejected', value: 'REJECTED' },
       ],
       onFilter: (value, record) => record.status === value,
     },
@@ -266,26 +223,7 @@ const MonthlyReportsPage = () => {
               />
             </Tooltip>
           )}
-          {(record.status === 'PENDING' || record.status === 'SUBMITTED') && (
-            <>
-              <Tooltip title="Approve">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CheckCircleOutlined className="text-green-500" />}
-                  onClick={() => setReviewModal({ visible: true, report: record, action: 'approve' })}
-                />
-              </Tooltip>
-              <Tooltip title="Reject">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CloseCircleOutlined className="text-red-500" />}
-                  onClick={() => setReviewModal({ visible: true, report: record, action: 'reject' })}
-                />
-              </Tooltip>
-            </>
-          )}
+          {/* Removed: Auto-approval implemented - Approve/Reject buttons removed */}
         </Space>
       ),
     },
@@ -303,12 +241,12 @@ const MonthlyReportsPage = () => {
       ),
     },
     {
-      key: 'pending',
+      key: 'draft',
       label: (
         <span className="flex items-center gap-2">
-          <ClockCircleOutlined />
-          Pending Review
-          <Badge count={pendingCount} className="ml-1" />
+          <FileTextOutlined />
+          Draft
+          <Badge count={draftCount} className="ml-1" />
         </span>
       ),
     },
@@ -319,16 +257,6 @@ const MonthlyReportsPage = () => {
           <CheckCircleOutlined />
           Approved
           <Badge count={approvedCount} showZero className="ml-1" style={{ backgroundColor: 'rgb(var(--color-success))' }} />
-        </span>
-      ),
-    },
-    {
-      key: 'rejected',
-      label: (
-        <span className="flex items-center gap-2">
-          <CloseCircleOutlined />
-          Rejected
-          <Badge count={rejectedCount} showZero className="ml-1" style={{ backgroundColor: 'rgb(var(--color-error))' }} />
         </span>
       ),
     },
@@ -353,7 +281,7 @@ const MonthlyReportsPage = () => {
                 Monthly Reports
               </Title>
               <Text className="text-text-secondary text-sm">
-                Review and approve student monthly internship reports
+                View student monthly internship reports
               </Text>
             </div>
           </div>
@@ -369,7 +297,7 @@ const MonthlyReportsPage = () => {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card size="small" className="rounded-xl border-border shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
@@ -384,12 +312,12 @@ const MonthlyReportsPage = () => {
 
           <Card size="small" className="rounded-xl border-border shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-warning/10 text-warning">
-                <ClockCircleOutlined className="text-lg" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-default/10 text-default">
+                <FileTextOutlined className="text-lg" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-text-primary">{pendingCount}</div>
-                <div className="text-[10px] uppercase font-bold text-text-tertiary">Pending Review</div>
+                <div className="text-2xl font-bold text-text-primary">{draftCount}</div>
+                <div className="text-[10px] uppercase font-bold text-text-tertiary">Draft</div>
               </div>
             </div>
           </Card>
@@ -406,17 +334,6 @@ const MonthlyReportsPage = () => {
             </div>
           </Card>
 
-          <Card size="small" className="rounded-xl border-border shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-error/10 text-error">
-                <CloseCircleOutlined className="text-lg" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-text-primary">{rejectedCount}</div>
-                <div className="text-[10px] uppercase font-bold text-text-tertiary">Rejected</div>
-              </div>
-            </div>
-          </Card>
         </div>
 
         {/* Search and Table */}
@@ -456,59 +373,7 @@ const MonthlyReportsPage = () => {
         </Card>
       </div>
 
-      {/* Review Modal */}
-      <Modal
-        title={
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              reviewModal.action === 'approve' ? 'bg-success/10' : 'bg-error/10'
-            }`}>
-              {reviewModal.action === 'approve' ? (
-                <CheckCircleOutlined className="text-success" />
-              ) : (
-                <CloseCircleOutlined className="text-error" />
-              )}
-            </div>
-            <span className="font-bold text-text-primary">
-              {reviewModal.action === 'approve' ? 'Approve Report' : 'Reject Report'}
-            </span>
-          </div>
-        }
-        open={reviewModal.visible}
-        onCancel={() => {
-          setReviewModal({ visible: false, report: null, action: null });
-          setRemarks('');
-        }}
-        footer={[
-          <Button key="cancel" onClick={() => setReviewModal({ visible: false, report: null, action: null })} className="rounded-lg">
-            Cancel
-          </Button>,
-          reviewModal.action === 'approve' ? (
-            <Button key="approve" type="primary" loading={actionLoading} onClick={handleApprove} className="rounded-lg bg-success border-success">
-              Approve
-            </Button>
-          ) : (
-            <Button key="reject" type="primary" danger loading={actionLoading} onClick={handleReject} className="rounded-lg">
-              Reject
-            </Button>
-          ),
-        ]}
-        className="rounded-2xl"
-      >
-        {reviewModal.report && (
-          <div className="mb-4 p-4 bg-surface rounded-xl border border-border">
-            <p><strong>Student:</strong> {reviewModal.report.application?.student?.name}</p>
-            <p><strong>Period:</strong> {dayjs().month(reviewModal.report.reportMonth - 1).format('MMMM')} {reviewModal.report.reportYear}</p>
-          </div>
-        )}
-        <TextArea
-          rows={4}
-          placeholder={reviewModal.action === 'approve' ? 'Add remarks (optional)' : 'Reason for rejection (required)'}
-          value={remarks}
-          onChange={(e) => setRemarks(e.target.value)}
-          className="rounded-lg"
-        />
-      </Modal>
+      {/* Removed: Auto-approval implemented - Review Modal removed */}
 
       {/* Detail Drawer */}
       <Drawer
@@ -601,7 +466,7 @@ const MonthlyReportsPage = () => {
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions - View only mode */}
             <div className="pt-4 flex justify-end gap-3 border-t border-border">
               {selectedReport.reportFileUrl && (
                 <Button
@@ -612,32 +477,7 @@ const MonthlyReportsPage = () => {
                   Download Report
                 </Button>
               )}
-              {(selectedReport.status === 'PENDING' || selectedReport.status === 'SUBMITTED') && (
-                <>
-                  <Button
-                    type="primary"
-                    icon={<CheckCircleOutlined />}
-                    onClick={() => {
-                      setDetailDrawer(false);
-                      setReviewModal({ visible: true, report: selectedReport, action: 'approve' });
-                    }}
-                    className="rounded-lg bg-success border-success"
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    danger
-                    icon={<CloseCircleOutlined />}
-                    onClick={() => {
-                      setDetailDrawer(false);
-                      setReviewModal({ visible: true, report: selectedReport, action: 'reject' });
-                    }}
-                    className="rounded-lg"
-                  >
-                    Reject
-                  </Button>
-                </>
-              )}
+              {/* Removed: Auto-approval implemented - Approve/Reject buttons removed */}
             </div>
           </div>
         )}

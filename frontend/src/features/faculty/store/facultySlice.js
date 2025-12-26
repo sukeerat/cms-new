@@ -315,17 +315,18 @@ export const fetchMonthlyReports = createAsyncThunk(
   }
 );
 
-export const reviewMonthlyReport = createAsyncThunk(
-  'faculty/reviewMonthlyReport',
-  async ({ reportId, reviewData }, { rejectWithValue }) => {
-    try {
-      const response = await facultyService.reviewMonthlyReport(reportId, reviewData);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to review report');
-    }
-  }
-);
+// Removed: Auto-approval implemented - reviewMonthlyReport no longer needed
+// export const reviewMonthlyReport = createAsyncThunk(
+//   'faculty/reviewMonthlyReport',
+//   async ({ reportId, reviewData }, { rejectWithValue }) => {
+//     try {
+//       const response = await facultyService.reviewMonthlyReport(reportId, reviewData);
+//       return response;
+//     } catch (error) {
+//       return rejectWithValue(error.response?.data?.message || 'Failed to review report');
+//     }
+//   }
+// );
 
 // Self-Identified Approvals
 export const fetchApplications = createAsyncThunk(
@@ -525,42 +526,43 @@ export const uploadJoiningLetter = createAsyncThunk(
 );
 
 // ==================== Monthly Report Actions ====================
+// Removed: Auto-approval implemented - approveMonthlyReport, rejectMonthlyReport, deleteMonthlyReport no longer needed
 
-export const approveMonthlyReport = createAsyncThunk(
-  'faculty/approveMonthlyReport',
-  async ({ reportId, remarks }, { rejectWithValue }) => {
-    try {
-      const response = await facultyService.approveMonthlyReport(reportId, remarks);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to approve report');
-    }
-  }
-);
+// export const approveMonthlyReport = createAsyncThunk(
+//   'faculty/approveMonthlyReport',
+//   async ({ reportId, remarks }, { rejectWithValue }) => {
+//     try {
+//       const response = await facultyService.approveMonthlyReport(reportId, remarks);
+//       return response;
+//     } catch (error) {
+//       return rejectWithValue(error.response?.data?.message || 'Failed to approve report');
+//     }
+//   }
+// );
 
-export const rejectMonthlyReport = createAsyncThunk(
-  'faculty/rejectMonthlyReport',
-  async ({ reportId, reason }, { rejectWithValue }) => {
-    try {
-      const response = await facultyService.rejectMonthlyReport(reportId, reason);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to reject report');
-    }
-  }
-);
+// export const rejectMonthlyReport = createAsyncThunk(
+//   'faculty/rejectMonthlyReport',
+//   async ({ reportId, reason }, { rejectWithValue }) => {
+//     try {
+//       const response = await facultyService.rejectMonthlyReport(reportId, reason);
+//       return response;
+//     } catch (error) {
+//       return rejectWithValue(error.response?.data?.message || 'Failed to reject report');
+//     }
+//   }
+// );
 
-export const deleteMonthlyReport = createAsyncThunk(
-  'faculty/deleteMonthlyReport',
-  async (reportId, { rejectWithValue }) => {
-    try {
-      const response = await facultyService.deleteMonthlyReport(reportId);
-      return { id: reportId, ...response };
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete report');
-    }
-  }
-);
+// export const deleteMonthlyReport = createAsyncThunk(
+//   'faculty/deleteMonthlyReport',
+//   async (reportId, { rejectWithValue }) => {
+//     try {
+//       const response = await facultyService.deleteMonthlyReport(reportId);
+//       return { id: reportId, ...response };
+//     } catch (error) {
+//       return rejectWithValue(error.response?.data?.message || 'Failed to delete report');
+//     }
+//   }
+// );
 
 // Backward compatibility aliases
 export const fetchGrievances = fetchFeedbackHistory;
@@ -827,22 +829,23 @@ const facultySlice = createSlice({
         state.monthlyReports.loading = false;
         state.monthlyReports.error = action.payload;
       })
-      .addCase(reviewMonthlyReport.pending, (state) => {
-        state.monthlyReports.loading = true;
-      })
-      .addCase(reviewMonthlyReport.fulfilled, (state, action) => {
-        state.monthlyReports.loading = false;
-        const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.id);
-        if (index !== -1) {
-          state.monthlyReports.list[index] = action.payload;
-        }
-        state.lastFetched.monthlyReports = null; // Invalidate cache
-        state.lastFetched.monthlyReportsKey = null;
-      })
-      .addCase(reviewMonthlyReport.rejected, (state, action) => {
-        state.monthlyReports.loading = false;
-        state.monthlyReports.error = action.payload;
-      })
+      // Removed: Auto-approval implemented - reviewMonthlyReport reducers no longer needed
+      // .addCase(reviewMonthlyReport.pending, (state) => {
+      //   state.monthlyReports.loading = true;
+      // })
+      // .addCase(reviewMonthlyReport.fulfilled, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.id);
+      //   if (index !== -1) {
+      //     state.monthlyReports.list[index] = action.payload;
+      //   }
+      //   state.lastFetched.monthlyReports = null; // Invalidate cache
+      //   state.lastFetched.monthlyReportsKey = null;
+      // })
+      // .addCase(reviewMonthlyReport.rejected, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   state.monthlyReports.error = action.payload;
+      // })
 
       // Applications
       .addCase(fetchApplications.pending, (state) => {
@@ -1014,52 +1017,54 @@ const facultySlice = createSlice({
       })
 
       // ==================== Monthly Report Actions ====================
-      .addCase(approveMonthlyReport.pending, (state) => {
-        state.monthlyReports.loading = true;
-      })
-      .addCase(approveMonthlyReport.fulfilled, (state, action) => {
-        state.monthlyReports.loading = false;
-        const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.data?.id);
-        if (index !== -1) {
-          state.monthlyReports.list[index] = action.payload.data;
-        }
-        state.lastFetched.monthlyReports = null;
-        state.lastFetched.monthlyReportsKey = null;
-      })
-      .addCase(approveMonthlyReport.rejected, (state, action) => {
-        state.monthlyReports.loading = false;
-        state.monthlyReports.error = action.payload;
-      })
-      .addCase(rejectMonthlyReport.pending, (state) => {
-        state.monthlyReports.loading = true;
-      })
-      .addCase(rejectMonthlyReport.fulfilled, (state, action) => {
-        state.monthlyReports.loading = false;
-        const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.data?.id);
-        if (index !== -1) {
-          state.monthlyReports.list[index] = action.payload.data;
-        }
-        state.lastFetched.monthlyReports = null;
-        state.lastFetched.monthlyReportsKey = null;
-      })
-      .addCase(rejectMonthlyReport.rejected, (state, action) => {
-        state.monthlyReports.loading = false;
-        state.monthlyReports.error = action.payload;
-      })
-      .addCase(deleteMonthlyReport.pending, (state) => {
-        state.monthlyReports.loading = true;
-      })
-      .addCase(deleteMonthlyReport.fulfilled, (state, action) => {
-        state.monthlyReports.loading = false;
-        state.monthlyReports.list = state.monthlyReports.list.filter(r => r.id !== action.payload.id);
-        state.monthlyReports.total -= 1;
-        state.lastFetched.monthlyReports = null; // Invalidate cache after mutation
-        state.lastFetched.monthlyReportsKey = null;
-      })
-      .addCase(deleteMonthlyReport.rejected, (state, action) => {
-        state.monthlyReports.loading = false;
-        state.monthlyReports.error = action.payload;
-      });
+      // Removed: Auto-approval implemented - approveMonthlyReport, rejectMonthlyReport, deleteMonthlyReport reducers no longer needed
+      // .addCase(approveMonthlyReport.pending, (state) => {
+      //   state.monthlyReports.loading = true;
+      // })
+      // .addCase(approveMonthlyReport.fulfilled, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.data?.id);
+      //   if (index !== -1) {
+      //     state.monthlyReports.list[index] = action.payload.data;
+      //   }
+      //   state.lastFetched.monthlyReports = null;
+      //   state.lastFetched.monthlyReportsKey = null;
+      // })
+      // .addCase(approveMonthlyReport.rejected, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   state.monthlyReports.error = action.payload;
+      // })
+      // .addCase(rejectMonthlyReport.pending, (state) => {
+      //   state.monthlyReports.loading = true;
+      // })
+      // .addCase(rejectMonthlyReport.fulfilled, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   const index = state.monthlyReports.list.findIndex(r => r.id === action.payload.data?.id);
+      //   if (index !== -1) {
+      //     state.monthlyReports.list[index] = action.payload.data;
+      //   }
+      //   state.lastFetched.monthlyReports = null;
+      //   state.lastFetched.monthlyReportsKey = null;
+      // })
+      // .addCase(rejectMonthlyReport.rejected, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   state.monthlyReports.error = action.payload;
+      // })
+      // .addCase(deleteMonthlyReport.pending, (state) => {
+      //   state.monthlyReports.loading = true;
+      // })
+      // .addCase(deleteMonthlyReport.fulfilled, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   state.monthlyReports.list = state.monthlyReports.list.filter(r => r.id !== action.payload.id);
+      //   state.monthlyReports.total -= 1;
+      //   state.lastFetched.monthlyReports = null; // Invalidate cache after mutation
+      //   state.lastFetched.monthlyReportsKey = null;
+      // })
+      // .addCase(deleteMonthlyReport.rejected, (state, action) => {
+      //   state.monthlyReports.loading = false;
+      //   state.monthlyReports.error = action.payload;
+      // })
+      ;
   },
 });
 

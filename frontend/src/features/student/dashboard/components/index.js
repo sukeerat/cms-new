@@ -5,3 +5,4 @@ export { default as ActiveInternshipCard } from './ActiveInternshipCard';
 export { default as RecentApplicationsList } from './RecentApplicationsList';
 export { default as MonthlyReportsCard } from './MonthlyReportsCard';
 export { default as GrievancesCard } from './GrievancesCard';
+export { default as JoiningLetterCard } from './JoiningLetterCard';

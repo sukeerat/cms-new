@@ -1,0 +1,335 @@
+import React, { memo, useState } from 'react';
+import { Typography, Button, Tag, Tooltip, Modal, Upload, message, Space } from 'antd';
+import {
+  FileTextOutlined,
+  CheckCircleOutlined,
+  UploadOutlined,
+  EyeOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined,
+  LoadingOutlined,
+  CloudUploadOutlined,
+} from '@ant-design/icons';
+import { getFileUrl } from '../../../../utils/imageUtils';
+import studentService from '../../../../services/student.service';
+
+const { Text } = Typography;
+
+const JoiningLetterCard = ({
+  application,
+  onRefresh,
+  loading = false,
+  compact = true,
+}) => {
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  // Check if application has joining letter
+  const hasJoiningLetter = !!(application?.joiningLetter || application?.joiningLetterUrl);
+  const joiningLetterUrl = application?.joiningLetter || application?.joiningLetterUrl;
+
+  // Handle file selection
+  const handleFileSelect = (file) => {
+    const isPdf = file.type === 'application/pdf';
+    const isLt5M = file.size / 1024 / 1024 < 5;
+
+    if (!isPdf) {
+      message.error('Only PDF files are allowed');
+      return false;
+    }
+
+    if (!isLt5M) {
+      message.error('File must be smaller than 5MB');
+      return false;
+    }
+
+    setSelectedFile(file);
+    return false; // Prevent auto-upload
+  };
+
+  // Handle upload
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      message.error('Please select a file first');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      await studentService.uploadJoiningLetter(application.id, selectedFile);
+      setUploadModalVisible(false);
+      setSelectedFile(null);
+      message.success('Joining letter uploaded successfully');
+
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      message.error(error.response?.data?.message || 'Failed to upload joining letter');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async () => {
+    try {
+      setUploading(true);
+      await studentService.deleteJoiningLetter(application.id);
+      setDeleteConfirmVisible(false);
+      message.success('Joining letter deleted successfully');
+
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      message.error(error.response?.data?.message || 'Failed to delete joining letter');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle view
+  const handleView = () => {
+    if (joiningLetterUrl) {
+      const url = getFileUrl(joiningLetterUrl);
+      window.open(url, '_blank');
+    }
+  };
+
+  if (!application) {
+    return null;
+  }
+
+  // Compact version for dashboard
+  if (compact) {
+    return (
+      <>
+        <div className={`p-3 rounded-xl border ${hasJoiningLetter ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${hasJoiningLetter ? 'bg-green-100' : 'bg-orange-100'}`}>
+                <FileTextOutlined className={hasJoiningLetter ? 'text-green-600' : 'text-orange-600'} />
+              </div>
+              <div>
+                <Text strong className="text-sm block">Joining Letter</Text>
+                <Text className={`text-xs ${hasJoiningLetter ? 'text-green-600' : 'text-orange-600'}`}>
+                  {hasJoiningLetter ? 'Uploaded' : 'Required'}
+                </Text>
+              </div>
+            </div>
+
+            {hasJoiningLetter ? (
+              <Space size="small">
+                <Tooltip title="View">
+                  <Button type="text" size="small" icon={<EyeOutlined />} onClick={handleView} />
+                </Tooltip>
+                <Tooltip title="Replace">
+                  <Button type="text" size="small" icon={<UploadOutlined />} onClick={() => setUploadModalVisible(true)} />
+                </Tooltip>
+                <Tooltip title="Delete">
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setDeleteConfirmVisible(true)} />
+                </Tooltip>
+              </Space>
+            ) : (
+              <Button
+                type="primary"
+                size="small"
+                icon={<UploadOutlined />}
+                onClick={() => setUploadModalVisible(true)}
+              >
+                Upload
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Upload Modal */}
+        <Modal
+          title={
+            <div className="flex items-center gap-2">
+              <CloudUploadOutlined className="text-blue-500" />
+              <span>{hasJoiningLetter ? 'Replace' : 'Upload'} Joining Letter</span>
+            </div>
+          }
+          open={uploadModalVisible}
+          onCancel={() => {
+            setUploadModalVisible(false);
+            setSelectedFile(null);
+          }}
+          footer={[
+            <Button
+              key="cancel"
+              onClick={() => {
+                setUploadModalVisible(false);
+                setSelectedFile(null);
+              }}
+            >
+              Cancel
+            </Button>,
+            <Button
+              key="upload"
+              type="primary"
+              loading={uploading}
+              disabled={!selectedFile}
+              onClick={handleUpload}
+              icon={uploading ? <LoadingOutlined /> : <UploadOutlined />}
+            >
+              {uploading ? 'Uploading...' : 'Upload'}
+            </Button>,
+          ]}
+        >
+          <div className="space-y-4">
+            <Upload.Dragger
+              accept=".pdf"
+              maxCount={1}
+              beforeUpload={handleFileSelect}
+              onRemove={() => setSelectedFile(null)}
+              fileList={selectedFile ? [{ uid: '-1', name: selectedFile.name, status: 'done' }] : []}
+            >
+              <p className="ant-upload-drag-icon">
+                <CloudUploadOutlined className="text-4xl text-blue-500" />
+              </p>
+              <p className="ant-upload-text">Click or drag file to upload</p>
+              <p className="ant-upload-hint">PDF only, max 5MB</p>
+            </Upload.Dragger>
+
+            {hasJoiningLetter && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <Text className="text-yellow-700 text-sm">
+                  <ExclamationCircleOutlined className="mr-2" />
+                  Uploading a new file will replace the existing joining letter.
+                </Text>
+              </div>
+            )}
+          </div>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          title={
+            <div className="flex items-center gap-2 text-red-500">
+              <DeleteOutlined />
+              <span>Delete Joining Letter</span>
+            </div>
+          }
+          open={deleteConfirmVisible}
+          onCancel={() => setDeleteConfirmVisible(false)}
+          footer={[
+            <Button key="cancel" onClick={() => setDeleteConfirmVisible(false)}>
+              Cancel
+            </Button>,
+            <Button key="delete" danger loading={uploading} onClick={handleDelete}>
+              Delete
+            </Button>,
+          ]}
+        >
+          <p>Are you sure you want to delete the joining letter?</p>
+          <p className="text-red-500 text-sm">This action cannot be undone.</p>
+        </Modal>
+      </>
+    );
+  }
+
+  // Full version (for other pages if needed)
+  return (
+    <>
+      <div className={`p-4 rounded-xl border ${hasJoiningLetter ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${hasJoiningLetter ? 'bg-green-100' : 'bg-orange-100'}`}>
+              <FileTextOutlined className={`text-2xl ${hasJoiningLetter ? 'text-green-600' : 'text-orange-600'}`} />
+            </div>
+            <div>
+              <Text strong className="text-base block">Joining Letter</Text>
+              <Text className={`text-sm ${hasJoiningLetter ? 'text-green-600' : 'text-orange-600'}`}>
+                {hasJoiningLetter ? 'Document uploaded' : 'Upload required'}
+              </Text>
+            </div>
+          </div>
+
+          {hasJoiningLetter && (
+            <Tag color="success" icon={<CheckCircleOutlined />}>
+              Uploaded
+            </Tag>
+          )}
+        </div>
+
+        <div className="mt-4">
+          {hasJoiningLetter ? (
+            <Space wrap>
+              <Button icon={<EyeOutlined />} onClick={handleView}>
+                View
+              </Button>
+              <Button icon={<UploadOutlined />} onClick={() => setUploadModalVisible(true)}>
+                Replace
+              </Button>
+              <Button danger icon={<DeleteOutlined />} onClick={() => setDeleteConfirmVisible(true)}>
+                Delete
+              </Button>
+            </Space>
+          ) : (
+            <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadModalVisible(true)} block>
+              Upload Joining Letter
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Modals - same as compact version */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <CloudUploadOutlined className="text-blue-500" />
+            <span>{hasJoiningLetter ? 'Replace' : 'Upload'} Joining Letter</span>
+          </div>
+        }
+        open={uploadModalVisible}
+        onCancel={() => {
+          setUploadModalVisible(false);
+          setSelectedFile(null);
+        }}
+        footer={[
+          <Button key="cancel" onClick={() => { setUploadModalVisible(false); setSelectedFile(null); }}>
+            Cancel
+          </Button>,
+          <Button key="upload" type="primary" loading={uploading} disabled={!selectedFile} onClick={handleUpload}>
+            {uploading ? 'Uploading...' : 'Upload'}
+          </Button>,
+        ]}
+      >
+        <Upload.Dragger
+          accept=".pdf"
+          maxCount={1}
+          beforeUpload={handleFileSelect}
+          onRemove={() => setSelectedFile(null)}
+          fileList={selectedFile ? [{ uid: '-1', name: selectedFile.name, status: 'done' }] : []}
+        >
+          <p className="ant-upload-drag-icon">
+            <CloudUploadOutlined className="text-4xl text-blue-500" />
+          </p>
+          <p className="ant-upload-text">Click or drag file to upload</p>
+          <p className="ant-upload-hint">PDF only, max 5MB</p>
+        </Upload.Dragger>
+      </Modal>
+
+      <Modal
+        title={<span className="text-red-500"><DeleteOutlined /> Delete Joining Letter</span>}
+        open={deleteConfirmVisible}
+        onCancel={() => setDeleteConfirmVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setDeleteConfirmVisible(false)}>Cancel</Button>,
+          <Button key="delete" danger loading={uploading} onClick={handleDelete}>Delete</Button>,
+        ]}
+      >
+        <p>Are you sure you want to delete the joining letter?</p>
+      </Modal>
+    </>
+  );
+};
+
+JoiningLetterCard.displayName = 'JoiningLetterCard';
+
+export default memo(JoiningLetterCard);

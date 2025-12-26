@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, Typography, Tag, Avatar, Row, Col } from 'antd';
+import React, { useState } from 'react';
+import { Card, Typography, Tag, Avatar, Row, Col, Button, Modal, Form, Input, message, Space, Tooltip } from 'antd';
 import {
   BankOutlined,
   CalendarOutlined,
@@ -8,17 +8,77 @@ import {
   MailOutlined,
   UserOutlined,
   StarOutlined,
+  EditOutlined,
+  SaveOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { formatDisplayDate, formatCurrency, getStatusColor } from '../../utils/applicationUtils';
 import { getImageUrl } from '../../../../../utils/imageUtils';
 import { getStatusIcon } from '../applicationHelpers';
+import studentService from '../../../../../services/student.service';
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
 
-const ApplicationDetailsTab = ({ application, isSelfIdentified, internship, industry }) => (
+const ApplicationDetailsTab = ({ application, isSelfIdentified, internship, industry, onApplicationUpdate }) => {
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+
+  // Handle opening edit modal
+  const handleOpenEditModal = () => {
+    form.setFieldsValue({
+      companyName: application.companyName || '',
+      companyAddress: application.companyAddress || '',
+      companyContact: application.companyContact || '',
+      companyEmail: application.companyEmail || '',
+      hrName: application.hrName || '',
+      hrContact: application.hrContact || '',
+      hrEmail: application.hrEmail || '',
+      jobProfile: application.jobProfile || '',
+    });
+    setEditModalVisible(true);
+  };
+
+  // Handle saving company info
+  const handleSaveCompanyInfo = async (values) => {
+    try {
+      setSaving(true);
+      await studentService.updateApplication(application.id, values);
+      message.success('Company information updated successfully');
+      setEditModalVisible(false);
+
+      // Notify parent to refresh data
+      if (onApplicationUpdate) {
+        onApplicationUpdate();
+      }
+    } catch (error) {
+      message.error(error.response?.data?.message || 'Failed to update company information');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+  <>
   <div className="space-y-6">
     {/* Company/Internship Info */}
-    <Card className="rounded-xl">
+    <Card
+      className="rounded-xl"
+      extra={
+        isSelfIdentified && (
+          <Tooltip title="Edit company information">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={handleOpenEditModal}
+            >
+              Edit
+            </Button>
+          </Tooltip>
+        )
+      }
+    >
       <div className="flex items-start gap-4">
         <Avatar
           src={industry?.logo ? getImageUrl(industry.logo) : null}
@@ -155,7 +215,151 @@ const ApplicationDetailsTab = ({ application, isSelfIdentified, internship, indu
         </div>
       </Card>
     )}
+
+    {/* Self-Identified: HR Contact Info */}
+    {isSelfIdentified && (application.hrName || application.hrContact || application.hrEmail) && (
+      <Card className="rounded-xl" title="HR / Contact Person">
+        <div className="space-y-3">
+          {application.hrName && (
+            <div className="flex items-center gap-2">
+              <UserOutlined className="text-purple-500" />
+              <div>
+                <Text type="secondary" className="block text-xs">Name</Text>
+                <Text>{application.hrName}</Text>
+              </div>
+            </div>
+          )}
+          {application.hrContact && (
+            <div className="flex items-center gap-2">
+              <PhoneOutlined className="text-green-500" />
+              <div>
+                <Text type="secondary" className="block text-xs">Phone</Text>
+                <Text>{application.hrContact}</Text>
+              </div>
+            </div>
+          )}
+          {application.hrEmail && (
+            <div className="flex items-center gap-2">
+              <MailOutlined className="text-blue-500" />
+              <div>
+                <Text type="secondary" className="block text-xs">Email</Text>
+                <Text>{application.hrEmail}</Text>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+    )}
   </div>
+
+  {/* Edit Company Info Modal */}
+  <Modal
+    title={
+      <div className="flex items-center gap-2">
+        <EditOutlined className="text-primary" />
+        <span>Edit Company Information</span>
+      </div>
+    }
+    open={editModalVisible}
+    onCancel={() => setEditModalVisible(false)}
+    footer={null}
+    width={600}
+  >
+    <Form
+      form={form}
+      layout="vertical"
+      onFinish={handleSaveCompanyInfo}
+      className="mt-4"
+    >
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item
+            label="Company Name"
+            name="companyName"
+            rules={[{ required: true, message: 'Company name is required' }]}
+          >
+            <Input placeholder="Enter company name" />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            label="Job Profile / Role"
+            name="jobProfile"
+            rules={[{ required: true, message: 'Job profile is required' }]}
+          >
+            <Input placeholder="e.g., Data Analyst Intern" />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Form.Item
+        label="Company Address"
+        name="companyAddress"
+      >
+        <TextArea rows={2} placeholder="Full address of the internship location" />
+      </Form.Item>
+
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item
+            label="Company Contact"
+            name="companyContact"
+          >
+            <Input placeholder="Phone number" />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            label="Company Email"
+            name="companyEmail"
+            rules={[{ type: 'email', message: 'Please enter a valid email' }]}
+          >
+            <Input placeholder="company@example.com" />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <div className="border-t pt-4 mt-4">
+        <Text strong className="block mb-3">HR / Contact Person</Text>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              label="HR Name"
+              name="hrName"
+            >
+              <Input placeholder="Contact person name" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              label="HR Contact"
+              name="hrContact"
+            >
+              <Input placeholder="Phone number" />
+            </Form.Item>
+          </Col>
+        </Row>
+        <Form.Item
+          label="HR Email"
+          name="hrEmail"
+          rules={[{ type: 'email', message: 'Please enter a valid email' }]}
+        >
+          <Input placeholder="hr@company.com" />
+        </Form.Item>
+      </div>
+
+      <div className="flex justify-end gap-2 mt-4">
+        <Button onClick={() => setEditModalVisible(false)} icon={<CloseOutlined />}>
+          Cancel
+        </Button>
+        <Button type="primary" htmlType="submit" loading={saving} icon={<SaveOutlined />}>
+          Save Changes
+        </Button>
+      </div>
+    </Form>
+  </Modal>
+  </>
 );
+};
 
 export default ApplicationDetailsTab;

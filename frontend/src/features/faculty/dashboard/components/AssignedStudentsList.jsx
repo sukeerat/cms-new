@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 import {
   getExpectedReportsAsOfToday,
   getExpectedVisitsAsOfToday,
-} from '../../../../utils/fourWeekCycle';
+} from '../../../../utils/monthlyCycle';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -101,8 +101,8 @@ const AssignedStudentsList = ({
   };
 
   /**
-   * Calculate expected reports using 4-week cycles.
-   * Reports are due every 4 weeks from internship startDate + 5 days grace period.
+   * Calculate expected reports using monthly cycles.
+   * Reports are due on the 5th of the next month.
    */
   const calculateExpectedReports = (internshipApp) => {
     if (internshipApp?.totalExpectedReports) {
@@ -121,8 +121,8 @@ const AssignedStudentsList = ({
   };
 
   /**
-   * Calculate expected visits using 4-week cycles.
-   * Visits are aligned with report cycles - 1 visit per 4-week cycle.
+   * Calculate expected visits using monthly cycles.
+   * Visits are aligned with report cycles - 1 visit per month.
    */
   const calculateExpectedVisits = (internshipApp) => {
     if (internshipApp?.totalExpectedVisits) {

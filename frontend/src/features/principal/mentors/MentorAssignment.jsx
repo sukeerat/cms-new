@@ -35,6 +35,8 @@ import {
   CloseCircleOutlined,
   EditOutlined,
   SwapOutlined,
+  BankOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import {
   fetchStaff,
@@ -412,10 +414,21 @@ const MentorAssignment = () => {
       },
       render: (_, record) => {
         const assignment = studentMentorMap.get(record.id);
-        return assignment ? (
-          <Tag color="blue">{assignment.mentor?.name || assignment.mentor?.user?.name}</Tag>
-        ) : (
-          <Tag color="default">Not Assigned</Tag>
+        if (!assignment) {
+          return <Tag color="default">Not Assigned</Tag>;
+        }
+        const isExternal = assignment.isCrossInstitution;
+        return (
+          <div className="flex items-center gap-1.5">
+            <Tag color={isExternal ? 'purple' : 'blue'} className="m-0">
+              {assignment.mentor?.name || assignment.mentor?.user?.name}
+            </Tag>
+            {isExternal && (
+              <Tooltip title={`External mentor from: ${assignment.mentor?.Institution?.name || 'Other Institution'}`}>
+                <GlobalOutlined className="text-purple-500 text-xs" />
+              </Tooltip>
+            )}
+          </div>
         );
       },
     },
@@ -475,11 +488,45 @@ const MentorAssignment = () => {
       dataIndex: ['mentor', 'name'],
       key: 'mentorName',
       sorter: (a, b) => (a.mentor?.name || '').localeCompare(b.mentor?.name || ''),
+      render: (_, record) => {
+        const isExternal = record.isCrossInstitution;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-text-primary">{record.mentor?.name}</span>
+            {isExternal && (
+              <Tooltip title={`From: ${record.mentor?.Institution?.name || 'Other Institution'}`}>
+                <Tag color="purple" className="m-0 text-[10px] px-1.5 border-0">
+                  <GlobalOutlined className="mr-1" />
+                  External
+                </Tag>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Institution',
+      key: 'institution',
+      render: (_, record) => {
+        if (record.isCrossInstitution && record.mentor?.Institution) {
+          return (
+            <Tooltip title={record.mentor.Institution.name}>
+              <div className="text-xs text-purple-600">
+                <BankOutlined className="mr-1" />
+                {record.mentor.Institution.code || record.mentor.Institution.name}
+              </div>
+            </Tooltip>
+          );
+        }
+        return <Text className="text-xs text-text-tertiary">This Institution</Text>;
+      },
     },
     {
       title: 'Email',
       dataIndex: ['mentor', 'email'],
       key: 'email',
+      render: (text) => <Text className="text-xs text-text-secondary">{text}</Text>,
     },
     {
       title: 'Total Students',
@@ -557,7 +604,7 @@ const MentorAssignment = () => {
     <div className="p-4 md:p-6 bg-background-secondary min-h-screen space-y-6">
       {/* Statistics Cards */}
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={12} sm={12} lg={4}>
           <Card variant="borderless" className="rounded-xl border border-border shadow-sm">
             <Statistic
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Total Mentors</Text>}
@@ -567,7 +614,7 @@ const MentorAssignment = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={12} sm={12} lg={4}>
           <Card variant="borderless" className="rounded-xl border border-border shadow-sm">
             <Statistic
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Active Mentors</Text>}
@@ -578,7 +625,19 @@ const MentorAssignment = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={12} sm={12} lg={4}>
+          <Card variant="borderless" className="rounded-xl border border-border shadow-sm">
+            <Tooltip title="Mentors from other institutions assigned to your students">
+              <Statistic
+                title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">External Mentors</Text>}
+                value={stats?.mentors?.external || 0}
+                prefix={<GlobalOutlined className="text-purple-500" />}
+                styles={{ content: { color: stats?.mentors?.external > 0 ? 'rgb(168, 85, 247)' : 'var(--ant-text-color-secondary)', fontWeight: 'bold' } }}
+              />
+            </Tooltip>
+          </Card>
+        </Col>
+        <Col xs={12} sm={12} lg={4}>
           <Card variant="borderless" className="rounded-xl border border-border shadow-sm">
             <Statistic
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Students with Mentor</Text>}
@@ -589,7 +648,7 @@ const MentorAssignment = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={4}>
           <Card variant="borderless" className="rounded-xl border border-border shadow-sm">
             <Statistic
               title={<Text className="text-[10px] uppercase font-bold text-text-tertiary">Unassigned Students</Text>}

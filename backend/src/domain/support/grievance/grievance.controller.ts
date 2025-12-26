@@ -111,8 +111,11 @@ export class GrievanceController {
    */
   @Get('user/:userId')
   async getGrievancesByUser(@Param('userId') userId: string, @Request() req: any) {
+    console.log(`[GrievanceController] getGrievancesByUser called - userId param: ${userId}, req.user.userId: ${req.user?.userId}, role: ${req.user?.role}`);
+
     // Ensure users can only access their own grievances unless they're admin
     if (req.user.userId !== userId && !['STATE_DIRECTORATE', 'PRINCIPAL'].includes(req.user.role)) {
+      console.log(`[GrievanceController] Unauthorized - userId mismatch`);
       throw new HttpException('Unauthorized', HttpStatus.FORBIDDEN);
     }
     return this.grievanceService.getGrievancesByUser(userId);

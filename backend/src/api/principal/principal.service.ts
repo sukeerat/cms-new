@@ -9,12 +9,12 @@ import { AssignMentorDto } from './dto/assign-mentor.dto';
 import { UserService } from '../../domain/user/user.service';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import {
-  calculateFourWeekCycles,
-  getTotalExpectedCycles,
+  calculateExpectedMonths,
+  getTotalExpectedCount,
   getExpectedReportsAsOfToday,
   getExpectedVisitsAsOfToday,
-  FOUR_WEEK_CYCLE,
-} from '../../common/utils/four-week-cycle.util';
+  MONTHLY_CYCLE,
+} from '../../common/utils/monthly-cycle.util';
 import * as bcrypt from 'bcryptjs';
 import * as XLSX from 'xlsx';
 
@@ -62,6 +62,7 @@ export class PrincipalService {
           activeBatches,
           pendingMonthlyReports,
           pendingGrievances,
+          selfIdentifiedApplications,
         ] = await Promise.all([
           this.prisma.student.count({ where: { institutionId } }),
           this.prisma.student.count({ where: { institutionId, isActive: true } }),
@@ -104,7 +105,18 @@ export class PrincipalService {
               status: { in: ['PENDING', 'UNDER_REVIEW'] },
             }
           }),
+          // Fetch self-identified applications to calculate pending joining letters using JavaScript
+          // This avoids MongoDB count query issues with null/undefined/empty string handling
+          this.prisma.internshipApplication.findMany({
+            where: { student: { institutionId }, isSelfIdentified: true },
+            select: { joiningLetterUrl: true },
+          }),
         ]);
+
+        // Calculate pending joining letters using JavaScript for reliable null/undefined handling
+        const pendingJoiningLetters = selfIdentifiedApplications.filter(
+          app => !app.joiningLetterUrl || app.joiningLetterUrl === ''
+        ).length;
 
         // Completion rate for self-identified internships (auto-approved on submission)
         const completionRate = totalSelfIdentifiedInternships > 0
@@ -136,6 +148,7 @@ export class PrincipalService {
             // Self-identified internships are auto-approved, so no pending approvals
             monthlyReports: pendingMonthlyReports,
             grievances: pendingGrievances,
+            joiningLetters: pendingJoiningLetters,
           },
           batches: {
             total: totalBatches,
@@ -528,8 +541,8 @@ export class PrincipalService {
             : new Date(start.getTime() + 180 * 24 * 60 * 60 * 1000);
 
           // Use stored values if available, otherwise calculate total
-          totalExpectedReports = storedExpectedReports ?? getTotalExpectedCycles(start, effectiveEnd);
-          totalExpectedVisits = storedExpectedVisits ?? getTotalExpectedCycles(start, effectiveEnd);
+          totalExpectedReports = storedExpectedReports ?? getTotalExpectedCount(start, effectiveEnd);
+          totalExpectedVisits = storedExpectedVisits ?? getTotalExpectedCount(start, effectiveEnd);
 
           // Calculate how many should be done by now using utility functions
           expectedReportsAsOfNow = getExpectedReportsAsOfToday(start, effectiveEnd);
@@ -3854,6 +3867,7 @@ export class PrincipalService {
       overdueReports,
       missingVisits,
       unassignedStudents,
+      studentsWithSelfIdentified,
     ] = await Promise.all([
       // Actual counts (not limited)
       this.prisma.grievance.count({ where: urgentGrievancesWhere }),
@@ -3922,7 +3936,53 @@ export class PrincipalService {
         },
         take: 50,
       }),
+
+      // Fetch students with self-identified internships to filter pending joining letters using JavaScript
+      // This avoids MongoDB count query issues with null/undefined/empty string handling
+      this.prisma.student.findMany({
+        where: {
+          institutionId,
+          isActive: true,
+          internshipApplications: {
+            some: { isSelfIdentified: true },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          rollNumber: true,
+          branch: { select: { id: true, name: true } },
+          mentorAssignments: {
+            where: { isActive: true },
+            take: 1,
+            select: {
+              mentor: { select: { id: true, name: true } },
+            },
+          },
+          internshipApplications: {
+            where: { isSelfIdentified: true },
+            take: 1,
+            select: {
+              joiningLetterUrl: true,
+              companyName: true,
+              startDate: true,
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      }),
     ]);
+
+    // Filter pending joining letters using JavaScript for reliable null/undefined handling
+    const pendingJoiningLetters = studentsWithSelfIdentified.filter(s => {
+      const app = s.internshipApplications[0];
+      return app && (!app.joiningLetterUrl || app.joiningLetterUrl === '');
+    }).slice(0, 50); // Limit to 50 for modal display
+
+    const pendingJoiningLettersCount = studentsWithSelfIdentified.filter(s => {
+      const app = s.internshipApplications[0];
+      return app && (!app.joiningLetterUrl || app.joiningLetterUrl === '');
+    }).length;
 
     return {
       summary: {
@@ -3930,7 +3990,8 @@ export class PrincipalService {
         overdueReportsCount,
         missingVisitsCount,
         unassignedStudentsCount,
-        totalAlerts: urgentGrievancesCount + overdueReportsCount + missingVisitsCount + unassignedStudentsCount,
+        pendingJoiningLettersCount,
+        totalAlerts: urgentGrievancesCount + overdueReportsCount + missingVisitsCount + unassignedStudentsCount + pendingJoiningLettersCount,
       },
       alerts: {
         urgentGrievances: urgentGrievances.map(g => ({
@@ -3967,6 +4028,16 @@ export class PrincipalService {
           rollNumber: s.rollNumber,
           batchName: s.batch?.name || null,
           branchName: s.branch?.name || null,
+        })),
+        pendingJoiningLetters: pendingJoiningLetters.map(s => ({
+          studentId: s.id,
+          studentName: s.name,
+          rollNumber: s.rollNumber,
+          branchName: s.branch?.name || null,
+          mentorId: s.mentorAssignments[0]?.mentor?.id || null,
+          mentorName: s.mentorAssignments[0]?.mentor?.name || null,
+          companyName: s.internshipApplications[0]?.companyName || null,
+          startDate: s.internshipApplications[0]?.startDate || null,
         })),
       },
     };

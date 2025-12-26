@@ -5,12 +5,12 @@ import { FacultyVisitService } from '../../domain/report/faculty-visit/faculty-v
 import { Prisma, ApplicationStatus, InternshipStatus, MonthlyReportStatus, DocumentType, AuditAction, AuditCategory, AuditSeverity, Role } from '@prisma/client';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import {
-  calculateFourWeekCycles,
-  FourWeekCycle,
-  getCycleSubmissionStatus,
-  isSubmissionLate,
-  FOUR_WEEK_CYCLE,
-} from '../../common/utils/four-week-cycle.util';
+  calculateExpectedMonths,
+  MonthlyCycle,
+  getReportSubmissionStatus as getMonthlyReportStatus,
+  MONTHLY_CYCLE,
+  getMonthName,
+} from '../../common/utils/monthly-cycle.util';
 
 // Month names for display
 const MONTH_NAMES = [
@@ -22,21 +22,22 @@ const MONTH_NAMES = [
 type ReportSubmissionStatus = 'NOT_YET_DUE' | 'CAN_SUBMIT' | 'OVERDUE' | 'SUBMITTED' | 'APPROVED';
 
 /**
- * Report period now based on 4-week cycles instead of calendar months
- * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V (Q47-49)
+ * Report period based on calendar months
+ * Uses the monthly cycle system where reports are due on the 5th of the following month
+ * @see monthly-cycle.util.ts
  */
 interface ReportPeriod {
-  cycleNumber: number;
-  month: number; // For backward compatibility
-  year: number;  // For backward compatibility
-  periodStartDate: Date;
-  periodEndDate: Date;
-  submissionWindowStart: Date;
-  submissionWindowEnd: Date;
+  monthNumber: number; // 1-12
+  month: number; // For backward compatibility (same as monthNumber)
+  year: number;
+  periodStartDate: Date; // First day of month
+  periodEndDate: Date; // Last day of month
+  submissionWindowStart: Date; // First day of next month
+  submissionWindowEnd: Date; // 5th of next month (reportDueDate)
   dueDate: Date;
-  isPartialMonth: boolean; // Now refers to partial cycle
+  isPartialMonth: boolean; // True if daysInMonth < full month
   isFinalReport: boolean;
-  daysInCycle: number;
+  daysInMonth: number;
 }
 
 @Injectable()
@@ -51,32 +52,53 @@ export class StudentService {
   /**
    * Helper: Calculate all expected report periods for an internship
    *
-   * UPDATED: Now uses 4-week cycles instead of calendar months
-   * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V (Q47-49)
+   * Uses calendar months for report periods
+   * - Month Inclusion Rule: Both first and last months require >10 days to be included
+   * - Report Due Date: 5th of the next month
    *
    * Example:
-   * - Internship Start: Dec 15, 2025
-   * - Report 1 cycle: Dec 15 - Jan 11 (4 weeks) → Due by Jan 16 (5 days grace)
-   * - Report 2 cycle: Jan 12 - Feb 8 → Due by Feb 13
-   * - Report 3 cycle: Feb 9 - Mar 8 → Due by Mar 13
+   * - Internship: Jan 15 - May 15
+   * - January: 16 days (>10) -> Report due Feb 5
+   * - February: 28 days -> Report due Mar 5
+   * - March: 31 days -> Report due Apr 5
+   * - April: 30 days -> Report due May 5
+   * - May: 15 days (>10) -> Report due Jun 5
    */
   private calculateExpectedReportPeriods(startDate: Date, endDate: Date): ReportPeriod[] {
-    const cycles = calculateFourWeekCycles(startDate, endDate);
+    const months = calculateExpectedMonths(startDate, endDate);
 
-    return cycles.map((cycle: FourWeekCycle) => ({
-      cycleNumber: cycle.cycleNumber,
-      // For backward compatibility, use cycle end date for month/year reference
-      month: cycle.cycleEndDate.getMonth() + 1,
-      year: cycle.cycleEndDate.getFullYear(),
-      periodStartDate: cycle.cycleStartDate,
-      periodEndDate: cycle.cycleEndDate,
-      submissionWindowStart: cycle.submissionWindowStart,
-      submissionWindowEnd: cycle.submissionWindowEnd,
-      dueDate: cycle.dueDate,
-      isPartialMonth: cycle.daysInCycle < FOUR_WEEK_CYCLE.DURATION_DAYS,
-      isFinalReport: cycle.isFinalCycle,
-      daysInCycle: cycle.daysInCycle,
-    }));
+    return months.map((month: MonthlyCycle) => {
+      // Calculate first day of the month
+      const periodStartDate = new Date(month.year, month.monthNumber - 1, 1);
+      periodStartDate.setHours(0, 0, 0, 0);
+
+      // Calculate last day of the month
+      const periodEndDate = new Date(month.year, month.monthNumber, 0);
+      periodEndDate.setHours(23, 59, 59, 999);
+
+      // Submission window starts on first day of next month
+      const nextMonth = month.monthNumber === 12 ? 1 : month.monthNumber + 1;
+      const nextYear = month.monthNumber === 12 ? month.year + 1 : month.year;
+      const submissionWindowStart = new Date(nextYear, nextMonth - 1, 1);
+      submissionWindowStart.setHours(0, 0, 0, 0);
+
+      // Get total days in the full month for partial month check
+      const totalDaysInFullMonth = new Date(month.year, month.monthNumber, 0).getDate();
+
+      return {
+        monthNumber: month.monthNumber,
+        month: month.monthNumber, // For backward compatibility
+        year: month.year,
+        periodStartDate,
+        periodEndDate,
+        submissionWindowStart,
+        submissionWindowEnd: month.reportDueDate,
+        dueDate: month.reportDueDate,
+        isPartialMonth: month.daysInMonth < totalDaysInFullMonth,
+        isFinalReport: month.isLastMonth,
+        daysInMonth: month.daysInMonth,
+      };
+    });
   }
 
   /**
@@ -111,18 +133,21 @@ export class StudentService {
     const windowEnd = report.submissionWindowEnd ? new Date(report.submissionWindowEnd) : null;
 
     if (!windowStart || !windowEnd) {
-      // Fallback: use 4-week cycle calculation based on cycle number and start date
-      // If we have cycle info, use that; otherwise fall back to period dates
-      const cycleEndDate = report.periodEndDate ? new Date(report.periodEndDate) : null;
+      // Fallback: use monthly cycle calculation based on period dates
+      // Reports are due on the 5th of the following month
+      const periodEndDate = report.periodEndDate ? new Date(report.periodEndDate) : null;
 
-      if (cycleEndDate) {
-        // Calculate submission window: day after cycle ends + 5 days grace
-        const calcWindowStart = new Date(cycleEndDate);
-        calcWindowStart.setDate(calcWindowStart.getDate() + 1);
+      if (periodEndDate) {
+        // Calculate submission window: first day of next month to 5th of next month
+        const reportMonth = periodEndDate.getMonth() + 1; // 1-12
+        const reportYear = periodEndDate.getFullYear();
+        const nextMonth = reportMonth === 12 ? 1 : reportMonth + 1;
+        const nextYear = reportMonth === 12 ? reportYear + 1 : reportYear;
+
+        const calcWindowStart = new Date(nextYear, nextMonth - 1, 1);
         calcWindowStart.setHours(0, 0, 0, 0);
 
-        const calcWindowEnd = new Date(calcWindowStart);
-        calcWindowEnd.setDate(calcWindowEnd.getDate() + FOUR_WEEK_CYCLE.GRACE_DAYS - 1);
+        const calcWindowEnd = new Date(nextYear, nextMonth - 1, MONTHLY_CYCLE.REPORT_DUE_DAY);
         calcWindowEnd.setHours(23, 59, 59, 999);
 
         if (now < calcWindowStart) {
@@ -132,7 +157,7 @@ export class StudentService {
             label: 'In Progress',
             color: 'default',
             canSubmit: false,
-            sublabel: `Cycle ends in ${daysUntil} days`
+            sublabel: `Month ends in ${daysUntil} days`
           };
         }
 
@@ -218,22 +243,46 @@ export class StudentService {
     return this.cache.getOrSet(
       cacheKey,
       async () => {
-        // Get current self-identified internship - FIXED: Include ONGOING status
+        // OPTIMIZED: Get current self-identified internship with only necessary fields
         const currentInternship = await this.prisma.internshipApplication.findFirst({
           where: {
             studentId,
             isSelfIdentified: true,
             status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] },
-            // Use OR condition to also check internshipStatus for ONGOING
             OR: [
               { status: { in: [ApplicationStatus.APPROVED, ApplicationStatus.JOINED] } },
               { internshipStatus: 'ONGOING' },
             ],
           },
-          include: {
+          select: {
+            id: true,
+            status: true,
+            isSelfIdentified: true,
+            companyName: true,
+            jobProfile: true,
+            startDate: true,
+            endDate: true,
+            joiningDate: true,
+            internshipDuration: true,
+            joiningLetterUrl: true,
+            joiningLetterUploadedAt: true,
+            facultyMentorName: true,
+            totalExpectedReports: true,
+            totalExpectedVisits: true,
             internship: {
-              include: {
-                industry: true,
+              select: {
+                id: true,
+                title: true,
+                startDate: true,
+                endDate: true,
+                industry: {
+                  select: {
+                    id: true,
+                    companyName: true,
+                    city: true,
+                    logo: true,
+                  },
+                },
               },
             },
             mentor: {
@@ -288,12 +337,19 @@ export class StudentService {
         // Get recent notifications (placeholder - would integrate with notification system)
         const notifications = [];
 
-        // Get recent activities (self-identified internships only)
+        // OPTIMIZED: Get recent activities with only necessary fields
         const recentActivities = await this.prisma.internshipApplication.findMany({
           where: { studentId, isSelfIdentified: true },
           take: 5,
           orderBy: { updatedAt: 'desc' },
-          include: {
+          select: {
+            id: true,
+            status: true,
+            companyName: true,
+            jobProfile: true,
+            isSelfIdentified: true,
+            updatedAt: true,
+            createdAt: true,
             internship: {
               select: {
                 title: true,
@@ -354,16 +410,38 @@ export class StudentService {
           },
         },
         internshipPreferences: true,
-        // Include internship applications for Career Track section
+        // OPTIMIZED: Include only necessary fields for Career Track section
         internshipApplications: {
-          include: {
+          select: {
+            id: true,
+            status: true,
+            isSelfIdentified: true,
+            companyName: true,
+            jobProfile: true,
+            startDate: true,
+            endDate: true,
+            joiningDate: true,
+            internshipDuration: true,
+            joiningLetterUrl: true,
+            joiningLetterUploadedAt: true,
+            facultyMentorName: true,
+            facultyMentorEmail: true,
+            totalExpectedReports: true,
+            totalExpectedVisits: true,
+            createdAt: true,
+            updatedAt: true,
             internship: {
-              include: {
+              select: {
+                id: true,
+                title: true,
+                startDate: true,
+                endDate: true,
                 industry: {
                   select: {
                     id: true,
                     companyName: true,
                     city: true,
+                    logo: true,
                   },
                 },
               },
@@ -938,6 +1016,125 @@ export class StudentService {
     return {
       success: true,
       message: 'Application withdrawn successfully',
+      application: updated,
+    };
+  }
+
+  /**
+   * Update self-identified application (company info, joining letter)
+   * Note: Time period (startDate, endDate) cannot be modified by student
+   */
+  async updateSelfIdentifiedApplication(
+    userId: string,
+    applicationId: string,
+    updateDto: {
+      companyName?: string;
+      companyAddress?: string;
+      companyContact?: string;
+      companyEmail?: string;
+      hrName?: string;
+      hrContact?: string;
+      hrEmail?: string;
+      jobProfile?: string;
+      joiningLetterUrl?: string;
+      deleteJoiningLetter?: boolean;
+    },
+  ) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const application = await this.prisma.internshipApplication.findUnique({
+      where: { id: applicationId },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Verify ownership
+    if (application.studentId !== student.id) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Only allow updates for self-identified applications
+    if (!application.isSelfIdentified) {
+      throw new BadRequestException('Only self-identified applications can be updated');
+    }
+
+    const oldValues = {
+      companyName: application.companyName,
+      companyAddress: application.companyAddress,
+      companyContact: application.companyContact,
+      companyEmail: application.companyEmail,
+      hrName: application.hrName,
+      hrContact: application.hrContact,
+      hrEmail: application.hrEmail,
+      jobProfile: application.jobProfile,
+      joiningLetterUrl: application.joiningLetterUrl,
+    };
+
+    // Build update data - explicitly exclude time period fields
+    const updateData: any = {};
+
+    if (updateDto.companyName !== undefined) updateData.companyName = updateDto.companyName;
+    if (updateDto.companyAddress !== undefined) updateData.companyAddress = updateDto.companyAddress;
+    if (updateDto.companyContact !== undefined) updateData.companyContact = updateDto.companyContact;
+    if (updateDto.companyEmail !== undefined) updateData.companyEmail = updateDto.companyEmail;
+    if (updateDto.hrName !== undefined) updateData.hrName = updateDto.hrName;
+    if (updateDto.hrContact !== undefined) updateData.hrContact = updateDto.hrContact;
+    if (updateDto.hrEmail !== undefined) updateData.hrEmail = updateDto.hrEmail;
+    if (updateDto.jobProfile !== undefined) updateData.jobProfile = updateDto.jobProfile;
+
+    // Handle joining letter
+    if (updateDto.deleteJoiningLetter) {
+      updateData.joiningLetterUrl = null;
+      updateData.joiningLetterUploadedAt = null;
+    } else if (updateDto.joiningLetterUrl !== undefined) {
+      updateData.joiningLetterUrl = updateDto.joiningLetterUrl;
+      updateData.joiningLetterUploadedAt = new Date();
+    }
+
+    const updated = await this.prisma.internshipApplication.update({
+      where: { id: applicationId },
+      data: updateData,
+      include: {
+        mentor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Audit application update
+    this.auditService.log({
+      action: AuditAction.APPLICATION_UPDATE,
+      entityType: 'InternshipApplication',
+      entityId: applicationId,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Self-identified application updated: ${updated.companyName}`,
+      category: AuditCategory.APPLICATION_PROCESS,
+      severity: AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      oldValues,
+      newValues: updateData,
+    }).catch(() => {});
+
+    await this.cache.invalidateByTags(['applications', `student:${student.id}`]);
+
+    return {
+      success: true,
+      message: 'Application updated successfully',
       application: updated,
     };
   }
@@ -1602,10 +1799,20 @@ export class StudentService {
         skip,
         take: limit,
         include: {
+          // OPTIMIZED: Only select necessary fields from application
           application: {
-            include: {
+            select: {
+              id: true,
+              companyName: true,
+              isSelfIdentified: true,
+              startDate: true,
+              endDate: true,
+              joiningDate: true,
+              completionDate: true,
               internship: {
-                include: {
+                select: {
+                  id: true,
+                  title: true,
                   industry: {
                     select: {
                       companyName: true,
@@ -1756,11 +1963,23 @@ export class StudentService {
     }
 
     const [grievances, total] = await Promise.all([
+      // OPTIMIZED: Only select necessary fields for list view
       this.prisma.grievance.findMany({
         where,
         skip,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          category: true,
+          description: true,
+          severity: true,
+          status: true,
+          submittedDate: true,
+          resolvedDate: true,
+          resolution: true,
+          createdAt: true,
+          updatedAt: true,
           internship: {
             select: {
               id: true,

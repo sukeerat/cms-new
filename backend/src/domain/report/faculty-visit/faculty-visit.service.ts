@@ -3,27 +3,29 @@ import { Role, VisitType, VisitLogStatus } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import {
-  calculateFourWeekCycles,
-  FourWeekCycle,
-  FOUR_WEEK_CYCLE,
-} from '../../../common/utils/four-week-cycle.util';
+  calculateExpectedMonths,
+  MonthlyCycle,
+  getVisitSubmissionStatus as getMonthlyVisitStatus,
+  MONTHLY_CYCLE,
+  getMonthName,
+} from '../../../common/utils/monthly-cycle.util';
 
 // Types for visit status
 export type VisitStatusType = 'UPCOMING' | 'PENDING' | 'OVERDUE' | 'COMPLETED';
 
 /**
- * Visit period now based on 4-week cycles (aligned with report cycles)
+ * Visit period now based on calendar months (aligned with monthly cycle system)
  * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V
  */
 interface VisitPeriod {
-  cycleNumber: number;
-  month: number; // For backward compatibility
-  year: number;  // For backward compatibility
-  requiredByDate: Date;
-  cycleStartDate: Date;
-  cycleEndDate: Date;
-  isPartialMonth: boolean; // Now refers to partial cycle
-  daysInCycle: number;
+  monthNumber: number; // 1-12
+  month: number; // Same as monthNumber for backward compatibility
+  year: number;
+  requiredByDate: Date; // Last day of month at 11:59:59 PM (NO grace period)
+  monthStartDate: Date; // First day of month
+  monthEndDate: Date; // Last day of month
+  isPartialMonth: boolean; // true if <=10 days in month
+  daysInMonth: number;
 }
 
 export interface VisitWithStatus {
@@ -43,49 +45,52 @@ export interface VisitWithStatus {
 /**
  * Calculate expected visit periods for internship
  *
- * UPDATED: Now uses 4-week cycles (aligned with report cycles)
+ * UPDATED: Now uses calendar months (aligned with monthly cycle system)
  * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V
  *
- * Example (with 5-day grace period):
- * - Internship Start: Dec 15, 2025
- * - Visit 1 cycle ends: Jan 11 → Due by Jan 16 (5 days grace)
- * - Visit 2 cycle ends: Feb 8 → Due by Feb 13 (5 days grace)
- * - Visit 3 cycle ends: Mar 8 → Due by Mar 13 (5 days grace)
+ * Example (NO grace period for visits):
+ * - Internship Start: Jan 15, 2025
+ * - January: 16 days (>10) -> Visit due Jan 31 11:59:59 PM
+ * - February: 28 days -> Visit due Feb 28 11:59:59 PM
+ * - March: 31 days -> Visit due Mar 31 11:59:59 PM
  */
 function calculateExpectedVisitPeriods(startDate: Date, endDate: Date): VisitPeriod[] {
-  const cycles = calculateFourWeekCycles(startDate, endDate);
+  const months = calculateExpectedMonths(startDate, endDate);
 
-  return cycles.map((cycle: FourWeekCycle) => {
-    // Calculate visit due date: cycle end + 5 days grace period
-    const visitDueDate = new Date(cycle.cycleEndDate);
-    visitDueDate.setDate(visitDueDate.getDate() + FOUR_WEEK_CYCLE.VISIT_GRACE_DAYS);
-    visitDueDate.setHours(23, 59, 59, 999);
+  return months.map((month: MonthlyCycle) => {
+    // Calculate first day of month
+    const monthStartDate = new Date(month.year, month.monthNumber - 1, 1);
+    monthStartDate.setHours(0, 0, 0, 0);
+
+    // Calculate last day of month
+    const monthEndDate = new Date(month.year, month.monthNumber, 0);
+    monthEndDate.setHours(23, 59, 59, 999);
 
     return {
-      cycleNumber: cycle.cycleNumber,
-      // For backward compatibility, use cycle end date for month/year reference
-      month: cycle.cycleEndDate.getMonth() + 1,
-      year: cycle.cycleEndDate.getFullYear(),
-      // Visit should be completed by cycle end + 5 days grace period
-      requiredByDate: visitDueDate,
-      cycleStartDate: cycle.cycleStartDate,
-      cycleEndDate: cycle.cycleEndDate,
-      isPartialMonth: cycle.daysInCycle < FOUR_WEEK_CYCLE.DURATION_DAYS,
-      daysInCycle: cycle.daysInCycle,
+      monthNumber: month.monthNumber,
+      // For backward compatibility
+      month: month.monthNumber,
+      year: month.year,
+      // Visit is due on the last day of the month (NO grace period)
+      requiredByDate: month.visitDueDate,
+      monthStartDate,
+      monthEndDate,
+      isPartialMonth: month.daysInMonth <= MONTHLY_CYCLE.MIN_DAYS_FOR_INCLUSION,
+      daysInMonth: month.daysInMonth,
     };
   });
 }
 
 /**
- * Get visit submission status based on 4-week cycles
- * NOTE: requiredByDate now includes 5-day grace period after cycle ends
+ * Get visit submission status based on calendar months
+ * NOTE: Visit deadline has NO grace period - due on last day of month at 11:59:59 PM
  * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V
  */
 function getVisitSubmissionStatus(visit: any): { status: VisitStatusType; label: string; color: string; sublabel?: string } {
   const now = new Date();
   const requiredByDate = visit.requiredByDate ? new Date(visit.requiredByDate) : null;
-  const cycleStartDate = visit.cycleStartDate ? new Date(visit.cycleStartDate) : null;
-  const cycleEndDate = visit.cycleEndDate ? new Date(visit.cycleEndDate) : null;
+  const monthStartDate = visit.monthStartDate ? new Date(visit.monthStartDate) : null;
+  const monthEndDate = visit.monthEndDate ? new Date(visit.monthEndDate) : null;
 
   // If visit is completed
   if (visit.status === VisitLogStatus.COMPLETED) {
@@ -101,7 +106,7 @@ function getVisitSubmissionStatus(visit: any): { status: VisitStatusType; label:
     return { status: 'PENDING', label: 'Pending', color: 'blue' };
   }
 
-  // Check if overdue (past requiredByDate which includes 5-day grace period)
+  // Check if overdue (past requiredByDate - last day of month, NO grace period)
   if (now > requiredByDate) {
     const daysOverdue = Math.floor((now.getTime() - requiredByDate.getTime()) / (1000 * 60 * 60 * 24));
     return {
@@ -112,36 +117,25 @@ function getVisitSubmissionStatus(visit: any): { status: VisitStatusType; label:
     };
   }
 
-  // Check if we're in grace period (between cycleEnd and requiredByDate)
-  if (cycleEndDate && now > cycleEndDate && now <= requiredByDate) {
-    const daysLeft = Math.ceil((requiredByDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  // Check if we're in the current month (between monthStart and monthEnd)
+  if (monthStartDate && monthEndDate && now >= monthStartDate && now <= monthEndDate) {
+    const daysLeft = Math.ceil((monthEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return {
       status: 'PENDING',
-      label: 'Grace Period',
-      color: 'orange',
-      sublabel: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to complete`,
-    };
-  }
-
-  // Check if we're in the current cycle (between cycleStart and cycleEnd)
-  if (cycleStartDate && cycleEndDate && now >= cycleStartDate && now <= cycleEndDate) {
-    const daysLeft = Math.ceil((cycleEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return {
-      status: 'PENDING',
-      label: 'Due This Cycle',
+      label: 'Due This Month',
       color: 'blue',
-      sublabel: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left in cycle`,
+      sublabel: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left in month`,
     };
   }
 
-  // Future cycle (not yet started)
-  if (cycleStartDate && now < cycleStartDate) {
-    const daysUntil = Math.ceil((cycleStartDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  // Future month (not yet started)
+  if (monthStartDate && now < monthStartDate) {
+    const daysUntil = Math.ceil((monthStartDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return {
       status: 'UPCOMING',
       label: 'Upcoming',
       color: 'gray',
-      sublabel: `Cycle starts in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`,
+      sublabel: `Month starts in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`,
     };
   }
 

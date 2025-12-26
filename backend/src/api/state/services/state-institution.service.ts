@@ -4,11 +4,11 @@ import { LruCacheService } from '../../../core/cache/lru-cache.service';
 import { AuditService } from '../../../infrastructure/audit/audit.service';
 import { Prisma, ApplicationStatus, Role, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import {
-  calculateFourWeekCycles,
+  calculateExpectedMonths,
   getExpectedReportsAsOfToday,
   getExpectedVisitsAsOfToday,
-  FOUR_WEEK_CYCLE,
-} from '../../../common/utils/four-week-cycle.util';
+  MONTHLY_CYCLE,
+} from '../../../common/utils/monthly-cycle.util';
 
 @Injectable()
 export class StateInstitutionService {
@@ -165,7 +165,7 @@ export class StateInstitutionService {
       visitCounts,
       reportCounts,
       facultyCounts,
-      internshipsInTrainingData, // Internships currently in their training period (with dates for 4-week calculation)
+      internshipsInTrainingData, // Internships currently in their training period (with dates for monthly cycle calculation)
     ] = await Promise.all([
       // 1. Total students per institution
       this.prisma.student.groupBy({
@@ -322,7 +322,7 @@ export class StateInstitutionService {
         _count: true,
       }),
 
-      // 9. Internships currently in their training period per institution (with dates for 4-week cycle calculation)
+      // 9. Internships currently in their training period per institution (with dates for monthly cycle calculation)
       // Requires startDate to be set and in the past, with endDate in the future or not set
       this.prisma.internshipApplication.findMany({
         where: {
@@ -349,13 +349,13 @@ export class StateInstitutionService {
     const facultyCountMap = new Map(facultyCounts.map(c => [c.institutionId, c._count]));
 
     /**
-     * Process internship data for 4-week cycle calculations
+     * Process internship data for monthly cycle calculations
      * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V (Q47-49)
      *
      * For each institution, calculate:
      * - internshipsInTraining: count of internships currently in training period
-     * - expectedReports: total expected reports based on 4-week cycles
-     * - expectedVisits: total expected visits based on 4-week cycles
+     * - expectedReports: total expected reports based on monthly cycles
+     * - expectedVisits: total expected visits based on monthly cycles
      *
      * OPTIMIZED: Use helper functions instead of calculating full cycle objects
      */
@@ -405,7 +405,7 @@ export class StateInstitutionService {
       const unassignedStudents = Math.max(0, activeStudents - activeAssignments);
 
       /**
-       * Calculate expected reports/visits using 4-week cycles
+       * Calculate expected reports/visits using monthly cycles
        * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V (Q47-49)
        */
       const expectedReportsThisMonth = expectedReportsMap.get(inst.id) || 0;
@@ -425,11 +425,11 @@ export class StateInstitutionService {
         ? Math.min((joiningLettersSubmitted / activeStudents) * 100, 100)
         : null;
       // Monthly report rate calculated separately (NOT included in compliance score)
-      // Monthly report rate based on 4-week cycle expected reports
+      // Monthly report rate based on monthly cycle expected reports
       const monthlyReportRate = expectedReportsThisMonth > 0
         ? Math.min((reportsSubmittedThisMonth / expectedReportsThisMonth) * 100, 100)
         : null;
-      // Visit completion rate based on 4-week cycle expected visits
+      // Visit completion rate based on monthly cycle expected visits
       const visitCompletionRate = expectedVisitsThisMonth > 0
         ? Math.min((facultyVisitsThisMonth / expectedVisitsThisMonth) * 100, 100)
         : null;
@@ -448,11 +448,11 @@ export class StateInstitutionService {
           assigned: activeAssignments,
           unassigned: unassignedStudents,
           facultyVisits: facultyVisitsThisMonth,
-          visitsExpected: expectedVisitsThisMonth, // Expected visits based on 4-week cycles
+          visitsExpected: expectedVisitsThisMonth, // Expected visits based on monthly cycles
           visitsMissing: missingVisits,
           visitCompletionRate,
           reportsSubmitted: reportsSubmittedThisMonth,
-          reportsExpected: expectedReportsThisMonth, // Expected reports based on 4-week cycles
+          reportsExpected: expectedReportsThisMonth, // Expected reports based on monthly cycles
           reportsMissing: missingReports,
           monthlyReportRate,
           totalFaculty,
@@ -582,6 +582,9 @@ export class StateInstitutionService {
       companiesCount,
       // Faculty count
       facultyCount,
+      // External mentors
+      externalMentorsCount,
+      studentsWithExternalMentors,
     ] = await Promise.all([
       // Total students
       this.prisma.student.count({ where: { institutionId: id } }),
@@ -928,6 +931,32 @@ export class StateInstitutionService {
           active: true,
         },
       }),
+
+      // External mentors count (mentors from other institutions assigned to this institution's students)
+      this.prisma.mentorAssignment.findMany({
+        where: {
+          student: { institutionId: id },
+          isActive: true,
+          mentor: {
+            institutionId: { not: id },
+          },
+        },
+        select: { mentorId: true },
+        distinct: ['mentorId'],
+      }).then(results => results.length),
+
+      // Students with external mentors (students assigned to mentors from other institutions)
+      this.prisma.mentorAssignment.findMany({
+        where: {
+          student: { institutionId: id },
+          isActive: true,
+          mentor: {
+            institutionId: { not: id },
+          },
+        },
+        select: { studentId: true },
+        distinct: ['studentId'],
+      }).then(results => results.length),
     ]);
 
     // Calculate unassigned students (active students - students with mentors)
@@ -999,6 +1028,9 @@ export class StateInstitutionService {
         unassigned: unassignedStudents,
         // Rate uses activeStudents as denominator (per compliance formula)
         rate: mentorAssignmentRate,
+        // External mentors (from other institutions)
+        externalMentors: externalMentorsCount,
+        studentsWithExternalMentors: studentsWithExternalMentors,
       },
       branchWiseData: branchWiseStudents.map(b => ({
         branch: b.branchName || 'Unknown',
@@ -1145,6 +1177,14 @@ export class StateInstitutionService {
                 name: true,
                 email: true,
                 phoneNo: true,
+                institutionId: true,
+                Institution: {
+                  select: {
+                    id: true,
+                    name: true,
+                    code: true,
+                  },
+                },
               },
             },
           },
@@ -1255,7 +1295,10 @@ export class StateInstitutionService {
       const selfIdentifiedApp = latestApp?.isSelfIdentified ? latestApp : null;
       const latestReport = student.monthlyReports?.[0];
       const latestVisit = latestApp?.facultyVisitLogs?.[0];
-      const activeMentor = student.mentorAssignments?.find((ma: any) => ma.isActive)?.mentor;
+      const activeAssignment = student.mentorAssignments?.find((ma: any) => ma.isActive);
+      const activeMentor = activeAssignment?.mentor;
+      // Check if mentor is from a different institution than the student
+      const isCrossInstitution = activeMentor ? activeMentor.institutionId !== id : false;
 
       // Get company info - prioritize self-identified, then approved internship
       let company = null;
@@ -1308,6 +1351,7 @@ export class StateInstitutionService {
           status: latestVisit.visitDate.getTime() <= now.getTime() ? 'COMPLETED' : 'SCHEDULED',
         } : null,
         mentor: activeMentor || null,
+        isCrossInstitutionMentor: isCrossInstitution,
         company,
       };
     });

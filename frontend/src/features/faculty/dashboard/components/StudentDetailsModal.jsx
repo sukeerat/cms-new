@@ -48,7 +48,7 @@ import { getImageUrl } from '../../../../utils/imageUtils';
 import {
   getExpectedReportsAsOfToday,
   getExpectedVisitsAsOfToday,
-} from '../../../../utils/fourWeekCycle';
+} from '../../../../utils/monthlyCycle';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -131,8 +131,8 @@ const StudentDetailsModal = ({
   };
 
   /**
-   * Calculate expected reports using 4-week cycles.
-   * Reports are due every 4 weeks from internship startDate + 5 days grace period.
+   * Calculate expected reports using monthly cycles.
+   * Reports are due on the 5th of the next month for each internship month.
    */
   const getExpectedReports = () => {
     if (internshipApp?.totalExpectedReports) return internshipApp.totalExpectedReports;
@@ -148,8 +148,8 @@ const StudentDetailsModal = ({
   };
 
   /**
-   * Calculate expected visits using 4-week cycles.
-   * Visits are aligned with report cycles - 1 visit per 4-week cycle.
+   * Calculate expected visits using monthly cycles.
+   * Visits are due on the last day of each internship month.
    */
   const getExpectedVisits = () => {
     if (internshipApp?.totalExpectedVisits) return internshipApp.totalExpectedVisits;

@@ -4,10 +4,13 @@ import { LruCacheService } from '../../core/cache/lru-cache.service';
 import { Prisma, ApplicationStatus, MonthlyReportStatus, AuditAction, AuditCategory, AuditSeverity, Role } from '@prisma/client';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import {
-  calculateFourWeekCycles,
-  getTotalExpectedCycles,
-  FOUR_WEEK_CYCLE,
-} from '../../common/utils/four-week-cycle.util';
+  calculateExpectedMonths,
+  getTotalExpectedCount,
+  getExpectedReportsAsOfToday,
+  getExpectedVisitsAsOfToday,
+  MONTHLY_CYCLE,
+  MonthlyCycle,
+} from '../../common/utils/monthly-cycle.util';
 
 @Injectable()
 export class FacultyService {
@@ -18,27 +21,27 @@ export class FacultyService {
   ) {}
 
   /**
-   * Calculate expected cycles (reports/visits) using 4-week cycles
+   * Calculate expected months (reports/visits) using monthly cycles
    * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V (Q47-49)
    *
    * @param startDate - Internship start date
    * @param endDate - Internship end date (or current date if ongoing)
-   * @param countOnlyDue - If true, only count cycles where submission window has started
+   * @param countOnlyDue - If true, only count months where report due date has passed
    */
   private calculateExpectedCycles(startDate: Date, endDate: Date, countOnlyDue = false): number {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const now = new Date();
 
-    const cycles = calculateFourWeekCycles(start, end);
+    const months: MonthlyCycle[] = calculateExpectedMonths(start, end);
 
     if (countOnlyDue) {
-      // Only count cycles where submission window has started (past due or currently due)
-      return cycles.filter(c => now >= c.submissionWindowStart).length;
+      // Only count months where the report due date has passed (5th of next month)
+      return months.filter(m => now >= m.reportDueDate).length;
     }
 
-    // Count total expected cycles for the internship duration
-    return cycles.length;
+    // Count total expected months for the internship duration
+    return months.length;
   }
 
 
@@ -376,7 +379,7 @@ export class FacultyService {
       let totalReportsExpected = 0;
 
       if (startDate) {
-        // Calculate using 4-week cycles from start date to now (or end date if completed)
+        // Calculate using monthly cycles from start date to now (or end date if completed)
         const effectiveEndDate = endDate && new Date(endDate) < now ? new Date(endDate) : now;
 
         // Only calculate if internship has started

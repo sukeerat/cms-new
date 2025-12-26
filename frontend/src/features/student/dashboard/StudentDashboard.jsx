@@ -1,6 +1,15 @@
 import React, { useState, useCallback, memo } from 'react';
-import { Row, Col, Spin, Alert, Modal, message, Progress } from 'antd';
-import { SyncOutlined } from '@ant-design/icons';
+import { Row, Col, Spin, Alert, Modal, message, Card, Typography, Button, Tag, Empty } from 'antd';
+import {
+  SyncOutlined,
+  FileTextOutlined,
+  ExclamationCircleOutlined,
+  BankOutlined,
+  RightOutlined,
+  PlusOutlined,
+  CheckCircleOutlined,
+  UploadOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import dayjs from 'dayjs';
@@ -11,110 +20,315 @@ import {
   DashboardHeader,
   StatisticsGrid,
   ActiveInternshipCard,
-  RecentApplicationsList,
-  MonthlyReportsCard,
-  GrievancesCard,
+  JoiningLetterCard,
 } from './components';
 import {
   selectInstitute,
   selectInstituteLoading,
-  fetchInstituteAsync,
 } from '../../../store/slices/instituteSlice';
 
 dayjs.extend(isSameOrBefore);
 
+const { Title, Text } = Typography;
+
+// Quick Actions Card Component
+const QuickActionsCard = memo(({
+  hasActiveInternship,
+  joiningLetterUploaded,
+  application,
+  onRefresh,
+  onNavigateToReports,
+  onNavigateToGrievances,
+  loading,
+}) => {
+  const navigate = useNavigate();
+
+  return (
+    <Card className="h-full rounded-2xl border border-border">
+      <Title level={5} className="mb-4 flex items-center gap-2">
+        <CheckCircleOutlined className="text-green-500" />
+        Quick Actions
+      </Title>
+
+      <div className="space-y-3">
+        {/* Joining Letter Status */}
+        {hasActiveInternship && (
+          <JoiningLetterCard
+            application={application}
+            onRefresh={onRefresh}
+            loading={loading}
+          />
+        )}
+
+        {/* Quick Links */}
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <Button
+            type="default"
+            icon={<FileTextOutlined />}
+            onClick={onNavigateToReports}
+            className="h-auto py-3 flex flex-col items-center justify-center"
+          >
+            <span className="text-xs mt-1">Submit Report</span>
+          </Button>
+          <Button
+            type="default"
+            icon={<ExclamationCircleOutlined />}
+            onClick={onNavigateToGrievances}
+            className="h-auto py-3 flex flex-col items-center justify-center"
+          >
+            <span className="text-xs mt-1">Grievance</span>
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+});
+
+QuickActionsCard.displayName = 'QuickActionsCard';
+
+// Recent Applications Mini Card
+const RecentApplicationsMini = memo(({ applications = [], onViewAll }) => {
+  const navigate = useNavigate();
+
+  const getStatusColor = (status) => {
+    const colors = {
+      APPLIED: 'blue',
+      SHORTLISTED: 'orange',
+      SELECTED: 'green',
+      APPROVED: 'green',
+      REJECTED: 'red',
+      WITHDRAWN: 'default',
+    };
+    return colors[status] || 'default';
+  };
+
+  return (
+    <Card
+      className="h-full rounded-2xl border border-border"
+      title={
+        <div className="flex items-center gap-2">
+          <BankOutlined className="text-blue-500" />
+          <span>Recent Applications</span>
+        </div>
+      }
+      extra={
+        <Button type="link" size="small" onClick={onViewAll}>
+          View All <RightOutlined />
+        </Button>
+      }
+      styles={{ body: { padding: applications.length > 0 ? '12px' : '24px' } }}
+    >
+      {applications.length > 0 ? (
+        <div className="space-y-2">
+          {applications.slice(0, 4).map((app, index) => {
+            const company = app.isSelfIdentified
+              ? { companyName: app.companyName }
+              : (app.internship?.industry || {});
+
+            return (
+              <div
+                key={app.id || index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                onClick={() => navigate('/my-applications')}
+              >
+                <div className="flex-1 min-w-0">
+                  <Text strong className="text-sm block truncate">
+                    {company.companyName || 'Company'}
+                  </Text>
+                  <Text className="text-xs text-gray-500">
+                    {app.internship?.title || app.jobProfile || 'Internship'}
+                  </Text>
+                </div>
+                <Tag color={getStatusColor(app.status)} className="ml-2">
+                  {app.status}
+                </Tag>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="No applications yet"
+          className="py-4"
+        >
+          <Button type="primary" size="small" onClick={() => navigate('/internships')}>
+            Browse Internships
+          </Button>
+        </Empty>
+      )}
+    </Card>
+  );
+});
+
+RecentApplicationsMini.displayName = 'RecentApplicationsMini';
+
+// Monthly Reports Mini Card
+const MonthlyReportsMini = memo(({ reports = [], onViewAll, onSubmit }) => {
+  const recentReports = reports.slice(0, 3);
+  const pendingCount = reports.filter(r => r.status === 'DRAFT' || !r.status).length;
+
+  return (
+    <Card
+      className="h-full rounded-2xl border border-border"
+      title={
+        <div className="flex items-center gap-2">
+          <FileTextOutlined className="text-purple-500" />
+          <span>Monthly Reports</span>
+          {pendingCount > 0 && (
+            <Tag color="orange" className="ml-1">{pendingCount} pending</Tag>
+          )}
+        </div>
+      }
+      extra={
+        <Button type="link" size="small" onClick={onViewAll}>
+          View All <RightOutlined />
+        </Button>
+      }
+    >
+      {recentReports.length > 0 ? (
+        <div className="space-y-2">
+          {recentReports.map((report, index) => (
+            <div
+              key={report.id || index}
+              className="flex items-center justify-between p-2 rounded-lg bg-gray-50"
+            >
+              <div>
+                <Text className="text-sm">
+                  {dayjs().month(report.reportMonth - 1).format('MMMM')} {report.reportYear}
+                </Text>
+              </div>
+              <Tag color={report.status === 'APPROVED' ? 'green' : 'default'}>
+                {report.status || 'Draft'}
+              </Tag>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="No reports yet"
+          className="py-4"
+        >
+          <Button type="primary" size="small" icon={<UploadOutlined />} onClick={onSubmit}>
+            Submit Report
+          </Button>
+        </Empty>
+      )}
+    </Card>
+  );
+});
+
+MonthlyReportsMini.displayName = 'MonthlyReportsMini';
+
+// Grievances Mini Card
+const GrievancesMini = memo(({ grievances = [], onViewAll, onCreateNew }) => {
+  const navigate = useNavigate();
+  const grievancesList = Array.isArray(grievances) ? grievances : (grievances?.grievances || []);
+  const pendingCount = grievancesList.filter(g => g.status !== 'RESOLVED' && g.status !== 'CLOSED').length;
+
+  const getStatusColor = (status) => {
+    const colors = {
+      SUBMITTED: 'blue',
+      IN_REVIEW: 'orange',
+      IN_PROGRESS: 'orange',
+      ESCALATED: 'red',
+      RESOLVED: 'green',
+      CLOSED: 'default',
+    };
+    return colors[status] || 'default';
+  };
+
+  return (
+    <Card
+      className="h-full rounded-2xl border border-border"
+      title={
+        <div className="flex items-center gap-2">
+          <ExclamationCircleOutlined className="text-orange-500" />
+          <span>Grievances</span>
+          {pendingCount > 0 && (
+            <Tag color="red" className="ml-1">{pendingCount} active</Tag>
+          )}
+        </div>
+      }
+      extra={
+        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={onCreateNew}>
+          New
+        </Button>
+      }
+    >
+      {grievancesList.length > 0 ? (
+        <div className="space-y-2">
+          {grievancesList.slice(0, 3).map((grievance, index) => (
+            <div
+              key={grievance.id || index}
+              className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+              onClick={() => navigate('/grievances')}
+            >
+              <div className="flex-1 min-w-0">
+                <Text strong className="text-sm block truncate">
+                  {grievance.title || grievance.subject}
+                </Text>
+                <Text className="text-xs text-gray-500">
+                  {dayjs(grievance.createdAt).format('MMM DD, YYYY')}
+                </Text>
+              </div>
+              <Tag color={getStatusColor(grievance.status)} className="ml-2">
+                {grievance.status}
+              </Tag>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="No grievances"
+          className="py-4"
+        >
+          <Button type="primary" size="small" icon={<PlusOutlined />} onClick={onCreateNew}>
+            Report Issue
+          </Button>
+        </Empty>
+      )}
+    </Card>
+  );
+});
+
+GrievancesMini.displayName = 'GrievancesMini';
+
+// Main Dashboard Component
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   // Institute data
   const institute = useSelector(selectInstitute);
-  const instituteLoading = useSelector(selectInstituteLoading);
 
   // Use custom hook for dashboard data with SWR
   const {
     isLoading,
-    isRevalidating, // NEW: SWR revalidation state
+    isRevalidating,
     loadingStates,
     profile,
-    internships,
-    applications,
-    reports,
-    mentor,
     grievances,
     stats,
+    counts, // Server-side counts from profile._count
     activeInternships,
     recentApplications,
     monthlyReports,
+    mentor,
     error,
     refresh,
     handleWithdrawApplication,
-    handleUpdateApplication,
-    handleSubmitReport,
-    handleCreateGrievance,
   } = useStudentDashboard();
 
   // Local UI state
   const [selectedInternship, setSelectedInternship] = useState(null);
-  const [reportModalVisible, setReportModalVisible] = useState(false);
-  const [grievanceModalVisible, setGrievanceModalVisible] = useState(false);
 
-  // Handle internship selection change
-  const handleInternshipChange = useCallback((internshipId) => {
-    const internship = activeInternships.find(i => i.id === internshipId);
-    setSelectedInternship(internship);
-  }, [activeInternships]);
-
-  // Navigate to application details
-  const handleViewApplication = useCallback((applicationId) => {
-    navigate(`/applications/${applicationId}`);
-  }, [navigate]);
-
-  // Navigate to my applications (self-identified internship details)
+  // Navigate to my applications
   const handleViewInternship = useCallback(() => {
     navigate('/my-applications');
   }, [navigate]);
-
-  // Handle application withdrawal with confirmation
-  const handleWithdraw = useCallback(async (applicationId) => {
-    Modal.confirm({
-      title: 'Withdraw Application',
-      content: 'Are you sure you want to withdraw this application?',
-      okText: 'Yes, Withdraw',
-      cancelText: 'Cancel',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          await handleWithdrawApplication(applicationId);
-          message.success('Application withdrawn successfully');
-        } catch (err) {
-          message.error('Failed to withdraw application');
-        }
-      },
-    });
-  }, [handleWithdrawApplication]);
-
-  // Handle report submission
-  const handleReportSubmit = useCallback(async (reportId, data) => {
-    try {
-      await handleSubmitReport(reportId, data);
-      message.success('Report submitted successfully');
-      setReportModalVisible(false);
-    } catch (err) {
-      message.error('Failed to submit report');
-    }
-  }, [handleSubmitReport]);
-
-  // Handle grievance creation
-  const handleGrievanceSubmit = useCallback(async (data) => {
-    try {
-      await handleCreateGrievance(data);
-      message.success('Grievance submitted successfully');
-      setGrievanceModalVisible(false);
-    } catch (err) {
-      message.error('Failed to submit grievance');
-    }
-  }, [handleCreateGrievance]);
 
   // Navigate to applications
   const handleNavigateToApplications = useCallback(() => {
@@ -131,15 +345,10 @@ const StudentDashboard = () => {
     navigate('/grievances');
   }, [navigate]);
 
-  // Handle opening report modal
-  const handleOpenReportModal = useCallback(() => {
-    setReportModalVisible(true);
-  }, []);
-
-  // Handle opening grievance modal
-  const handleOpenGrievanceModal = useCallback(() => {
-    setGrievanceModalVisible(true);
-  }, []);
+  // Navigate to submit grievance
+  const handleCreateGrievance = useCallback(() => {
+    navigate('/submit-grievance');
+  }, [navigate]);
 
   // Show error state
   if (error) {
@@ -160,84 +369,92 @@ const StudentDashboard = () => {
     );
   }
 
+  const hasActiveInternship = activeInternships && activeInternships.length > 0;
+  const currentInternship = selectedInternship || (hasActiveInternship ? activeInternships[0] : null);
+
   return (
     <Spin spinning={isLoading} tip="Loading dashboard...">
-        <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
-          {/* Subtle Revalidation Indicator */}
-          {isRevalidating && !isLoading && (
-            <div
-              className="fixed top-0 left-0 right-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-center gap-2 text-blue-700 text-sm"
-              style={{
-                animation: 'slideDown 0.3s ease-out',
-              }}
-            >
-              <SyncOutlined spin />
-              <span>Updating dashboard data...</span>
-            </div>
-          )}
-
-          {/* Header Section */}
-          <DashboardHeader
-            studentName={profile?.name}
-            instituteName={institute?.name}
-            mentorName={mentor?.name}
-            onRefresh={refresh}
-            loading={isLoading}
-            isRevalidating={isRevalidating}
-          />
-
-          {/* Statistics Grid */}
-          <div className="mb-6">
-            <StatisticsGrid stats={stats} />
+      <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+        {/* Subtle Revalidation Indicator */}
+        {isRevalidating && !isLoading && (
+          <div
+            className="fixed top-0 left-0 right-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-center gap-2 text-blue-700 text-sm"
+            style={{ animation: 'slideDown 0.3s ease-out' }}
+          >
+            <SyncOutlined spin />
+            <span>Updating dashboard data...</span>
           </div>
+        )}
 
-          {/* Main Content Grid */}
+        {/* Header Section */}
+        <DashboardHeader
+          studentName={profile?.name}
+          instituteName={institute?.name}
+          mentorName={mentor?.name}
+          onRefresh={refresh}
+          loading={isLoading}
+          isRevalidating={isRevalidating}
+        />
+
+        {/* Statistics Grid */}
+        <StatisticsGrid stats={stats} counts={counts} />
+
+        {/* Main Content Section */}
+        <div className="space-y-4">
+          {/* Primary Row: Active Internship + Quick Actions */}
           <Row gutter={[16, 16]}>
-            {/* Active Internship Card */}
-            <Col xs={24} lg={16}>
+            <Col xs={24} lg={hasActiveInternship ? 16 : 24}>
               <ActiveInternshipCard
-                internship={selectedInternship || activeInternships[0]}
+                internship={currentInternship}
                 onViewDetails={handleViewInternship}
                 loading={loadingStates?.applications}
+                studentMentor={mentor}
               />
             </Col>
 
-            {/* Recent Applications */}
-            <Col xs={24} lg={8}>
-              <RecentApplicationsList
+            {hasActiveInternship && (
+              <Col xs={24} lg={8}>
+                <QuickActionsCard
+                  hasActiveInternship={hasActiveInternship}
+                  joiningLetterUploaded={!!currentInternship?.joiningLetterUrl}
+                  application={currentInternship}
+                  onRefresh={refresh}
+                  onNavigateToReports={handleNavigateToReports}
+                  onNavigateToGrievances={handleCreateGrievance}
+                  loading={loadingStates?.applications}
+                />
+              </Col>
+            )}
+          </Row>
+
+          {/* Secondary Row: Reports, Grievances, Recent Applications */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12} lg={8}>
+              <RecentApplicationsMini
                 applications={recentApplications}
-                loading={isLoading}
-                onView={handleViewApplication}
-                onWithdraw={handleWithdraw}
                 onViewAll={handleNavigateToApplications}
               />
             </Col>
-          </Row>
 
-          {/* Secondary Content Grid */}
-          <Row gutter={[16, 16]} className="mt-4">
-            {/* Monthly Reports */}
-            <Col xs={24} lg={12}>
-              <MonthlyReportsCard
+            <Col xs={24} md={12} lg={8}>
+              <MonthlyReportsMini
                 reports={monthlyReports}
-                loading={isLoading}
-                onSubmitReport={handleOpenReportModal}
                 onViewAll={handleNavigateToReports}
+                onSubmit={handleNavigateToReports}
               />
             </Col>
 
-            {/* Grievances */}
-            <Col xs={24} lg={12}>
-              <GrievancesCard
+            <Col xs={24} md={24} lg={8}>
+              <GrievancesMini
                 grievances={grievances}
-                loading={isLoading}
-                onCreateNew={handleOpenGrievanceModal}
                 onViewAll={handleNavigateToGrievances}
+                onCreateNew={handleCreateGrievance}
               />
             </Col>
           </Row>
         </div>
-      </Spin>
+      </div>
+    </Spin>
   );
 };
 

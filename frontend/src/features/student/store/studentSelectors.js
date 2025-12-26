@@ -1025,3 +1025,120 @@ export const selectMentorWithFallback = createSelector(
     return mentorData;
   }
 );
+
+// ============================================================================
+// PROFILE DATA EXTRACTION SELECTORS
+// These extract data directly from the profile response to avoid redundant API calls
+// ============================================================================
+
+/**
+ * Extract applications from profile's internshipApplications
+ * @param {Object} state - Redux root state
+ * @returns {Array} Array of applications from profile
+ */
+export const selectApplicationsFromProfile = createSelector(
+  [selectProfileData],
+  (profileData) => profileData?.internshipApplications || DEFAULT_ARRAY
+);
+
+/**
+ * Extract counts from profile's _count field
+ * @param {Object} state - Redux root state
+ * @returns {Object} Counts object from profile
+ */
+export const selectCountsFromProfile = createSelector(
+  [selectProfileData],
+  (profileData) => profileData?._count || DEFAULT_OBJECT
+);
+
+/**
+ * Get applications - prefers profile data, falls back to applications state
+ * This helps reduce redundant API calls since profile already has internshipApplications
+ * @param {Object} state - Redux root state
+ * @returns {Array} Array of applications
+ */
+export const selectApplicationsWithProfileFallback = createSelector(
+  [selectApplicationsFromProfile, selectApplicationsList],
+  (profileApplications, stateApplications) => {
+    // If profile has applications, use those (more up-to-date from single API call)
+    if (profileApplications && profileApplications.length > 0) {
+      return profileApplications;
+    }
+    // Fallback to state applications
+    return stateApplications;
+  }
+);
+
+/**
+ * Self-identified applications from profile data
+ * @param {Object} state - Redux root state
+ * @returns {Array} Array of self-identified applications
+ */
+export const selectSelfIdentifiedFromProfile = createSelector(
+  [selectApplicationsFromProfile],
+  (applications) => applications.filter((app) => app.isSelfIdentified === true)
+);
+
+/**
+ * Platform applications from profile data
+ * @param {Object} state - Redux root state
+ * @returns {Array} Array of platform applications
+ */
+export const selectPlatformFromProfile = createSelector(
+  [selectApplicationsFromProfile],
+  (applications) => applications.filter((app) => !app.isSelfIdentified)
+);
+
+/**
+ * Active internships from profile data
+ * @param {Object} state - Redux root state
+ * @returns {Array} Array of active internship applications
+ */
+export const selectActiveInternshipsFromProfile = createSelector(
+  [selectApplicationsFromProfile],
+  (applications) => applications.filter(app =>
+    ['SELECTED', 'APPROVED', 'JOINED', 'ACTIVE'].includes(app.status)
+  )
+);
+
+/**
+ * Quick stats calculated from profile data
+ * Uses _count for accurate server-side counts and internshipApplications for status breakdowns
+ * @param {Object} state - Redux root state
+ * @returns {Object} Statistics object
+ */
+export const selectStatsFromProfile = createSelector(
+  [selectProfileData, selectApplicationsFromProfile, selectCountsFromProfile],
+  (profileData, applications, counts) => {
+    if (!profileData) return DEFAULT_OBJECT;
+
+    const selfIdentifiedCount = applications.filter(app =>
+      app.isSelfIdentified === true
+    ).length;
+
+    const activeStatuses = ['SELECTED', 'APPROVED', 'JOINED', 'ACTIVE'];
+    const pendingStatuses = ['APPLIED', 'SHORTLISTED', 'UNDER_REVIEW', 'PENDING'];
+
+    return {
+      // From _count (server-side accurate counts)
+      totalApplications: counts.internshipApplications || applications.length,
+      totalMonthlyReports: counts.monthlyReports || 0,
+      totalGrievances: counts.grievances || 0,
+
+      // Calculated from applications
+      selfIdentifiedCount,
+      ongoingInternships: applications.filter(app =>
+        activeStatuses.includes(app.status)
+      ).length,
+      pendingApplications: applications.filter(app =>
+        pendingStatuses.includes(app.status)
+      ).length,
+      completedInternships: applications.filter(app =>
+        app.status === 'COMPLETED'
+      ).length,
+      selectedApplications: applications.filter(app =>
+        app.status === 'SELECTED' || app.status === 'APPROVED'
+      ).length,
+    };
+  }
+);

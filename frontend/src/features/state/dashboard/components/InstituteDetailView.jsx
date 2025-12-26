@@ -28,6 +28,7 @@ import {
   List,
   Alert,
   Result,
+  Switch,
 } from 'antd';
 import {
   TeamOutlined,
@@ -61,14 +62,18 @@ import {
   fetchInstituteCompanies,
   fetchInstituteFacultyPrincipal,
   fetchInstitutionMentors,
+  fetchAllMentors,
   assignMentorToStudent,
   removeMentorFromStudent,
   deleteInstituteStudent,
+  deleteInstituteFaculty,
   selectInstituteOverview,
   selectInstituteStudents,
   selectInstituteCompanies,
   selectInstituteFacultyPrincipal,
   selectSelectedInstitute,
+  selectAllMentors,
+  selectAllMentorsLoading,
 } from '../../store/stateSlice';
 import { useDebounce } from '../../../../hooks/useDebounce';
 import { getImageUrl } from '../../../../utils/imageUtils';
@@ -156,7 +161,7 @@ const OverviewTab = memo(({ data, loading, error }) => {
           className="rounded-xl border-border"
         >
           <div className="flex items-center justify-between">
-            <div className="flex-1 grid grid-cols-2 gap-4">
+            <div className="flex-1 grid grid-cols-3 gap-3">
               <div className="text-center">
                 <div className="text-xl font-bold text-success">{data.mentorAssignment?.assigned || 0}</div>
                 <div className="text-[10px] text-text-tertiary">Assigned</div>
@@ -165,6 +170,12 @@ const OverviewTab = memo(({ data, loading, error }) => {
                 <div className="text-xl font-bold text-error">{data.mentorAssignment?.unassigned || 0}</div>
                 <div className="text-[10px] text-text-tertiary">Unassigned</div>
               </div>
+              <Tooltip title={`${data.mentorAssignment?.studentsWithExternalMentors || 0} students have mentors from other institutions`}>
+                <div className="text-center">
+                  <div className="text-xl font-bold text-purple-500">{data.mentorAssignment?.externalMentors || 0}</div>
+                  <div className="text-[10px] text-text-tertiary">External</div>
+                </div>
+              </Tooltip>
             </div>
           </div>
         </Card>
@@ -271,7 +282,7 @@ const OverviewTab = memo(({ data, loading, error }) => {
 OverviewTab.displayName = 'OverviewTab';
 
 // Memoized Faculty Tab Component
-const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
+const FacultyTab = memo(({ principal, faculty, summary, loading, error, onDeleteFaculty }) => {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -358,7 +369,7 @@ const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {faculty.map((member, index) => (
-              <div key={member.id || index} className="flex items-center gap-3 p-3 rounded-lg bg-background-tertiary/30 border border-border/50 hover:border-primary/30 transition-colors">
+              <div key={member.id || index} className="flex items-center gap-3 p-3 rounded-lg bg-background-tertiary/30 border border-border/50 hover:border-primary/30 transition-colors group">
                 <Avatar size={36} icon={<UserOutlined />} className={member.role === 'HOD' ? 'bg-purple-500' : 'bg-primary'} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -371,6 +382,16 @@ const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
                     <span><EnvironmentOutlined className="mr-1" />{member.stats?.visitsCompleted || 0}/{member.stats?.visitsScheduled || 0}</span>
                   </div>
                 </div>
+                <Tooltip title="Delete Faculty">
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => onDeleteFaculty?.(member)}
+                  />
+                </Tooltip>
               </div>
             ))}
           </div>
@@ -383,10 +404,11 @@ const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
 FacultyTab.displayName = 'FacultyTab';
 
 // Student Detail Modal Component
-const StudentDetailModal = memo(({ visible, student, onClose }) => {
+const StudentDetailModal = memo(({ visible, student, onClose, institutionId }) => {
   if (!student) return null;
 
   const mentor = student.mentor || student.mentorAssignments?.find(ma => ma.isActive)?.mentor;
+  const isMentorExternal = student.isCrossInstitutionMentor || (mentor?.institutionId && mentor.institutionId !== institutionId);
   const company = student.company || student.internshipApplications?.find(app => app.status === 'APPROVED' || app.status === 'SELECTED')?.internship?.industry;
   const selfId = student.selfIdentifiedData;
 
@@ -424,7 +446,20 @@ const StudentDetailModal = memo(({ visible, student, onClose }) => {
           <Descriptions.Item label="Roll Number"><Text code>{student.rollNumber}</Text></Descriptions.Item>
           <Descriptions.Item label="Email">{student.email}</Descriptions.Item>
           <Descriptions.Item label="Branch">{student.branchName}</Descriptions.Item>
-          <Descriptions.Item label="Mentor">{mentor ? <Tag color="green" className="border-0 rounded-md">{mentor.name}</Tag> : <Tag color="red" className="border-0 rounded-md">Unassigned</Tag>}</Descriptions.Item>
+          <Descriptions.Item label="Mentor">
+            {mentor ? (
+              <Space size={4}>
+                <Tag color={isMentorExternal ? 'purple' : 'green'} className="border-0 rounded-md">{mentor.name}</Tag>
+                {isMentorExternal && (
+                  <Tooltip title={mentor.Institution?.name || 'Other Institution'}>
+                    <Tag color="purple" className="border-0 rounded-md text-[10px]">External</Tag>
+                  </Tooltip>
+                )}
+              </Space>
+            ) : (
+              <Tag color="red" className="border-0 rounded-md">Unassigned</Tag>
+            )}
+          </Descriptions.Item>
           <Descriptions.Item label="Company">{company ? company.companyName : '-'}</Descriptions.Item>
         </Descriptions>
 
@@ -470,6 +505,8 @@ const InstituteDetailView = ({ defaultTab = null }) => {
   const students = useSelector(selectInstituteStudents);
   const companies = useSelector(selectInstituteCompanies);
   const facultyPrincipal = useSelector(selectInstituteFacultyPrincipal);
+  const allMentorsFromStore = useSelector(selectAllMentors);
+  const allMentorsLoading = useSelector(selectAllMentorsLoading);
 
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -494,7 +531,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
   // Filters
   const [studentFilter, setStudentFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
-  const [reportStatusFilter, setReportStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [selfIdentifiedFilter, setSelfIdentifiedFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -505,6 +542,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
   const [mentorsLoading, setMentorsLoading] = useState(false);
   const [selectedMentorId, setSelectedMentorId] = useState(null);
   const [assigningMentor, setAssigningMentor] = useState(false);
+  const [showAllInstitutions, setShowAllInstitutions] = useState(false);
 
   // Track if initial fetch done
   const fetchedTabsRef = useRef({ students: false, companies: false, faculty: false });
@@ -523,6 +561,15 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       // Reset search skip flags for new institute
       studentSearchInitializedRef.current = false;
       companySearchInitializedRef.current = false;
+      // Reset all search and filter states for fresh start
+      setStudentSearchInput('');
+      setCompanySearchInput('');
+      setStudentFilter('all');
+      setBranchFilter('all');
+      setStatusFilter('all');
+      setSelfIdentifiedFilter('all');
+      // Reset to overview tab
+      setActiveTab('overview');
     }
   }, [dispatch, selectedInstitute?.id]);
 
@@ -559,12 +606,12 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       search: debouncedStudentSearch || undefined,
       filter: studentFilter,
       branch: branchFilter !== 'all' ? branchFilter : undefined,
-      reportStatus: reportStatusFilter !== 'all' ? reportStatusFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
       selfIdentified: selfIdentifiedFilter !== 'all' ? selfIdentifiedFilter : undefined,
     }));
     // Note: activeTab is intentionally NOT in dependencies - tab switches are handled by fetchedTabsRef
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedStudentSearch, selectedInstitute?.id, dispatch, studentFilter, branchFilter, reportStatusFilter, selfIdentifiedFilter]);
+  }, [debouncedStudentSearch, selectedInstitute?.id, dispatch, studentFilter, branchFilter, statusFilter, selfIdentifiedFilter]);
 
   // Handle debounced company search - only trigger on actual search changes
   // NOT on tab changes (tab changes are handled by the tab effect above)
@@ -591,16 +638,16 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       search: studentSearchInput || undefined,
       filter: studentFilter,
       branch: branchFilter !== 'all' ? branchFilter : undefined,
-      reportStatus: reportStatusFilter !== 'all' ? reportStatusFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
       selfIdentified: selfIdentifiedFilter !== 'all' ? selfIdentifiedFilter : undefined,
     }));
-  }, [dispatch, selectedInstitute?.id, studentSearchInput, studentFilter, branchFilter, reportStatusFilter, selfIdentifiedFilter]);
+  }, [dispatch, selectedInstitute?.id, studentSearchInput, studentFilter, branchFilter, statusFilter, selfIdentifiedFilter]);
 
   // Reset filters
   const resetFilters = useCallback(() => {
     setStudentFilter('all');
     setBranchFilter('all');
-    setReportStatusFilter('all');
+    setStatusFilter('all');
     setSelfIdentifiedFilter('all');
     setStudentSearchInput('');
     if (selectedInstitute?.id) {
@@ -618,23 +665,51 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       search: studentSearchInput || undefined,
       filter: studentFilter,
       branch: branchFilter !== 'all' ? branchFilter : undefined,
-      reportStatus: reportStatusFilter !== 'all' ? reportStatusFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
       selfIdentified: selfIdentifiedFilter !== 'all' ? selfIdentifiedFilter : undefined,
       loadMore: true,
     }));
-  }, [dispatch, selectedInstitute?.id, students.cursor, students.hasMore, students.loadingMore, studentSearchInput, studentFilter, branchFilter, reportStatusFilter, selfIdentifiedFilter]);
+  }, [dispatch, selectedInstitute?.id, students.cursor, students.hasMore, students.loadingMore, studentSearchInput, studentFilter, branchFilter, statusFilter, selfIdentifiedFilter]);
 
   // Mentor handlers
   const handleEditMentor = useCallback(async (student) => {
     setMentorStudent(student);
     setSelectedMentorId(student.mentorAssignments?.find(ma => ma.isActive)?.mentor?.id || null);
     setMentorModalVisible(true);
+    setShowAllInstitutions(false); // Reset to institution-only mode
 
     if (selectedInstitute?.id) {
       setMentorsLoading(true);
       try {
         const result = await dispatch(fetchInstitutionMentors(selectedInstitute.id)).unwrap();
         // API returns { success: true, data: mentors[] }
+        setMentors(result?.data || result || []);
+      } catch {
+        message.error('Failed to load mentors');
+      } finally {
+        setMentorsLoading(false);
+      }
+    }
+  }, [dispatch, selectedInstitute?.id]);
+
+  // Handle toggling between institution and all mentors
+  const handleToggleAllInstitutions = useCallback(async (checked) => {
+    setShowAllInstitutions(checked);
+    setSelectedMentorId(null); // Reset selection when switching modes
+
+    if (checked) {
+      // Fetch all mentors from all institutions
+      try {
+        await dispatch(fetchAllMentors()).unwrap();
+      } catch {
+        message.error('Failed to load mentors from all institutions');
+        setShowAllInstitutions(false);
+      }
+    } else if (selectedInstitute?.id) {
+      // Revert to institution mentors
+      setMentorsLoading(true);
+      try {
+        const result = await dispatch(fetchInstitutionMentors(selectedInstitute.id)).unwrap();
         setMentors(result?.data || result || []);
       } catch {
         message.error('Failed to load mentors');
@@ -711,6 +786,35 @@ const InstituteDetailView = ({ defaultTab = null }) => {
     });
   }, [dispatch, selectedInstitute?.id]);
 
+  // Delete faculty handler
+  const handleDeleteFaculty = useCallback((faculty) => {
+    Modal.confirm({
+      title: 'Delete Faculty',
+      icon: <ExclamationCircleOutlined className="text-error" />,
+      content: (
+        <div>
+          <p>Are you sure you want to delete <strong>{faculty.name}</strong>?</p>
+          <p className="text-text-tertiary text-sm mt-2">
+            This will permanently remove the faculty member and all associated data including student assignments and visit logs.
+          </p>
+        </div>
+      ),
+      okText: 'Delete',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await dispatch(deleteInstituteFaculty({
+            facultyId: faculty.id,
+            institutionId: selectedInstitute?.id
+          })).unwrap();
+          message.success('Faculty deleted successfully');
+        } catch (error) {
+          message.error(typeof error === 'string' ? error : 'Failed to delete faculty');
+        }
+      },
+    });
+  }, [dispatch, selectedInstitute?.id]);
+
   // Handler for viewing student details
   const handleViewStudentDetails = useCallback((record) => {
     setSelectedStudent(record);
@@ -730,92 +834,33 @@ const InstituteDetailView = ({ defaultTab = null }) => {
     ];
   }, [handleEditMentor, handleRemoveMentor, handleViewStudentDetails, handleDeleteStudent]);
 
-  // Memoized student columns - Clean and non-overlapping
+  // Memoized student columns - Compact with all key info
   const studentColumns = useMemo(() => [
     {
       title: 'Student',
       key: 'student',
       fixed: 'left',
-      width: 220,
-      render: (_, record) => {
-        const imageUrl = getImageUrl(record.profileImage);
-        return (
-          <div className="flex items-center gap-3">
-            {imageUrl ? (
-              <Tooltip
-                title={
-                  <div className="text-center">
-                    <img
-                      src={imageUrl}
-                      alt={record.name}
-                      className="w-32 h-32 rounded-lg object-cover mx-auto"
-                      loading="lazy"
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                    <div className="mt-2 font-medium">{record.name}</div>
-                    <div className="text-xs opacity-75">{record.rollNumber}</div>
-                  </div>
-                }
-                placement="right"
-                color="white"
-                overlayInnerStyle={{ padding: 8 }}
-              >
-                <Avatar
-                  icon={<UserOutlined />}
-                  src={imageUrl}
-                  className="bg-primary/10 text-primary shrink-0 cursor-pointer"
-                  size={36}
-                />
-              </Tooltip>
-            ) : (
-              <Avatar
-                icon={<UserOutlined />}
-                className="bg-primary/10 text-primary shrink-0"
-                size={36}
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold text-text-primary text-sm truncate" title={record.name}>
-                {record.name}
-              </div>
-              <div className="text-xs text-text-tertiary font-mono">{record.rollNumber}</div>
-            </div>
+      width: 160,
+      render: (_, record) => (
+        <div className="min-w-0">
+          <div className="font-medium text-text-primary text-xs truncate" title={record.name}>
+            {record.name}
           </div>
-        );
-      },
+          <div className="text-[10px] text-text-tertiary font-mono">{record.rollNumber}</div>
+        </div>
+      ),
     },
     {
       title: 'Branch',
       dataIndex: 'branchName',
       key: 'branchName',
-      width: 120,
-      render: (text) => (
-        <span className="text-sm text-text-secondary">{text || '-'}</span>
-      ),
-    },
-    {
-      title: 'Mentor',
-      key: 'mentor',
-      width: 150,
-      render: (_, record) => {
-        const mentor = record.mentor || record.mentorAssignments?.find((ma) => ma.isActive)?.mentor;
-        if (!mentor) {
-          return <Tag color="error" className="m-0 rounded text-xs">Unassigned</Tag>;
-        }
-        return (
-          <Tooltip title={mentor.email}>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-success" />
-              <span className="text-sm text-text-primary truncate">{mentor.name}</span>
-            </div>
-          </Tooltip>
-        );
-      },
+      width: 80,
+      render: (text) => <span className="text-xs text-text-secondary">{text || '-'}</span>,
     },
     {
       title: 'Company',
       key: 'company',
-      width: 180,
+      width: 140,
       ellipsis: true,
       render: (_, record) => {
         const company = record.company;
@@ -824,49 +869,142 @@ const InstituteDetailView = ({ defaultTab = null }) => {
         const isSelf = company?.isSelfIdentified || selfId?.companyName;
 
         if (!name) {
-          return <span className="text-text-tertiary text-sm italic">Not Placed</span>;
+          return <span className="text-text-tertiary text-xs">-</span>;
         }
         return (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-text-primary truncate" title={name}>{name}</span>
-            {isSelf && <Tag color="purple" className="m-0 text-[10px] px-1 shrink-0">Self</Tag>}
-          </div>
+          <Tooltip title={name}>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-text-primary truncate">{name}</span>
+              {isSelf && <Tag color="purple" className="m-0 text-[9px] px-1 shrink-0">Self</Tag>}
+            </div>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Report',
-      key: 'report',
-      width: 100,
-      align: 'center',
+      title: 'Start',
+      key: 'startDate',
+      width: 75,
       render: (_, record) => {
-        const status = record.currentMonthReport?.status;
-        if (!status) {
-          return <Tag color="error" className="m-0 rounded text-xs">Missing</Tag>;
+        // Get dates from internshipApplications (approved one) or selfIdentifiedData
+        const approvedApp = record.internshipApplications?.find(app => app.status === 'APPROVED');
+        const startDate = approvedApp?.startDate || record.selfIdentifiedData?.startDate || record.internshipStartDate;
+
+        if (!startDate) {
+          return <span className="text-text-tertiary text-xs">-</span>;
         }
-        return <Tag color={getStatusColor(status)} className="m-0 rounded text-xs">{status}</Tag>;
+
+        const start = new Date(startDate);
+        return (
+          <span className="text-xs text-text-primary">
+            {start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' })}
+          </span>
+        );
       },
     },
     {
-      title: 'Last Visit',
-      key: 'visit',
-      width: 100,
+      title: 'End',
+      key: 'endDate',
+      width: 75,
+      render: (_, record) => {
+        // Get dates from internshipApplications (approved one) or selfIdentifiedData
+        const approvedApp = record.internshipApplications?.find(app => app.status === 'APPROVED');
+        const endDate = approvedApp?.endDate || record.selfIdentifiedData?.endDate || record.internshipEndDate;
+
+        if (!endDate) {
+          return <span className="text-text-tertiary text-xs">-</span>;
+        }
+
+        const end = new Date(endDate);
+        return (
+          <span className="text-xs text-text-primary">
+            {end.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' })}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Mentor',
+      key: 'mentor',
+      width: 130,
+      render: (_, record) => {
+        const mentor = record.mentor || record.mentorAssignments?.find((ma) => ma.isActive)?.mentor;
+        if (!mentor) {
+          return <Tag color="error" className="m-0 rounded text-[10px]">No Mentor</Tag>;
+        }
+        const isExternal = record.isCrossInstitutionMentor || (mentor.institutionId && mentor.institutionId !== selectedInstitute?.id);
+        const tooltipContent = isExternal
+          ? `External: ${mentor.name} (${mentor.Institution?.name || 'Other Institution'})`
+          : `${mentor.name} (${mentor.email})`;
+        return (
+          <Tooltip title={tooltipContent}>
+            <Tag color={isExternal ? 'purple' : 'success'} className="m-0 rounded text-[10px]">
+              {isExternal ? 'External' : 'Assigned'}
+            </Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'JL',
+      key: 'joiningLetter',
+      width: 40,
       align: 'center',
       render: (_, record) => {
-        if (!record.lastFacultyVisit?.date) {
-          return <span className="text-text-tertiary text-xs">None</span>;
+        // Check if joining letter is uploaded (auto-approved, no workflow)
+        const approvedApp = record.internshipApplications?.find(app => app.status === 'APPROVED');
+        const selfId = record.selfIdentifiedData;
+        const hasJL = approvedApp?.joiningLetterUrl || selfId?.joiningLetterUrl || record.joiningLetterUrl;
+
+        if (hasJL) {
+          return <Tooltip title="Uploaded"><Tag color="success" className="m-0 rounded text-[10px]">Yes</Tag></Tooltip>;
         }
+        return <Tooltip title="Not Uploaded"><span className="text-text-tertiary text-[10px]">No</span></Tooltip>;
+      },
+    },
+    {
+      title: 'Reports',
+      key: 'reports',
+      width: 65,
+      align: 'center',
+      render: (_, record) => {
+        // Count from monthlyReports array or use provided counts
+        const submitted = record.reportsSubmitted ?? record.monthlyReportsCount ?? record.monthlyReports?.length ?? 0;
+        const expected = record.reportsExpected ?? record.expectedReportsCount ?? 0;
+        const color = expected === 0 ? 'default' : submitted >= expected ? 'success' : submitted > 0 ? 'warning' : 'error';
         return (
-          <span className="text-sm text-text-secondary">
-            {new Date(record.lastFacultyVisit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
+          <Tooltip title={`${submitted} submitted of ${expected} expected`}>
+            <span className={`text-[10px] font-mono ${expected === 0 ? 'text-text-tertiary' : submitted >= expected ? 'text-success' : submitted > 0 ? 'text-warning' : 'text-error'}`}>
+              {submitted}/{expected}
+            </span>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Visits',
+      key: 'visits',
+      width: 55,
+      align: 'center',
+      render: (_, record) => {
+        // Count from facultyVisitLogs in approved application or use provided counts
+        const approvedApp = record.internshipApplications?.find(app => app.status === 'APPROVED');
+        const completed = record.visitsCompleted ?? record.facultyVisitsCount ?? approvedApp?.facultyVisitLogs?.length ?? 0;
+        const expected = record.visitsExpected ?? record.expectedVisitsCount ?? 0;
+        const color = expected === 0 ? 'default' : completed >= expected ? 'success' : completed > 0 ? 'warning' : 'error';
+        return (
+          <Tooltip title={`${completed} completed of ${expected} expected`}>
+            <span className={`text-[10px] font-mono ${expected === 0 ? 'text-text-tertiary' : completed >= expected ? 'text-success' : completed > 0 ? 'text-warning' : 'text-error'}`}>
+              {completed}/{expected}
+            </span>
+          </Tooltip>
         );
       },
     },
     {
       title: '',
       key: 'action',
-      width: 50,
+      width: 40,
       fixed: 'right',
       align: 'center',
       render: (_, record) => (
@@ -944,6 +1082,18 @@ const InstituteDetailView = ({ defaultTab = null }) => {
     );
   }
 
+  // Show full-page loader when switching institutions (loading but no data yet)
+  if (overview.loading && !overview.data) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Spin size="large" />
+          <Text className="block text-text-tertiary mt-4">Loading institution data...</Text>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Header - Minimal */}
@@ -1010,11 +1160,10 @@ const InstituteDetailView = ({ defaultTab = null }) => {
                         <Select.Option value="all">All Branches</Select.Option>
                         {availableBranches.map((b) => <Select.Option key={b} value={b}>{b}</Select.Option>)}
                       </Select>
-                      <Select value={reportStatusFilter} onChange={setReportStatusFilter} size="small" className="w-32">
-                        <Select.Option value="all">All Reports</Select.Option>
-                        <Select.Option value="draft">Draft</Select.Option>
-                        <Select.Option value="approved">Approved</Select.Option>
-                        <Select.Option value="not_submitted">Not Submitted</Select.Option>
+                      <Select value={statusFilter} onChange={setStatusFilter} size="small" className="w-28">
+                        <Select.Option value="all">All Status</Select.Option>
+                        <Select.Option value="active">Active</Select.Option>
+                        <Select.Option value="inactive">Inactive</Select.Option>
                       </Select>
                       <Button icon={<ReloadOutlined />} onClick={resetFilters} size="small" type="text" />
                     </div>
@@ -1026,18 +1175,24 @@ const InstituteDetailView = ({ defaultTab = null }) => {
                   {/* Table */}
                   <div className="rounded-xl border border-border flex-1 min-h-0 overflow-hidden bg-surface flex flex-col">
                     <div className="flex-1 min-h-0 overflow-auto">
-                      <Table
-                        columns={studentColumns}
-                        dataSource={students.list}
-                        rowKey="id"
-                        loading={students.loading}
-                        pagination={false}
-                        scroll={{ x: 900 }}
-                        size="small"
-                        className="custom-table"
-                      />
+                      {students.loading && students.list.length === 0 ? (
+                        <div className="flex items-center justify-center py-16">
+                          <Spin size="large" />
+                        </div>
+                      ) : (
+                        <Table
+                          columns={studentColumns}
+                          dataSource={students.list}
+                          rowKey="id"
+                          loading={students.loading && students.list.length > 0}
+                          pagination={false}
+                          scroll={{ x: 850 }}
+                          size="small"
+                          className="custom-table"
+                        />
+                      )}
                     </div>
-                    {students.hasMore && (
+                    {students.hasMore && !students.loading && (
                       <div className="text-center py-2 border-t border-border shrink-0">
                         <Button onClick={handleLoadMore} loading={students.loadingMore} size="small">Load More</Button>
                       </div>
@@ -1073,12 +1228,16 @@ const InstituteDetailView = ({ defaultTab = null }) => {
                   {/* Table */}
                   <div className="rounded-xl border border-border flex-1 min-h-0 overflow-hidden bg-surface flex flex-col">
                     <div className="flex-1 min-h-0 overflow-auto">
-                      {(companies.loading || companies.list?.length > 0) ? (
+                      {companies.loading && companies.list?.length === 0 ? (
+                        <div className="flex items-center justify-center py-16">
+                          <Spin size="large" />
+                        </div>
+                      ) : companies.list?.length > 0 ? (
                         <Table
                           columns={companyColumns}
                           dataSource={companies.list}
                           rowKey="id"
-                          loading={companies.loading}
+                          loading={companies.loading && companies.list.length > 0}
                           pagination={{ pageSize: 15, size: 'small', showSizeChanger: false }}
                           size="small"
                           scroll={{ x: 900 }}
@@ -1097,7 +1256,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
               label: <span className="flex items-center gap-2"><IdcardOutlined /> Faculty</span>,
               children: (
                 <div className="h-full overflow-y-auto hide-scrollbar p-4">
-                  <FacultyTab principal={facultyPrincipal.principal} faculty={facultyPrincipal.faculty} summary={facultyPrincipal.summary} loading={facultyPrincipal.loading} error={facultyPrincipal.error} />
+                  <FacultyTab principal={facultyPrincipal.principal} faculty={facultyPrincipal.faculty} summary={facultyPrincipal.summary} loading={facultyPrincipal.loading} error={facultyPrincipal.error} onDeleteFaculty={handleDeleteFaculty} />
                 </div>
               ),
             },
@@ -1106,7 +1265,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       </div>
 
       {/* Student Detail Modal */}
-      <StudentDetailModal visible={studentModalVisible} student={selectedStudent} onClose={() => setStudentModalVisible(false)} />
+      <StudentDetailModal visible={studentModalVisible} student={selectedStudent} onClose={() => setStudentModalVisible(false)} institutionId={selectedInstitute?.id} />
 
       {/* Company Detail Modal */}
       <Modal
@@ -1188,12 +1347,12 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       <Modal
         title={
           <div className="flex items-center gap-2 text-primary">
-            <TeamOutlined /> 
+            <TeamOutlined />
             <span className="font-bold text-lg">{mentorStudent?.mentorAssignments?.some(ma => ma.isActive) ? 'Change' : 'Assign'} Mentor</span>
           </div>
         }
         open={mentorModalVisible}
-        onCancel={() => { setMentorModalVisible(false); setMentorStudent(null); setSelectedMentorId(null); }}
+        onCancel={() => { setMentorModalVisible(false); setMentorStudent(null); setSelectedMentorId(null); setShowAllInstitutions(false); }}
         onOk={handleAssignMentor}
         okText="Save Assignment"
         confirmLoading={assigningMentor}
@@ -1201,6 +1360,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
         cancelButtonProps={{ className: "rounded-xl h-10 font-medium hover:bg-background-tertiary" }}
         destroyOnHidden
         className="rounded-2xl overflow-hidden"
+        width={550}
       >
         <div className="py-6">
           <div className="bg-background-tertiary/30 p-4 rounded-xl border border-border mb-6">
@@ -1212,7 +1372,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
                 <Text className="text-text-tertiary text-xs font-mono">{mentorStudent?.rollNumber}</Text>
               </div>
             </div>
-            
+
             {mentorStudent?.mentorAssignments?.find(ma => ma.isActive)?.mentor && (
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
                 <Text type="secondary" className="text-xs">Current Mentor:</Text>
@@ -1221,29 +1381,98 @@ const InstituteDetailView = ({ defaultTab = null }) => {
             )}
           </div>
 
-          <Text className="block mb-2 font-bold text-text-primary text-sm uppercase tracking-wide">Select New Mentor</Text>
+          {/* Toggle for cross-institution mentors */}
+          <div className="flex items-center justify-between mb-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+            <div>
+              <Text className="font-medium text-text-primary block">Show mentors from all institutions</Text>
+              <Text className="text-xs text-text-tertiary">Enable to assign mentors from other institutions</Text>
+            </div>
+            <Switch
+              checked={showAllInstitutions}
+              onChange={handleToggleAllInstitutions}
+              loading={allMentorsLoading}
+            />
+          </div>
+
+          <Text className="block mb-2 font-bold text-text-primary text-sm uppercase tracking-wide">
+            {showAllInstitutions ? 'Select Mentor from Any Institution' : 'Select Mentor from This Institution'}
+          </Text>
           <Select
             placeholder="Search for a mentor..."
-            loading={mentorsLoading}
+            loading={showAllInstitutions ? allMentorsLoading : mentorsLoading}
             value={selectedMentorId}
             onChange={setSelectedMentorId}
             style={{ width: '100%' }}
             size="large"
             className="rounded-xl"
             showSearch
-            optionFilterProp="children"
-            filterOption={(input, option) => option.children.toLowerCase().includes(input.toLowerCase())}
+            optionFilterProp="label"
+            filterOption={(input, option) => {
+              const mentor = (showAllInstitutions ? allMentorsFromStore : mentors).find(m => m.id === option.value);
+              if (!mentor) return false;
+              const searchLower = input.toLowerCase();
+              return mentor.name?.toLowerCase().includes(searchLower) ||
+                     mentor.email?.toLowerCase().includes(searchLower) ||
+                     mentor.institutionName?.toLowerCase().includes(searchLower);
+            }}
             suffixIcon={<SearchOutlined className="text-text-tertiary" />}
+            notFoundContent={
+              (showAllInstitutions ? allMentorsLoading : mentorsLoading)
+                ? <Spin size="small" />
+                : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No mentors found" />
+            }
           >
-            {mentors.map((mentor) => (
-              <Select.Option key={mentor.id} value={mentor.id}>
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-text-primary">{mentor.name}</span>
-                  <Tag className="m-0 rounded border-border bg-background text-xs text-text-secondary">{mentor.activeAssignments} students</Tag>
-                </div>
-              </Select.Option>
-            ))}
+            {(showAllInstitutions ? allMentorsFromStore : mentors).map((mentor) => {
+              const isExternal = showAllInstitutions && mentor.institutionId !== selectedInstitute?.id;
+              return (
+                <Select.Option key={mentor.id} value={mentor.id} label={mentor.name}>
+                  <div className="flex justify-between items-center py-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-text-primary">{mentor.name}</span>
+                        {isExternal && (
+                          <Tag color="purple" className="m-0 text-[10px] px-1.5 border-0">External</Tag>
+                        )}
+                      </div>
+                      {showAllInstitutions && (
+                        <div className="text-[11px] text-text-tertiary truncate">
+                          <BankOutlined className="mr-1" />
+                          {mentor.institutionName || 'Unknown Institution'}
+                          {mentor.institutionCode && <span className="ml-1">({mentor.institutionCode})</span>}
+                        </div>
+                      )}
+                    </div>
+                    <Tag className="m-0 ml-2 rounded border-border bg-background text-[10px] text-text-secondary shrink-0">
+                      {mentor.activeAssignments} students
+                    </Tag>
+                  </div>
+                </Select.Option>
+              );
+            })}
           </Select>
+
+          {showAllInstitutions && selectedMentorId && (
+            (() => {
+              const selectedMentor = allMentorsFromStore.find(m => m.id === selectedMentorId);
+              const isExternal = selectedMentor?.institutionId !== selectedInstitute?.id;
+              if (isExternal && selectedMentor) {
+                return (
+                  <Alert
+                    type="info"
+                    className="mt-3 rounded-lg"
+                    message={
+                      <span className="text-sm">
+                        <strong>{selectedMentor.name}</strong> is from <strong>{selectedMentor.institutionName}</strong>.
+                        This is a cross-institution assignment.
+                      </span>
+                    }
+                    showIcon
+                  />
+                );
+              }
+              return null;
+            })()
+          )}
         </div>
       </Modal>
     </div>

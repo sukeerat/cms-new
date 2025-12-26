@@ -104,6 +104,12 @@ const initialState = {
     loading: false,
     error: null,
   },
+  // All mentors across all institutions (for cross-institution assignment)
+  allMentors: {
+    list: [],
+    loading: false,
+    error: null,
+  },
   institutionsWithStats: {
     list: [],
     pagination: null,
@@ -874,6 +880,18 @@ export const fetchInstitutionMentors = createAsyncThunk(
   }
 );
 
+export const fetchAllMentors = createAsyncThunk(
+  'state/fetchAllMentors',
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await stateService.getAllMentors(params);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch all mentors');
+    }
+  }
+);
+
 export const assignMentorToStudent = createAsyncThunk(
   'state/assignMentorToStudent',
   async ({ studentId, mentorId }, { rejectWithValue }) => {
@@ -907,6 +925,19 @@ export const deleteInstituteStudent = createAsyncThunk(
       return { studentId, institutionId, ...response };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete student');
+    }
+  }
+);
+
+// Delete Faculty thunk
+export const deleteInstituteFaculty = createAsyncThunk(
+  'state/deleteInstituteFaculty',
+  async ({ facultyId, institutionId }, { rejectWithValue }) => {
+    try {
+      const response = await stateService.deleteFaculty(facultyId);
+      return { facultyId, institutionId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete faculty');
     }
   }
 );
@@ -1111,14 +1142,33 @@ const stateSlice = createSlice({
       }
     },
     setSelectedInstitute: (state, action) => {
-      state.selectedInstitute.id = action.payload;
-      // Don't clear data - let caching handle when to refetch
-      // Reset loading states only
-      state.instituteOverview.loading = false;
-      state.instituteStudents.loading = false;
-      state.instituteStudents.loadingMore = false;
-      state.instituteCompanies.loading = false;
-      state.instituteFacultyPrincipal.loading = false;
+      const newId = action.payload;
+      const oldId = state.selectedInstitute.id;
+
+      // If switching to a different institution, clear all cached data to force fresh fetch
+      if (oldId !== newId) {
+        // Clear cached data for the new institution to force fresh fetch
+        state.instituteOverview = { data: null, loading: true, error: null };
+        state.instituteStudents = { list: [], cursor: null, hasMore: true, total: 0, filters: { branches: [] }, loading: true, loadingMore: false, error: null };
+        state.instituteCompanies = { list: [], total: 0, summary: null, loading: true, error: null };
+        state.instituteFacultyPrincipal = { principal: null, faculty: [], summary: null, loading: true, error: null };
+
+        // Clear cache timestamps for this specific institution to force re-fetch
+        if (state.lastFetched.instituteOverview) {
+          delete state.lastFetched.instituteOverview[newId];
+        }
+        if (state.lastFetched.instituteStudents) {
+          delete state.lastFetched.instituteStudents[newId];
+        }
+        if (state.lastFetched.instituteCompanies) {
+          delete state.lastFetched.instituteCompanies[newId];
+        }
+        if (state.lastFetched.instituteFaculty) {
+          delete state.lastFetched.instituteFaculty[newId];
+        }
+      }
+
+      state.selectedInstitute.id = newId;
     },
     clearSelectedInstitute: (state) => {
       state.selectedInstitute = { id: null, data: null, loading: false, error: null };
@@ -1796,6 +1846,20 @@ const stateSlice = createSlice({
         state.instituteFacultyPrincipal.error = action.payload;
       })
 
+      // All Mentors (cross-institution)
+      .addCase(fetchAllMentors.pending, (state) => {
+        state.allMentors.loading = true;
+        state.allMentors.error = null;
+      })
+      .addCase(fetchAllMentors.fulfilled, (state, action) => {
+        state.allMentors.loading = false;
+        state.allMentors.list = action.payload.data || action.payload || [];
+      })
+      .addCase(fetchAllMentors.rejected, (state, action) => {
+        state.allMentors.loading = false;
+        state.allMentors.error = action.payload;
+      })
+
       // Delete Student
       .addCase(deleteInstituteStudent.fulfilled, (state, action) => {
         // Remove student from list
@@ -1807,6 +1871,23 @@ const stateSlice = createSlice({
         if (action.payload.institutionId) {
           if (state.lastFetched.instituteStudents) {
             delete state.lastFetched.instituteStudents[action.payload.institutionId];
+          }
+          if (state.lastFetched.instituteOverview) {
+            delete state.lastFetched.instituteOverview[action.payload.institutionId];
+          }
+        }
+      })
+
+      // Delete Faculty
+      .addCase(deleteInstituteFaculty.fulfilled, (state, action) => {
+        // Remove faculty from list
+        state.instituteFacultyPrincipal.faculty = state.instituteFacultyPrincipal.faculty.filter(
+          f => f.id !== action.payload.facultyId
+        );
+        // Invalidate caches for this institution to force refresh on next visit
+        if (action.payload.institutionId) {
+          if (state.lastFetched.instituteFaculty) {
+            delete state.lastFetched.instituteFaculty[action.payload.institutionId];
           }
           if (state.lastFetched.instituteOverview) {
             delete state.lastFetched.instituteOverview[action.payload.institutionId];
@@ -2026,6 +2107,11 @@ export const selectInstituteOverview = (state) => state.state?.instituteOverview
 export const selectInstituteStudents = (state) => state.state?.instituteStudents ?? { list: [], cursor: null, hasMore: true, total: 0, loading: false, loadingMore: false, error: null, filters: { branches: [] } };
 export const selectInstituteCompanies = (state) => state.state?.instituteCompanies ?? { list: [], total: 0, summary: null, loading: false, error: null };
 export const selectInstituteFacultyPrincipal = (state) => state.state?.instituteFacultyPrincipal ?? { principal: null, faculty: [], summary: null, loading: false, error: null };
+
+// All Mentors selectors (cross-institution)
+export const selectAllMentors = (state) => state.state?.allMentors?.list ?? [];
+export const selectAllMentorsLoading = (state) => state.state?.allMentors?.loading ?? false;
+export const selectAllMentorsError = (state) => state.state?.allMentors?.error ?? null;
 
 // Critical Alerts selectors
 export const selectCriticalAlerts = (state) => state.state?.criticalAlerts?.data ?? null;

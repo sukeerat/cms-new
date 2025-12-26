@@ -369,6 +369,10 @@ export class StateService {
   // MENTOR METHODS
   // ==========================================
 
+  async getAllMentors(params?: { search?: string; institutionId?: string }) {
+    return this.mentorService.getAllMentors(params);
+  }
+
   async getInstitutionMentors(institutionId: string) {
     return this.mentorService.getInstitutionMentors(institutionId);
   }

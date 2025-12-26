@@ -28,3 +28,10 @@ export const getImageUrl = (relativePath) => {
   // Otherwise, prepend the uploads base URL
   return `${UPLOADS_BASE_URL}/${relativePath}`;
 };
+
+/**
+ * Alias for getImageUrl - works for any file type (documents, PDFs, etc.)
+ * @param {string} relativePath - Relative path from database
+ * @returns {string|null} - Full URL or null if no path provided
+ */
+export const getFileUrl = getImageUrl;

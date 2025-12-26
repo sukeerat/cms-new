@@ -158,6 +158,65 @@ export class StudentController {
     return this.studentService.withdrawApplication(req.user.userId, id);
   }
 
+  @Put('applications/:id')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Update self-identified application (company info, joining letter)' })
+  @ApiResponse({ status: 200, description: 'Application updated successfully' })
+  async updateApplication(@Req() req, @Param('id') id: string, @Body() updateDto: any) {
+    return this.studentService.updateSelfIdentifiedApplication(req.user.userId, id, updateDto);
+  }
+
+  @Put('applications/:id/joining-letter')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Upload or replace joining letter' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Joining letter uploaded successfully' })
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadJoiningLetter(
+    @Req() req,
+    @Param('id') applicationId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Validate file type
+    if (file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Only PDF files are allowed');
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    // Get student info for proper file path
+    const profile = await this.studentService.getProfile(req.user.userId);
+
+    // Upload to MinIO
+    const result = await this.fileStorageService.uploadStudentDocument(file, {
+      institutionId: profile.institutionId || 'default',
+      studentId: profile.id,
+      documentType: 'joining-letter',
+    });
+
+    // Update application with new joining letter URL
+    return this.studentService.updateSelfIdentifiedApplication(req.user.userId, applicationId, {
+      joiningLetterUrl: result.url,
+    });
+  }
+
+  @Delete('applications/:id/joining-letter')
+  @Roles(Role.STUDENT)
+  @ApiOperation({ summary: 'Delete joining letter' })
+  @ApiResponse({ status: 200, description: 'Joining letter deleted successfully' })
+  async deleteJoiningLetter(@Req() req, @Param('id') applicationId: string) {
+    return this.studentService.updateSelfIdentifiedApplication(req.user.userId, applicationId, {
+      deleteJoiningLetter: true,
+    });
+  }
+
   // Self-Identified Internships
   @Post('self-identified')
   @Roles(Role.STUDENT)

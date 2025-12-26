@@ -3,13 +3,22 @@
  * Centralized constants for grievance categories, statuses, and priorities
  */
 
+// Must match Prisma GrievanceCategory enum
 export const GRIEVANCE_CATEGORIES = [
-  { value: 'ACADEMIC', label: 'Academic', color: 'blue', description: 'Issues related to academic matters' },
-  { value: 'INTERNSHIP', label: 'Internship', color: 'cyan', description: 'Internship-related concerns' },
-  { value: 'FACULTY', label: 'Faculty', color: 'purple', description: 'Faculty interaction or support issues' },
-  { value: 'INDUSTRY', label: 'Industry', color: 'orange', description: 'Industry partner related issues' },
-  { value: 'PLACEMENT', label: 'Placement', color: 'green', description: 'Placement and career concerns' },
-  { value: 'TECHNICAL', label: 'Technical', color: 'geekblue', description: 'Technical or infrastructure issues' },
+  { value: 'INTERNSHIP_RELATED', label: 'Internship Related', color: 'cyan', description: 'Issues related to your internship' },
+  { value: 'MENTOR_RELATED', label: 'Mentor Related', color: 'purple', description: 'Issues with faculty mentor support' },
+  { value: 'INDUSTRY_RELATED', label: 'Industry Related', color: 'orange', description: 'Industry partner related issues' },
+  { value: 'PAYMENT_ISSUE', label: 'Payment Issue', color: 'gold', description: 'Stipend or payment concerns' },
+  { value: 'WORKPLACE_HARASSMENT', label: 'Workplace Harassment', color: 'red', description: 'Harassment at workplace' },
+  { value: 'WORK_CONDITION', label: 'Work Condition', color: 'volcano', description: 'Working conditions concerns' },
+  { value: 'WORK_ENVIRONMENT', label: 'Work Environment', color: 'geekblue', description: 'Issues with work environment' },
+  { value: 'SAFETY_CONCERN', label: 'Safety Concern', color: 'magenta', description: 'Safety related issues' },
+  { value: 'HARASSMENT', label: 'Harassment', color: 'red', description: 'General harassment concerns' },
+  { value: 'MENTORSHIP', label: 'Mentorship', color: 'blue', description: 'Mentorship quality issues' },
+  { value: 'LEARNING_OPPORTUNITY', label: 'Learning Opportunity', color: 'green', description: 'Lack of learning opportunities' },
+  { value: 'DISCRIMINATION', label: 'Discrimination', color: 'red', description: 'Discrimination concerns' },
+  { value: 'WORK_HOURS', label: 'Work Hours', color: 'lime', description: 'Issues with work hours' },
+  { value: 'DOCUMENTATION', label: 'Documentation', color: 'cyan', description: 'Documentation related issues' },
   { value: 'OTHER', label: 'Other', color: 'default', description: 'Other concerns' },
 ];
 
@@ -34,7 +43,7 @@ export const GRIEVANCE_PRIORITIES = [
  * @returns {Object} Category configuration
  */
 export const getCategoryConfig = (value) => {
-  return GRIEVANCE_CATEGORIES.find(c => c.value === value) || GRIEVANCE_CATEGORIES[6];
+  return GRIEVANCE_CATEGORIES.find(c => c.value === value) || GRIEVANCE_CATEGORIES[GRIEVANCE_CATEGORIES.length - 1];
 };
 
 /**

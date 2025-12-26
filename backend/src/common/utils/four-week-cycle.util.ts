@@ -1,5 +1,22 @@
 /**
- * 4-Week Cycle Utility
+ * @deprecated This file is DEPRECATED as of December 2025.
+ * Use `monthly-cycle.util.ts` instead for the new Fixed Monthly Cycle system.
+ *
+ * This file is kept for reference only and will be removed in a future release.
+ *
+ * Migration Guide:
+ * - calculateFourWeekCycles() → calculateExpectedMonths()
+ * - getTotalExpectedCycles() → getTotalExpectedCount()
+ * - getExpectedReportsAsOfToday() → same name in monthly-cycle.util.ts
+ * - getExpectedVisitsAsOfToday() → same name in monthly-cycle.util.ts
+ * - FourWeekCycle interface → MonthlyCycle interface
+ * - FOUR_WEEK_CYCLE constant → MONTHLY_CYCLE constant
+ *
+ * ============================================================================
+ * LEGACY CODE BELOW - DO NOT USE IN NEW IMPLEMENTATIONS
+ * ============================================================================
+ *
+ * 4-Week Cycle Utility (DEPRECATED)
  *
  * Implements the compliance calculation specification:
  * - Reports are due every 4 weeks from internship startDate

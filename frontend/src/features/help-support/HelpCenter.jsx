@@ -16,6 +16,7 @@ import {
   Form,
   Select,
   Upload,
+  Divider,
 } from 'antd';
 import {
   SearchOutlined,
@@ -25,7 +26,9 @@ import {
   CustomerServiceOutlined,
   UploadOutlined,
   LikeOutlined,
+  DislikeOutlined,
   EyeOutlined,
+  FireOutlined,
 } from '@ant-design/icons';
 import { helpSupportService, SUPPORT_CATEGORIES, TICKET_PRIORITY } from '../../services/helpSupport.service';
 import { useAuth } from '../../hooks/useAuth';
@@ -33,7 +36,7 @@ import { useAuth } from '../../hooks/useAuth';
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-// Enhanced markdown-like text to HTML converter
+// Enhanced markdown-like text to HTML converter with table support
 const renderMarkdown = (text) => {
   if (!text) return '';
 
@@ -41,6 +44,41 @@ const renderMarkdown = (text) => {
   const paragraphs = text.split(/\n\n+/);
 
   const processedParagraphs = paragraphs.map(para => {
+    // Check if this is a table (contains | characters on multiple lines)
+    const lines = para.split('\n');
+    const isTable = lines.length >= 2 &&
+      lines[0].includes('|') &&
+      lines[1].includes('|') &&
+      lines.some(l => l.match(/^[\s|:-]+$/)); // Has separator row
+
+    if (isTable) {
+      const tableLines = lines.filter(l => l.trim() && !l.match(/^[\s|:-]+$/));
+      if (tableLines.length > 0) {
+        const headerCells = tableLines[0].split('|').map(c => c.trim()).filter(c => c);
+        const bodyRows = tableLines.slice(1);
+
+        let tableHtml = `<div class="overflow-x-auto my-4"><table class="w-full text-sm border-collapse">`;
+        tableHtml += `<thead><tr class="bg-background-tertiary">`;
+        headerCells.forEach(cell => {
+          tableHtml += `<th class="text-left px-3 py-2 font-semibold text-text-primary border-b border-border">${cell}</th>`;
+        });
+        tableHtml += `</tr></thead><tbody>`;
+
+        bodyRows.forEach((row, idx) => {
+          const cells = row.split('|').map(c => c.trim()).filter(c => c);
+          const rowClass = idx % 2 === 1 ? 'bg-background-secondary/30' : '';
+          tableHtml += `<tr class="${rowClass}">`;
+          cells.forEach(cell => {
+            tableHtml += `<td class="px-3 py-2 text-text-secondary border-b border-border/50">${cell}</td>`;
+          });
+          tableHtml += `</tr>`;
+        });
+
+        tableHtml += `</tbody></table></div>`;
+        return tableHtml;
+      }
+    }
+
     let html = para
       // Escape HTML entities
       .replace(/&/g, '&amp;')
@@ -52,12 +90,12 @@ const renderMarkdown = (text) => {
       .replace(/`([^`]+)`/g, '<code class="bg-background-tertiary px-1.5 py-0.5 rounded text-primary text-sm font-mono">$1</code>');
 
     // Check if this paragraph is a list
-    const lines = html.split('\n');
-    const isBulletList = lines.every(line => line.trim() === '' || line.trim().startsWith('•') || line.trim().startsWith('-'));
-    const isNumberedList = lines.every(line => line.trim() === '' || /^\d+\./.test(line.trim()));
+    const listLines = html.split('\n');
+    const isBulletList = listLines.every(line => line.trim() === '' || line.trim().startsWith('•') || line.trim().startsWith('-'));
+    const isNumberedList = listLines.every(line => line.trim() === '' || /^\d+\./.test(line.trim()));
 
-    if (isBulletList && lines.some(line => line.trim().startsWith('•') || line.trim().startsWith('-'))) {
-      const listItems = lines
+    if (isBulletList && listLines.some(line => line.trim().startsWith('•') || line.trim().startsWith('-'))) {
+      const listItems = listLines
         .filter(line => line.trim())
         .map(line => {
           const content = line.replace(/^[•-]\s*/, '').trim();
@@ -67,8 +105,8 @@ const renderMarkdown = (text) => {
       return `<ul class="list-disc list-outside ml-5 my-3 space-y-1 text-text-secondary">${listItems}</ul>`;
     }
 
-    if (isNumberedList && lines.some(line => /^\d+\./.test(line.trim()))) {
-      const listItems = lines
+    if (isNumberedList && listLines.some(line => /^\d+\./.test(line.trim()))) {
+      const listItems = listLines
         .filter(line => line.trim())
         .map(line => {
           const content = line.replace(/^\d+\.\s*/, '').trim();
@@ -96,10 +134,12 @@ const HelpCenter = () => {
   const [loading, setLoading] = useState(true);
   const [faqs, setFaqs] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [popularFaqs, setPopularFaqs] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [activeKey, setActiveKey] = useState(null);
 
   // Ticket modal state
   const [ticketModalVisible, setTicketModalVisible] = useState(false);
@@ -110,12 +150,14 @@ const HelpCenter = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [faqsData, categoriesData] = await Promise.all([
+      const [faqsData, categoriesData, popularData] = await Promise.all([
         helpSupportService.getPublishedFAQs(),
         helpSupportService.getFAQCategories(),
+        helpSupportService.getPopularFAQs(5),
       ]);
       setFaqs(faqsData);
       setCategories(categoriesData);
+      setPopularFaqs(popularData);
     } catch (error) {
       console.error('Failed to fetch FAQs:', error);
       message.error('Failed to load help articles');
@@ -168,8 +210,22 @@ const HelpCenter = () => {
     try {
       await helpSupportService.markFAQHelpful(id);
       message.success('Thanks for your feedback!');
+      // Update local state to reflect the change
+      setFaqs(prev => prev.map(faq =>
+        faq.id === id ? { ...faq, helpfulCount: (faq.helpfulCount || 0) + 1 } : faq
+      ));
     } catch (error) {
       console.error('Failed to mark FAQ helpful:', error);
+    }
+  };
+
+  // Handle vote (helpful/not helpful)
+  const handleVote = async (id, type) => {
+    if (type === 'up') {
+      await handleMarkHelpful(id);
+    } else {
+      // For 'down' votes, just show feedback message (no backend tracking for unhelpful)
+      message.info('Thanks for your feedback! We\'ll work to improve this article.');
     }
   };
 
@@ -254,7 +310,7 @@ const HelpCenter = () => {
               className="rounded-2xl border-border shadow-sm bg-surface"
               size="small"
             >
-              <Space orientation="vertical" style={{ width: '100%' }}>
+              <Space direction="vertical" style={{ width: '100%' }} size="small">
                 <Button
                   type={selectedCategory === null ? 'primary' : 'text'}
                   block
@@ -276,6 +332,49 @@ const HelpCenter = () => {
                 ))}
               </Space>
             </Card>
+
+            {/* Popular Articles */}
+            {popularFaqs.length > 0 && (
+              <Card
+                title={
+                  <div className="flex items-center gap-2">
+                    <FireOutlined className="text-orange-500" />
+                    <span className="font-bold text-text-primary">Popular Articles</span>
+                  </div>
+                }
+                className="mt-4 rounded-2xl border-border shadow-sm bg-surface"
+                size="small"
+              >
+                <Space direction="vertical" style={{ width: '100%' }} size={0}>
+                  {popularFaqs.slice(0, 5).map((faq, index) => (
+                    <div
+                      key={faq.id}
+                      className="py-2 border-b border-border/50 last:border-0 cursor-pointer hover:bg-background-secondary/30 -mx-3 px-3 transition-colors"
+                      onClick={() => {
+                        setSelectedCategory(null);
+                        setSearchQuery('');
+                        setSearchResults(null);
+                        setActiveKey(faq.id);
+                        // Scroll to the FAQ after a short delay to allow state updates
+                        setTimeout(() => {
+                          document.getElementById(`faq-${faq.id}`)?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center',
+                          });
+                        }, 100);
+                      }}
+                    >
+                      <Text className="text-text-primary text-sm leading-snug line-clamp-2 hover:text-primary">
+                        {index + 1}. {faq.title}
+                      </Text>
+                      <Text className="text-text-tertiary text-xs flex items-center gap-1 mt-1">
+                        <EyeOutlined /> {faq.viewCount} views
+                      </Text>
+                    </div>
+                  ))}
+                </Space>
+              </Card>
+            )}
 
             {/* Submit Ticket Card */}
             <Card className="mt-4 rounded-2xl border-border shadow-sm bg-surface" size="small">
@@ -329,37 +428,17 @@ const HelpCenter = () => {
                 <Card className="rounded-2xl border-border shadow-sm bg-surface overflow-hidden" styles={{ body: { padding: 0 } }}>
                   <Collapse
                     accordion
+                    activeKey={activeKey}
+                    onChange={(key) => setActiveKey(key)}
                     expandIconPosition="end"
                     ghost
                     className="custom-collapse"
                     items={displayFAQs.map((faq) => ({
                       key: faq.id,
-                      header: (
-                        <div className="py-3">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                              <QuestionCircleOutlined className="text-primary text-sm" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <Text strong className="text-text-primary text-[15px] block mb-1.5 leading-snug">{faq.title}</Text>
-                              <Space size={8} wrap>
-                                <Tag color={getCategoryInfo(faq.category).color} className="rounded-md border-0 font-bold uppercase tracking-wider text-[10px] m-0">
-                                  {getCategoryInfo(faq.category).label}
-                                </Tag>
-                                <Text className="text-text-tertiary text-xs flex items-center gap-1">
-                                  <EyeOutlined /> {faq.viewCount} views
-                                </Text>
-                                <Text className="text-text-tertiary text-xs flex items-center gap-1">
-                                  <LikeOutlined /> {faq.helpfulCount || 0} found helpful
-                                </Text>
-                              </Space>
-                            </div>
-                          </div>
-                        </div>
-                      ),
+                      id: `faq-${faq.id}`,
                       className: "border-b border-border last:border-0 hover:bg-background-secondary/30 transition-colors",
                       label: (
-                        <div className="py-3">
+                        <div className="py-3" id={`faq-${faq.id}`}>
                           <div className="flex items-start gap-3">
                             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                               <QuestionCircleOutlined className="text-primary text-sm" />
@@ -388,18 +467,19 @@ const HelpCenter = () => {
                               <Text className="text-text-secondary text-sm italic">{faq.summary}</Text>
                             </div>
                           )}
-                          <Paragraph className="text-text-secondary leading-relaxed mb-6">
-                            {faq.content}
-                          </Paragraph>
-                          
+                          <div
+                            className="faq-content text-text-secondary leading-relaxed mb-6"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(faq.content) }}
+                          />
+
                           <Divider className="my-4 border-border/50" />
-                          
+
                           <div className="flex items-center justify-between">
                             <Text className="text-xs text-text-tertiary font-medium">Was this helpful?</Text>
                             <Space>
-                              <Button 
-                                size="small" 
-                                icon={<LikeOutlined />} 
+                              <Button
+                                size="small"
+                                icon={<LikeOutlined />}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleVote(faq.id, 'up');
@@ -408,9 +488,9 @@ const HelpCenter = () => {
                               >
                                 Yes
                               </Button>
-                              <Button 
-                                size="small" 
-                                icon={<DislikeOutlined />} 
+                              <Button
+                                size="small"
+                                icon={<DislikeOutlined />}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleVote(faq.id, 'down');

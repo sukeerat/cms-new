@@ -36,6 +36,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { grievanceService } from '../../../services/grievance.service';
+import { studentService } from '../../../services/student.service';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 
@@ -51,14 +52,22 @@ const ESCALATION_LEVELS = {
   STATE_DIRECTORATE: { label: 'State Directorate', color: 'red', icon: <GlobalOutlined />, order: 2 },
 };
 
-// Constants
+// Constants - Must match Prisma GrievanceCategory enum
 const CATEGORIES = [
-  { value: 'ACADEMIC', label: 'Academic', description: 'Issues related to academic matters' },
-  { value: 'INTERNSHIP', label: 'Internship', description: 'Internship-related concerns' },
-  { value: 'FACULTY', label: 'Faculty', description: 'Faculty interaction or support issues' },
-  { value: 'INDUSTRY', label: 'Industry', description: 'Industry partner related issues' },
-  { value: 'PLACEMENT', label: 'Placement', description: 'Placement and career concerns' },
-  { value: 'TECHNICAL', label: 'Technical', description: 'Technical or infrastructure issues' },
+  { value: 'INTERNSHIP_RELATED', label: 'Internship Related', description: 'Issues related to your internship' },
+  { value: 'MENTOR_RELATED', label: 'Mentor Related', description: 'Issues with faculty mentor support' },
+  { value: 'INDUSTRY_RELATED', label: 'Industry Related', description: 'Industry partner related issues' },
+  { value: 'PAYMENT_ISSUE', label: 'Payment Issue', description: 'Stipend or payment concerns' },
+  { value: 'WORKPLACE_HARASSMENT', label: 'Workplace Harassment', description: 'Harassment at workplace' },
+  { value: 'WORK_CONDITION', label: 'Work Condition', description: 'Working conditions concerns' },
+  { value: 'WORK_ENVIRONMENT', label: 'Work Environment', description: 'Issues with work environment' },
+  { value: 'SAFETY_CONCERN', label: 'Safety Concern', description: 'Safety related issues' },
+  { value: 'HARASSMENT', label: 'Harassment', description: 'General harassment concerns' },
+  { value: 'MENTORSHIP', label: 'Mentorship', description: 'Mentorship quality issues' },
+  { value: 'LEARNING_OPPORTUNITY', label: 'Learning Opportunity', description: 'Lack of learning opportunities' },
+  { value: 'DISCRIMINATION', label: 'Discrimination', description: 'Discrimination concerns' },
+  { value: 'WORK_HOURS', label: 'Work Hours', description: 'Issues with work hours' },
+  { value: 'DOCUMENTATION', label: 'Documentation', description: 'Documentation related issues' },
   { value: 'OTHER', label: 'Other', description: 'Other concerns' },
 ];
 
@@ -100,17 +109,17 @@ const SubmitGrievance = () => {
   }, []);
 
   useEffect(() => {
-    if (userInfo?.id) {
-      fetchMyGrievances();
-    }
-  }, [userInfo]);
+    fetchMyGrievances();
+  }, []);
 
   const fetchMyGrievances = async () => {
     try {
       setLoading(true);
-      // Use student-specific endpoint for better data including escalation chain
-      const response = await grievanceService.getByStudentId(userInfo.id);
-      setGrievances(response || []);
+      // Use student portal endpoint - same as dashboard (works with JWT auth)
+      const response = await studentService.getGrievances();
+      // Handle both array and paginated response formats
+      const grievancesList = response?.data || response?.grievances || response || [];
+      setGrievances(Array.isArray(grievancesList) ? grievancesList : []);
     } catch (error) {
       console.error('Error fetching grievances:', error);
       toast.error('Failed to load your grievances');
@@ -125,14 +134,14 @@ const SubmitGrievance = () => {
 
       const grievanceData = {
         category: values.category,
-        subject: values.subject,
+        title: values.subject,  // Backend expects 'title', form uses 'subject'
         description: values.description,
-        priority: values.priority,
+        severity: values.priority,  // Backend expects 'severity', form uses 'priority'
         attachments: fileList.map(file => file.response?.url || file.url).filter(Boolean),
-        isAnonymous: values.isAnonymous || false,
       };
 
-      await grievanceService.submit(grievanceData);
+      // Use student portal endpoint for consistency
+      await studentService.submitGrievance(grievanceData);
       toast.success('Grievance submitted successfully!');
       form.resetFields();
       setFileList([]);

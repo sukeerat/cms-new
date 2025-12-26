@@ -1,15 +1,12 @@
 import React, { memo } from 'react';
-import { Card, Typography, Tag, Button, Avatar, Progress, Space, Tooltip, Divider, Spin } from 'antd';
+import { Card, Typography, Tag, Button, Avatar, Progress, Divider, Spin, Empty } from 'antd';
 import {
   BankOutlined,
   CalendarOutlined,
   EnvironmentOutlined,
   UserOutlined,
-  PhoneOutlined,
-  MailOutlined,
-  CheckCircleOutlined,
   ClockCircleOutlined,
-  FileTextOutlined,
+  RightOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -19,37 +16,39 @@ const { Title, Text } = Typography;
 const ActiveInternshipCard = ({
   internship,
   onViewDetails,
-  onUploadReport,
-  monthlyReportStatus,
-  canUploadReport,
   loading = false,
+  studentMentor = null, // Fallback mentor from student's mentorAssignments
 }) => {
-  // Show loading state while data is being fetched
+  // Show loading state
   if (loading) {
     return (
-      <Card className="h-full border border-border rounded-xl">
-        <div className="text-center py-8">
+      <Card className="h-full rounded-2xl border border-border">
+        <div className="flex items-center justify-center py-16">
           <Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} />
-          <Title level={5} className="mt-4 text-text-tertiary">
-            Loading internship...
-          </Title>
         </div>
       </Card>
     );
   }
 
+  // Show empty state
   if (!internship) {
     return (
-      <Card className="h-full border border-border rounded-xl">
-        <div className="text-center py-8">
-          <BankOutlined className="text-5xl text-text-tertiary" />
-          <Title level={5} className="mt-4 text-text-tertiary">
-            No Active Internship
-          </Title>
-          <Text type="secondary">
-            Apply for internships to get started
-          </Text>
-        </div>
+      <Card className="h-full rounded-2xl border border-border">
+        <Empty
+          image={<BankOutlined className="text-6xl text-gray-300" />}
+          imageStyle={{ height: 80 }}
+          description={
+            <div className="text-center">
+              <Title level={5} className="text-gray-500 mb-1">No Active Internship</Title>
+              <Text type="secondary">Apply for internships or add a self-identified one to get started</Text>
+            </div>
+          }
+          className="py-12"
+        >
+          <Button type="primary" onClick={() => window.location.href = '/internships'}>
+            Browse Internships
+          </Button>
+        </Empty>
       </Card>
     );
   }
@@ -57,8 +56,6 @@ const ActiveInternshipCard = ({
   // Handle self-identified vs regular internships
   const isSelfIdentified = internship.isSelfIdentified || !internship.internshipId;
 
-  // For self-identified: companyName is directly on application
-  // For regular: companyName is in internship.industry
   const company = isSelfIdentified
     ? { companyName: internship.companyName, city: internship.companyAddress?.split(',')[0] }
     : (internship.internship?.industry || internship.industry || {});
@@ -69,143 +66,141 @@ const ActiveInternshipCard = ({
 
   // Calculate progress
   const totalDays = endDate && startDate ? dayjs(endDate).diff(dayjs(startDate), 'day') : 0;
-  const daysCompleted = startDate ? dayjs().diff(dayjs(startDate), 'day') : 0;
+  const daysCompleted = startDate ? Math.max(0, dayjs().diff(dayjs(startDate), 'day')) : 0;
+  const daysRemaining = totalDays > 0 ? Math.max(0, totalDays - daysCompleted) : 0;
   const progressPercent = totalDays > 0 ? Math.min(Math.round((daysCompleted / totalDays) * 100), 100) : 0;
+
+  const getStatusConfig = (status) => {
+    const configs = {
+      SELECTED: { color: 'green', label: 'Selected' },
+      APPROVED: { color: 'green', label: isSelfIdentified ? 'Active' : 'Approved' },
+      JOINED: { color: 'purple', label: 'Ongoing' },
+      COMPLETED: { color: 'cyan', label: 'Completed' },
+    };
+    return configs[status] || { color: 'blue', label: status };
+  };
+
+  const statusConfig = getStatusConfig(internship.status);
 
   return (
     <Card
-      className="h-full border border-border rounded-xl hover:shadow-md transition-shadow"
-      title={
-        <div className="flex items-center gap-3">
+      className="h-full rounded-2xl border border-border hover:shadow-lg transition-shadow duration-300"
+      styles={{ body: { padding: '24px' } }}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-center gap-4">
           <Avatar
-            size={48}
+            size={56}
             icon={<BankOutlined />}
             src={company.logo}
-            className="bg-primary"
+            className="bg-blue-50 text-blue-500"
           />
           <div>
-            <Title level={5} className="m-0">
-              {company.companyName || 'Company'}
-            </Title>
-            <Text type="secondary" className="text-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <Title level={4} className="m-0">
+                {company.companyName || 'Company'}
+              </Title>
+              {isSelfIdentified && (
+                <Tag color="purple" className="text-xs">Self-Identified</Tag>
+              )}
+            </div>
+            <Text className="text-gray-500">
               {internship.jobProfile || internship.internship?.title || 'Internship'}
             </Text>
           </div>
         </div>
-      }
-      extra={
-        <Tag color={
-          internship.status === 'SELECTED' || internship.status === 'APPROVED' ? 'green' :
-          internship.status === 'JOINED' ? 'purple' :
-          internship.status === 'COMPLETED' ? 'cyan' : 'blue'
-        }>
-          {internship.isSelfIdentified && internship.status === 'APPROVED' ? 'Self-Identified' : internship.status}
+        <Tag color={statusConfig.color} className="text-sm px-3 py-1">
+          {statusConfig.label}
         </Tag>
-      }
-    >
-      <Space orientation="vertical" className="w-full" size="middle">
-        {/* Duration Progress */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <Text className="text-sm">Internship Progress</Text>
-            <Text className="text-sm font-medium">{progressPercent}%</Text>
-          </div>
-          <Progress
-            percent={progressPercent}
-            showInfo={false}
-            size="small"
-          />
-          <div className="flex justify-between mt-1 text-xs text-text-secondary">
-            <span>{startDate ? dayjs(startDate).format('MMM DD, YYYY') : 'N/A'}</span>
-            <span>{endDate ? dayjs(endDate).format('MMM DD, YYYY') : 'N/A'}</span>
+      </div>
+
+      {/* Progress Section */}
+      <div className="bg-gray-50 rounded-xl p-4 mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <Text className="text-sm font-medium text-gray-700">Internship Progress</Text>
+          <Text className="text-sm font-bold text-blue-600">{progressPercent}%</Text>
+        </div>
+        <Progress
+          percent={progressPercent}
+          showInfo={false}
+          strokeColor={{
+            '0%': '#3b82f6',
+            '100%': '#10b981',
+          }}
+          className="mb-2"
+        />
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>{startDate ? dayjs(startDate).format('MMM DD, YYYY') : 'N/A'}</span>
+          <span>{daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Completed'}</span>
+          <span>{endDate ? dayjs(endDate).format('MMM DD, YYYY') : 'N/A'}</span>
+        </div>
+      </div>
+
+      {/* Details Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+          <CalendarOutlined className="text-blue-500" />
+          <div>
+            <Text className="text-xs text-gray-500 block">Duration</Text>
+            <Text className="text-sm font-medium">{duration || 'N/A'} months</Text>
           </div>
         </div>
-
-        <Divider className="my-2" />
-
-        {/* Details */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2">
-            <CalendarOutlined className="text-text-tertiary" />
-            <Text className="text-sm">{duration || 'N/A'} months</Text>
-          </div>
-          <div className="flex items-center gap-2">
-            <EnvironmentOutlined className="text-text-tertiary" />
-            <Text className="text-sm">{company.city || 'N/A'}</Text>
+        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+          <EnvironmentOutlined className="text-green-500" />
+          <div>
+            <Text className="text-xs text-gray-500 block">Location</Text>
+            <Text className="text-sm font-medium">{company.city || 'N/A'}</Text>
           </div>
         </div>
-
-        {/* Faculty Mentor (for self-identified internships) */}
-        {isSelfIdentified && (internship.mentor || internship.facultyMentorName) && (
-          <div className="p-3 bg-primary-50/50 rounded-lg">
-            <Text className="text-xs text-text-secondary block mb-2">Faculty Mentor</Text>
-            <div className="flex items-center gap-2">
-              <Avatar size="small" icon={<UserOutlined />} className="bg-primary" />
-              <div>
-                <Text strong className="text-sm">
-                  {internship.mentor?.name || internship.facultyMentorName}
-                </Text>
-                {(internship.mentor?.email || internship.facultyMentorEmail) && (
-                  <Text className="text-xs text-text-secondary block">
-                    {internship.mentor?.email || internship.facultyMentorEmail}
-                  </Text>
-                )}
-              </div>
-            </div>
+        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+          <ClockCircleOutlined className="text-purple-500" />
+          <div>
+            <Text className="text-xs text-gray-500 block">Days Completed</Text>
+            <Text className="text-sm font-medium">{daysCompleted} days</Text>
           </div>
-        )}
-
-        {/* Industry Mentor (for regular internships) */}
-        {!isSelfIdentified && internship.industryMentor && (
-          <div className="p-3 bg-background-tertiary rounded-lg">
-            <Text className="text-xs text-text-secondary block mb-2">Industry Mentor</Text>
-            <div className="flex items-center gap-2">
-              <Avatar size="small" icon={<UserOutlined />} />
-              <div>
-                <Text strong className="text-sm">{internship.industryMentor.name}</Text>
-                {internship.industryMentor.email && (
-                  <Text className="text-xs text-text-secondary block">{internship.industryMentor.email}</Text>
-                )}
-              </div>
-            </div>
+        </div>
+        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+          <UserOutlined className="text-orange-500" />
+          <div>
+            <Text className="text-xs text-gray-500 block">Mentor</Text>
+            <Text className="text-sm font-medium truncate">
+              {internship.mentor?.name || internship.facultyMentorName || studentMentor?.name || 'Not assigned'}
+            </Text>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Monthly Report Status */}
-        {monthlyReportStatus && (
-          <div className="p-3 bg-primary-50 rounded-lg">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <FileTextOutlined className="text-primary" />
-                <Text className="text-sm">Monthly Reports</Text>
-              </div>
-              <Text className="text-sm font-medium">
-                {monthlyReportStatus.submitted}/{monthlyReportStatus.total}
+      {/* Faculty Mentor Card (for self-identified) */}
+      {isSelfIdentified && (internship.mentor || internship.facultyMentorName) && (
+        <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl mb-6">
+          <Text className="text-xs text-blue-600 font-medium block mb-2">Faculty Mentor</Text>
+          <div className="flex items-center gap-3">
+            <Avatar size="small" icon={<UserOutlined />} className="bg-blue-500" />
+            <div>
+              <Text strong className="text-sm block">
+                {internship.mentor?.name || internship.facultyMentorName}
               </Text>
+              {(internship.mentor?.email || internship.facultyMentorEmail) && (
+                <Text className="text-xs text-gray-500">
+                  {internship.mentor?.email || internship.facultyMentorEmail}
+                </Text>
+              )}
             </div>
-            <Progress
-              percent={monthlyReportStatus.total > 0
-                ? Math.round((monthlyReportStatus.submitted / monthlyReportStatus.total) * 100)
-                : 0}
-              showInfo={false}
-              size="small"
-              className="mt-2"
-            />
           </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-2 mt-2">
-          <Button type="primary" block onClick={onViewDetails}>
-            View Details
-          </Button>
-          {canUploadReport && (
-            <Button block onClick={onUploadReport}>
-              Upload Report
-            </Button>
-          )}
         </div>
-      </Space>
+      )}
+
+      {/* Action Button */}
+      <Button
+        type="primary"
+        size="large"
+        block
+        onClick={onViewDetails}
+        className="rounded-xl h-12"
+      >
+        View Details <RightOutlined />
+      </Button>
     </Card>
   );
 };

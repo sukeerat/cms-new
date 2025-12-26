@@ -4,11 +4,11 @@ import { LruCacheService } from '../../../core/cache/lru-cache.service';
 import { ApplicationStatus, Role } from '@prisma/client';
 import { AuditService } from '../../../infrastructure/audit/audit.service';
 import {
-  calculateFourWeekCycles,
+  calculateExpectedMonths,
   getExpectedReportsAsOfToday,
   getExpectedVisitsAsOfToday,
-  FOUR_WEEK_CYCLE,
-} from '../../../common/utils/four-week-cycle.util';
+  MONTHLY_CYCLE,
+} from '../../../common/utils/monthly-cycle.util';
 
 @Injectable()
 export class StateDashboardService {
@@ -213,7 +213,7 @@ export class StateDashboardService {
         // Students with no mentor (total students - students with active mentors)
         const studentsWithNoMentor = Math.max(0, totalStudents - studentsWithActiveMentors);
 
-        // Fetch internships currently in their training period with dates for 4-week cycle calculation
+        // Fetch internships currently in their training period with dates for monthly cycle calculation
         // Requires startDate to be set and in the past, with endDate in the future or not set
         const internshipsInTraining = await this.prisma.internshipApplication.findMany({
           where: {
@@ -235,14 +235,14 @@ export class StateDashboardService {
         const internshipsCurrentlyInTraining = internshipsInTraining.length;
 
         /**
-         * Calculate expected reports/visits using 4-week cycles
+         * Calculate expected reports/visits using monthly cycles
          * @see COMPLIANCE_CALCULATION_ANALYSIS.md Section V (Q47-49)
          *
          * For each internship:
-         * - Reports: 1 per 4-week cycle (due 5 days after cycle ends)
-         * - Visits: 1 per 4-week cycle (due at cycle end)
+         * - Reports: 1 per month (due on the 5th of the following month)
+         * - Visits: 1 per month (due at month end)
          *
-         * "Expected this month" = sum of all cycles where submission window is currently open
+         * "Expected this month" = sum of all months where submission deadline has passed
          *
          * OPTIMIZED: Use helper functions instead of calculating full cycle objects
          */

@@ -5,11 +5,18 @@
  *
  * This script calculates and populates the totalExpectedReports and
  * totalExpectedVisits fields for all internship applications based on
- * the 4-week cycle calculation logic.
+ * the Fixed Monthly Cycle calculation logic.
+ *
+ * BUSINESS RULES:
+ *   - Reports are aligned with calendar months (January, February, etc.)
+ *   - Report due date: 5th of the next month
+ *   - Visit due date: Last day of the month (no grace period)
+ *   - First month: Include only if >10 days in that month
+ *   - Last month: Include only if >10 days in that month
  *
  * WHAT IT DOES:
  *   1. Finds all InternshipApplication records with startDate and endDate
- *   2. Calculates expected reports/visits using 4-week cycle logic
+ *   2. Calculates expected reports/visits using monthly cycle logic
  *   3. Updates totalExpectedReports and totalExpectedVisits fields
  *
  * USAGE:
@@ -28,6 +35,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { MONTHLY_CYCLE_CONFIG } from '../src/config/monthly-cycle.config';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -38,24 +46,40 @@ const prisma = new PrismaClient();
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
 // =============================================================================
-// 4-WEEK CYCLE CALCULATION (copied from four-week-cycle.util.ts)
+// MONTHLY CYCLE CALCULATION (from monthly-cycle.util.ts)
+// Uses centralized config from: src/config/monthly-cycle.config.ts
 // =============================================================================
 
-const CYCLE_DURATION_DAYS = 28; // 4 weeks = 28 days
-const MAX_CYCLES = 26; // Max ~2 years of internship
+const MIN_DAYS_FOR_INCLUSION = MONTHLY_CYCLE_CONFIG.MIN_DAYS_FOR_INCLUSION;
+const MAX_MONTHS = MONTHLY_CYCLE_CONFIG.MAX_MONTHS;
+const MONTH_NAMES = MONTHLY_CYCLE_CONFIG.MONTH_NAMES;
 
-interface FourWeekCycle {
-  cycleNumber: number;
-  cycleStartDate: Date;
-  cycleEndDate: Date;
+interface MonthlyCycle {
+  monthNumber: number;
+  monthName: string;
+  year: number;
+  daysInMonth: number;
+  isFirstMonth: boolean;
+  isLastMonth: boolean;
+  isIncluded: boolean;
 }
 
-function calculateFourWeekCycles(startDate: Date, endDate: Date): FourWeekCycle[] {
+/**
+ * Get the number of days in a specific month
+ */
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/**
+ * Calculate all expected months for an internship
+ * Only returns months with >10 days (isIncluded = true)
+ */
+function calculateExpectedMonths(startDate: Date, endDate: Date): MonthlyCycle[] {
   if (!startDate || !endDate) {
     return [];
   }
 
-  const cycles: FourWeekCycle[] = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
 
@@ -63,46 +87,76 @@ function calculateFourWeekCycles(startDate: Date, endDate: Date): FourWeekCycle[
     return [];
   }
 
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-
   if (end < start) {
     return [];
   }
 
-  let cycleNumber = 1;
-  let cycleStartDate = new Date(start);
+  const months: MonthlyCycle[] = [];
+  let currentYear = start.getFullYear();
+  let currentMonth = start.getMonth() + 1; // 1-indexed
 
-  while (cycleStartDate <= end && cycleNumber <= MAX_CYCLES) {
-    const naturalCycleEnd = new Date(cycleStartDate);
-    naturalCycleEnd.setDate(naturalCycleEnd.getDate() + CYCLE_DURATION_DAYS - 1);
-    naturalCycleEnd.setHours(23, 59, 59, 999);
+  const endYear = end.getFullYear();
+  const endMonth = end.getMonth() + 1;
 
-    const cycleEndDate = naturalCycleEnd > end ? new Date(end) : naturalCycleEnd;
-    const isFinalCycle = cycleEndDate >= end || naturalCycleEnd >= end;
+  let isFirst = true;
+  let monthCount = 0;
 
-    cycles.push({
-      cycleNumber,
-      cycleStartDate: new Date(cycleStartDate),
-      cycleEndDate: new Date(cycleEndDate),
-    });
+  while (
+    (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) &&
+    monthCount < MAX_MONTHS
+  ) {
+    const totalDaysInMonth = getDaysInMonth(currentYear, currentMonth);
+    let daysInMonth: number;
 
-    if (isFinalCycle) {
-      break;
+    // Calculate days in this month for the internship
+    if (currentYear === start.getFullYear() && currentMonth === start.getMonth() + 1) {
+      // First month: from start date to end of month
+      daysInMonth = totalDaysInMonth - start.getDate() + 1;
+    } else if (currentYear === end.getFullYear() && currentMonth === end.getMonth() + 1) {
+      // Last month: from start of month to end date
+      daysInMonth = end.getDate();
+    } else {
+      // Full month
+      daysInMonth = totalDaysInMonth;
     }
 
-    cycleStartDate = new Date(cycleEndDate);
-    cycleStartDate.setDate(cycleStartDate.getDate() + 1);
-    cycleStartDate.setHours(0, 0, 0, 0);
-    cycleNumber++;
+    const isLastMonth = currentYear === endYear && currentMonth === endMonth;
+    const isIncluded = daysInMonth > MIN_DAYS_FOR_INCLUSION;
+
+    const cycle: MonthlyCycle = {
+      monthNumber: currentMonth,
+      monthName: MONTH_NAMES[currentMonth - 1],
+      year: currentYear,
+      daysInMonth,
+      isFirstMonth: isFirst,
+      isLastMonth,
+      isIncluded,
+    };
+
+    if (isIncluded) {
+      months.push(cycle);
+    }
+
+    isFirst = false;
+    monthCount++;
+
+    // Move to next month
+    currentMonth++;
+    if (currentMonth > 12) {
+      currentMonth = 1;
+      currentYear++;
+    }
   }
 
-  return cycles;
+  return months;
 }
 
-function getTotalExpectedCycles(startDate: Date, endDate: Date): number {
-  const cycles = calculateFourWeekCycles(startDate, endDate);
-  return cycles.length;
+/**
+ * Get total expected count (reports or visits)
+ */
+function getTotalExpectedCount(startDate: Date, endDate: Date): number {
+  const months = calculateExpectedMonths(startDate, endDate);
+  return months.length;
 }
 
 // =============================================================================
@@ -134,9 +188,10 @@ function logSection(title: string) {
 async function populateExpectedCounts() {
   const startTime = Date.now();
 
-  logSection('POPULATE: Expected Reports & Visits Counts');
+  logSection('POPULATE: Expected Reports & Visits Counts (Monthly Cycle)');
   log(`Timestamp: ${new Date().toISOString()}`);
   log(`DRY_RUN: ${DRY_RUN}`);
+  log(`Calculation Method: Fixed Monthly Cycle (>10 days rule)`);
   log('');
 
   try {
@@ -167,7 +222,7 @@ async function populateExpectedCounts() {
     log('');
 
     // Step 2: Calculate and update each application
-    log('Step 2: Calculating expected counts...');
+    log('Step 2: Calculating expected counts using monthly cycles...');
 
     let successCount = 0;
     let skippedCount = 0;
@@ -194,13 +249,13 @@ async function populateExpectedCounts() {
           continue;
         }
 
-        // If no end date, estimate 6 months from start
-        const effectiveEndDate = endDate || new Date(new Date(startDate).getTime() + 180 * 24 * 60 * 60 * 1000);
+        // If no end date, estimate 16 weeks (minimum internship) from start
+        const effectiveEndDate = endDate || new Date(new Date(startDate).getTime() + 16 * 7 * 24 * 60 * 60 * 1000);
 
-        // Calculate expected cycles
-        const expectedCycles = getTotalExpectedCycles(new Date(startDate), new Date(effectiveEndDate));
+        // Calculate expected months
+        const expectedMonths = getTotalExpectedCount(new Date(startDate), new Date(effectiveEndDate));
 
-        if (expectedCycles === 0) {
+        if (expectedMonths === 0) {
           skippedCount++;
           continue;
         }
@@ -208,13 +263,15 @@ async function populateExpectedCounts() {
         stats.calculated++;
 
         // Check if already set with same values
-        if (app.totalExpectedReports === expectedCycles && app.totalExpectedVisits === expectedCycles) {
+        if (app.totalExpectedReports === expectedMonths && app.totalExpectedVisits === expectedMonths) {
           alreadySetCount++;
           continue;
         }
 
         if (DRY_RUN) {
-          log(`  [DRY_RUN] Would update ${app.id}: ${expectedCycles} reports/visits (start: ${new Date(startDate).toLocaleDateString()}, end: ${new Date(effectiveEndDate).toLocaleDateString()})`);
+          const months = calculateExpectedMonths(new Date(startDate), new Date(effectiveEndDate));
+          const monthNames = months.map(m => m.monthName).join(', ');
+          log(`  [DRY_RUN] Would update ${app.id}: ${expectedMonths} reports/visits (${monthNames})`);
           successCount++;
           continue;
         }
@@ -223,8 +280,8 @@ async function populateExpectedCounts() {
         await prisma.internshipApplication.update({
           where: { id: app.id },
           data: {
-            totalExpectedReports: expectedCycles,
-            totalExpectedVisits: expectedCycles,
+            totalExpectedReports: expectedMonths,
+            totalExpectedVisits: expectedMonths,
           },
         });
 

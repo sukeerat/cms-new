@@ -168,7 +168,8 @@ const PrincipalDashboard = () => {
     if (!alertsEnhanced?.summary) return 0;
     return (alertsEnhanced.summary.overdueReportsCount || 0) +
            (alertsEnhanced.summary.missingVisitsCount || 0) +
-           (alertsEnhanced.summary.urgentGrievancesCount || 0);
+           (alertsEnhanced.summary.urgentGrievancesCount || 0) +
+           (alertsEnhanced.summary.pendingJoiningLettersCount || 0);
   }, [alertsEnhanced]);
 
   useEffect(() => {
@@ -415,7 +416,7 @@ const PrincipalDashboard = () => {
             >
               {!alertsEnhancedLoading && (
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <Tooltip title="Click to view overdue reports">
                     <div
                       className="text-center p-3 bg-warning/10 rounded-lg cursor-pointer hover:bg-warning/20 transition-colors"
@@ -462,6 +463,22 @@ const PrincipalDashboard = () => {
                         {alertsEnhanced?.summary?.urgentGrievancesCount || 0}
                       </div>
                       <div className="text-xs text-text-secondary uppercase font-semibold">Grievances</div>
+                    </div>
+                  </Tooltip>
+                  <Tooltip title="Click to view students with pending joining letters">
+                    <div
+                      className="text-center p-3 bg-purple-500/10 rounded-lg cursor-pointer hover:bg-purple-500/20 transition-colors"
+                      onClick={() => alertsEnhanced?.alerts?.pendingJoiningLetters?.length > 0 && setAlertDetailModal({
+                        visible: true,
+                        type: 'joiningLetters',
+                        title: 'Pending Joining Letters',
+                        data: alertsEnhanced.alerts.pendingJoiningLetters
+                      })}
+                    >
+                      <div className="text-2xl font-bold text-purple-600">
+                        {alertsEnhanced?.summary?.pendingJoiningLettersCount || 0}
+                      </div>
+                      <div className="text-xs text-text-secondary uppercase font-semibold">Joining Letters</div>
                     </div>
                   </Tooltip>
                 </div>
@@ -880,6 +897,13 @@ const PrincipalDashboard = () => {
                 { title: 'Roll No', dataIndex: 'rollNumber', key: 'rollNumber' },
                 { title: 'Batch', dataIndex: 'batchName', key: 'batchName' },
                 { title: 'Branch', dataIndex: 'branchName', key: 'branchName' },
+              ] : alertDetailModal.type === 'joiningLetters' ? [
+                { title: 'Student', dataIndex: 'studentName', key: 'studentName' },
+                { title: 'Roll No', dataIndex: 'rollNumber', key: 'rollNumber' },
+                { title: 'Mentor', dataIndex: 'mentorName', key: 'mentorName', render: (m) => m || <Text type="secondary">Not assigned</Text> },
+                { title: 'Branch', dataIndex: 'branchName', key: 'branchName' },
+                { title: 'Company', dataIndex: 'companyName', key: 'companyName', render: (c) => c || <Text type="secondary">-</Text> },
+                { title: 'Start Date', dataIndex: 'startDate', key: 'startDate', render: (d) => d ? new Date(d).toLocaleDateString() : '-' },
               ] : []
             }
           />

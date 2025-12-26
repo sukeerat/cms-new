@@ -86,8 +86,24 @@ export class GrievanceService {
     }
   }
 
-  // Get grievance with all relations
-  private getGrievanceInclude() {
+  // Get grievance with basic relations (for list views - faster, no data integrity issues)
+  private getGrievanceListInclude() {
+    return {
+      student: {
+        include: {
+          user: true,
+          Institution: true
+        }
+      },
+      assignedTo: true,
+      facultySupervisor: true,
+      industry: true,
+      internship: true,
+    };
+  }
+
+  // Get grievance with all relations including status history (for detail views)
+  private getGrievanceDetailInclude() {
     return {
       student: {
         include: {
@@ -100,16 +116,6 @@ export class GrievanceService {
       industry: true,
       internship: true,
       statusHistory: {
-        include: {
-          changedBy: {
-            select: {
-              id: true,
-              name: true,
-              role: true,
-              email: true,
-            }
-          }
-        },
         orderBy: { createdAt: 'asc' as const },
       },
     };
@@ -146,7 +152,7 @@ export class GrievanceService {
           actionRequested: data.actionRequested,
           preferredContactMethod: data.preferredContactMethod,
         },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
       });
 
       // Create initial status history entry
@@ -196,7 +202,7 @@ export class GrievanceService {
       // Fetch updated grievance with status history
       return await this.prisma.grievance.findUnique({
         where: { id: grievance.id },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
       });
     } catch (error) {
       this.logger.error(`Failed to submit grievance: ${error.message}`, error.stack);
@@ -209,19 +215,17 @@ export class GrievanceService {
    */
   async getGrievancesByUser(userId: string) {
     try {
-      const cacheKey = `grievances:user:${userId}`;
+      this.logger.log(`Fetching grievances for user: ${userId}`);
 
-      return await this.cache.getOrSet(
-        cacheKey,
-        async () => {
-          return await this.prisma.grievance.findMany({
-            where: { student: { userId } },
-            include: this.getGrievanceInclude(),
-            orderBy: { createdAt: 'desc' },
-          });
-        },
-        this.CACHE_TTL,
-      );
+      // Skip cache temporarily for debugging
+      const grievances = await this.prisma.grievance.findMany({
+        where: { student: { userId } },
+        include: this.getGrievanceListInclude(),
+        orderBy: { createdAt: 'desc' },
+      });
+
+      this.logger.log(`Found ${grievances.length} grievances for user ${userId}`);
+      return grievances;
     } catch (error) {
       this.logger.error(`Failed to get grievances for user ${userId}: ${error.message}`, error.stack);
       throw error;
@@ -235,7 +239,7 @@ export class GrievanceService {
     try {
       return await this.prisma.grievance.findMany({
         where: { studentId },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
         orderBy: { createdAt: 'desc' },
       });
     } catch (error) {
@@ -258,7 +262,7 @@ export class GrievanceService {
             where: {
               student: { institutionId },
             },
-            include: this.getGrievanceInclude(),
+            include: this.getGrievanceListInclude(),
             orderBy: { createdAt: 'desc' },
           });
         },
@@ -285,7 +289,7 @@ export class GrievanceService {
 
       const grievances = await this.prisma.grievance.findMany({
         where: whereClause,
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
         orderBy: { createdAt: 'desc' },
       });
 
@@ -315,7 +319,7 @@ export class GrievanceService {
                 { facultySupervisorId: facultyUserId },
               ],
             },
-            include: this.getGrievanceInclude(),
+            include: this.getGrievanceListInclude(),
             orderBy: { createdAt: 'desc' },
           });
         },
@@ -334,7 +338,7 @@ export class GrievanceService {
     try {
       const grievance = await this.prisma.grievance.findUnique({
         where: { id },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceDetailInclude(),
       });
 
       if (!grievance) {
@@ -390,7 +394,7 @@ export class GrievanceService {
           previousAssignees,
           status: GrievanceStatus.UNDER_REVIEW,
         },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
       });
 
       // Create status history entry
@@ -483,7 +487,7 @@ export class GrievanceService {
           resolvedDate: newStatus === GrievanceStatus.RESOLVED ? new Date() : undefined,
           assignedToId: responderId,
         },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
       });
 
       // Create status history entry
@@ -611,7 +615,7 @@ export class GrievanceService {
             push: escalationEntry,
           },
         },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
       });
 
       // Create status history entry
@@ -708,7 +712,7 @@ export class GrievanceService {
       const updated = await this.prisma.grievance.update({
         where: { id },
         data: updateData,
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
       });
 
       // Create status history entry
@@ -771,7 +775,7 @@ export class GrievanceService {
           resolution: reason,
           resolvedDate: new Date(),
         },
-        include: this.getGrievanceInclude(),
+        include: this.getGrievanceListInclude(),
       });
 
       // Create status history entry
@@ -978,11 +982,6 @@ export class GrievanceService {
           statusHistory: {
             where: {
               action: { in: ['SUBMITTED', 'ASSIGNED', 'ESCALATED'] },
-            },
-            include: {
-              changedBy: {
-                select: { id: true, name: true, role: true },
-              },
             },
             orderBy: { createdAt: 'asc' },
           },

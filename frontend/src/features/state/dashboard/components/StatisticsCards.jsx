@@ -169,7 +169,7 @@ const StatusCard = ({ title, submitted, expected, icon, details, detailsTitle })
               {displayValue}
             </div>
             <Text className="text-text-secondary text-xs mt-1 block">
-              {expected > 0 ? `${Math.round((submitted / expected) * 100)}% this cycle` : 'No data'}
+              {expected > 0 ? `${Math.round((submitted / expected) * 100)}% this month` : 'No data'}
             </Text>
           </div>
         </div>
@@ -397,9 +397,9 @@ const StatisticsCards = ({ stats }) => {
 
   // Report details for modal
   const reportDetails = [
-    { label: 'Submitted This Cycle', value: reportsSubmitted, icon: <CheckCircleOutlined />, tooltip: 'Reports submitted in the current cycle' },
-    { label: 'Expected This Cycle', value: reportsExpected, icon: <TeamOutlined />, tooltip: 'Reports expected based on active internships in their 4-week cycle' },
-    { label: 'Missing This Cycle', value: monthlyReports?.missingThisMonth || 0, icon: <WarningOutlined />, highlight: (monthlyReports?.missingThisMonth || 0) > 0, tooltip: 'Reports not yet submitted this cycle' },
+    { label: 'Submitted This Month', value: reportsSubmitted, icon: <CheckCircleOutlined />, tooltip: 'Reports submitted in the current month' },
+    { label: 'Expected This Month', value: reportsExpected, icon: <TeamOutlined />, tooltip: 'Reports expected based on active internships this month' },
+    { label: 'Missing This Month', value: monthlyReports?.missingThisMonth || 0, icon: <WarningOutlined />, highlight: (monthlyReports?.missingThisMonth || 0) > 0, tooltip: 'Reports not yet submitted this month' },
     { label: 'Total Submitted', value: monthlyReports?.total || 0, icon: <FileTextOutlined />, tooltip: 'Total reports submitted all time' },
     { label: 'Last Month', value: monthlyReports?.lastMonth || 0, icon: <ClockCircleOutlined />, tooltip: 'Reports submitted last month' },
     { label: 'Pending Review', value: monthlyReports?.pendingReview || 0, icon: <ClockCircleOutlined />, tooltip: 'Reports awaiting review' },
@@ -407,9 +407,9 @@ const StatisticsCards = ({ stats }) => {
 
   // Visit details for modal
   const visitDetails = [
-    { label: 'Completed This Cycle', value: visitsCompleted, icon: <CheckCircleOutlined />, tooltip: 'Visits completed in the current cycle' },
-    { label: 'Expected This Cycle', value: visitsExpected, icon: <TeamOutlined />, tooltip: 'Visits expected based on active internships' },
-    { label: 'Pending This Cycle', value: facultyVisits?.pendingThisMonth || 0, icon: <WarningOutlined />, highlight: (facultyVisits?.pendingThisMonth || 0) > 0, tooltip: 'Visits still pending this cycle' },
+    { label: 'Completed This Month', value: visitsCompleted, icon: <CheckCircleOutlined />, tooltip: 'Visits completed in the current month' },
+    { label: 'Expected This Month', value: visitsExpected, icon: <TeamOutlined />, tooltip: 'Visits expected based on active internships' },
+    { label: 'Pending This Month', value: facultyVisits?.pendingThisMonth || 0, icon: <WarningOutlined />, highlight: (facultyVisits?.pendingThisMonth || 0) > 0, tooltip: 'Visits still pending this month' },
     { label: 'Total Visits', value: facultyVisits?.total || 0, icon: <CalendarOutlined />, tooltip: 'Total visits completed all time' },
     { label: 'Last Month', value: facultyVisits?.lastMonth || 0, icon: <ClockCircleOutlined />, tooltip: 'Visits completed last month' },
     { label: 'Completion Rate', value: facultyVisits?.completionRate != null ? `${facultyVisits.completionRate}%` : 'N/A', icon: <RiseOutlined />, tooltip: 'Percentage of expected visits completed' },

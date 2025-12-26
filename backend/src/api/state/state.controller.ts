@@ -505,6 +505,16 @@ export class StateController {
 
   // ==================== Mentor Management ====================
 
+  @Get('mentors')
+  @ApiOperation({ summary: 'Get all mentors across all institutions' })
+  async getAllMentors(
+    @Query('search') search?: string,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    const mentors = await this.stateService.getAllMentors({ search, institutionId });
+    return { success: true, data: mentors };
+  }
+
   @Post('students/:id/assign-mentor')
   @ApiOperation({ summary: 'Assign mentor to student' })
   async assignMentorToStudent(

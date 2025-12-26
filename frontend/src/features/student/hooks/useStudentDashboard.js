@@ -36,6 +36,13 @@ import {
   selectProfileData,
   selectInternshipsList,
   selectReportsList,
+  // New profile-based selectors for optimization
+  selectApplicationsFromProfile,
+  selectActiveInternshipsFromProfile,
+  selectSelfIdentifiedFromProfile,
+  selectPlatformFromProfile,
+  selectStatsFromProfile,
+  selectCountsFromProfile,
 } from '../store/studentSelectors';
 import { useSWR, getCachedData, setCachedData } from '../../../hooks/useSWR';
 
@@ -71,17 +78,18 @@ export const useStudentDashboard = () => {
   const [isRevalidating, setIsRevalidating] = useState(false);
 
   // Fetch all dashboard data - optimized to reduce redundant calls
+  // Profile API now returns internshipApplications, mentorAssignments, and _count
+  // so we can skip separate fetches for applications and mentor
   const fetchDashboardData = useCallback(async (forceRefresh = false) => {
     // Fetch dashboard and profile in parallel
+    // Profile includes: internshipApplications, mentorAssignments, _count
     dispatch(fetchStudentDashboard({ forceRefresh }));
     await dispatch(fetchStudentProfile({ forceRefresh }));
 
-    // After profile is loaded, fetch mentor (uses cached profile data)
-    dispatch(fetchMentor());
+    // Mentor is extracted from profile.mentorAssignments - no separate call needed
+    // Applications are in profile.internshipApplications - no separate call needed
 
-    // Fetch remaining data in parallel
-    // Note: /student/applications returns ALL applications including self-identified
-    dispatch(fetchApplications({ forceRefresh }));
+    // Only fetch grievances and reports separately (they're not in profile)
     dispatch(fetchMyReports({ forceRefresh }));
     dispatch(fetchGrievances());
   }, [dispatch]);
@@ -110,14 +118,35 @@ export const useStudentDashboard = () => {
   const isLoading = swrIsLoading || reduxIsLoading;
 
   // Use memoized selectors for derived data
+  // Prefer profile-based selectors to avoid redundant API calls
   const normalizedApplications = useSelector(selectNormalizedApplicationsList);
   const normalizedGrievances = useSelector(selectNormalizedGrievancesList);
+
+  // Use profile-based selectors (preferred - single API call)
+  const applicationsFromProfile = useSelector(selectApplicationsFromProfile);
+  const selfIdentifiedFromProfile = useSelector(selectSelfIdentifiedFromProfile);
+  const platformFromProfile = useSelector(selectPlatformFromProfile);
+  const activeInternshipsFromProfile = useSelector(selectActiveInternshipsFromProfile);
+  const statsFromProfile = useSelector(selectStatsFromProfile);
+  const countsFromProfile = useSelector(selectCountsFromProfile);
+
+  // Fallback selectors (from separate API calls)
   const selfIdentifiedApplications = useSelector(selectSelfIdentifiedApplications);
   const platformApplications = useSelector(selectPlatformApplications);
   const stats = useSelector(selectCalculatedStats);
   const activeInternships = useSelector(selectActiveInternships);
   const recentApplications = useSelector(selectRecentApplications);
   const monthlyReports = useSelector(selectMonthlyReportsWithInfo);
+
+  // Merge stats from profile with calculated stats
+  const mergedStats = {
+    ...stats,
+    ...statsFromProfile,
+    // Prefer _count values from profile for accurate server-side counts
+    totalApplications: countsFromProfile?.internshipApplications || stats?.totalApplications || 0,
+    totalMonthlyReports: countsFromProfile?.monthlyReports || 0,
+    totalGrievances: countsFromProfile?.grievances || stats?.grievances || 0,
+  };
 
   // Action handlers with error handling
   const handleWithdrawApplication = useCallback(async (applicationId) => {
@@ -164,26 +193,43 @@ export const useStudentDashboard = () => {
   const internshipsList = useSelector(selectInternshipsList);
   const reportsList = useSelector(selectReportsList);
 
+  // Prefer profile data over separate API call data
+  const effectiveApplications = applicationsFromProfile.length > 0
+    ? applicationsFromProfile
+    : normalizedApplications;
+  const effectiveSelfIdentified = selfIdentifiedFromProfile.length > 0
+    ? selfIdentifiedFromProfile
+    : selfIdentifiedApplications;
+  const effectivePlatformApplications = platformFromProfile.length > 0
+    ? platformFromProfile
+    : platformApplications;
+  const effectiveActiveInternships = activeInternshipsFromProfile.length > 0
+    ? activeInternshipsFromProfile
+    : activeInternships;
+
   return {
     // State
     isLoading,
-    isRevalidating, // NEW: Shows subtle indicator during background refresh
+    isRevalidating, // Shows subtle indicator during background refresh
     loadingStates,
     dashboard: dashboard.stats,
     profile: profileData,
     mentor: mentorData,
     grievances: normalizedGrievances,
-    applications: normalizedApplications, // All applications (platform + self-identified)
-    selfIdentified: selfIdentifiedApplications, // Filtered self-identified only
-    platformApplications, // Filtered platform only
+    applications: effectiveApplications, // All applications (from profile or API)
+    selfIdentified: effectiveSelfIdentified, // Filtered self-identified only
+    platformApplications: effectivePlatformApplications, // Filtered platform only
     internships: internshipsList,
     reports: reportsList,
 
-    // Computed
-    stats,
-    activeInternships,
+    // Computed - using merged stats with _count data
+    stats: mergedStats,
+    activeInternships: effectiveActiveInternships,
     recentApplications,
     monthlyReports,
+
+    // Server-side counts from profile._count
+    counts: countsFromProfile,
 
     // Actions
     refresh,
@@ -191,7 +237,7 @@ export const useStudentDashboard = () => {
     handleWithdrawApplication,
     handleUpdateApplication,
     handleSubmitReport,
-    revalidate, // NEW: Manual revalidation trigger
+    revalidate, // Manual revalidation trigger
 
     // Errors
     errors,

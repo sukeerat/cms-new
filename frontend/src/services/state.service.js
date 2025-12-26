@@ -105,6 +105,11 @@ export const stateService = {
     return response.data;
   },
 
+  async deleteFaculty(facultyId) {
+    const response = await API.delete(`/state/faculty/${facultyId}`);
+    return response.data;
+  },
+
   // Principals
   async getPrincipals(params = {}) {
     const queryParams = new URLSearchParams(params).toString();
@@ -308,6 +313,16 @@ export const stateService = {
   },
 
   // Mentor Management
+  async getAllMentors(params = {}) {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    );
+    const queryParams = new URLSearchParams(cleanParams).toString();
+    const url = queryParams ? `/state/mentors?${queryParams}` : '/state/mentors';
+    const response = await API.get(url);
+    return response.data;
+  },
+
   async getInstitutionMentors(institutionId) {
     const response = await API.get(`/state/institutions/${institutionId}/mentors`);
     return response.data;

@@ -75,6 +75,25 @@ export const studentService = {
     return response.data;
   },
 
+  async updateApplication(applicationId, data) {
+    const response = await API.put(`/student/applications/${applicationId}`, data);
+    return response.data;
+  },
+
+  async uploadJoiningLetter(applicationId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await API.put(`/student/applications/${applicationId}/joining-letter`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  async deleteJoiningLetter(applicationId) {
+    const response = await API.delete(`/student/applications/${applicationId}/joining-letter`);
+    return response.data;
+  },
+
   // =====================
   // Self-Identified Internships
   // =====================

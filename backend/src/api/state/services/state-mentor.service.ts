@@ -15,10 +15,77 @@ export class StateMentorService {
   ) {}
 
   /**
+   * Get all faculty/mentors from all institutions
+   * Used by state admin for cross-institution mentor assignment
+   */
+  async getAllMentors(params?: { search?: string; institutionId?: string }) {
+    const [mentors, allAssignments, institutions] = await Promise.all([
+      this.prisma.user.findMany({
+        where: {
+          role: { in: [Role.FACULTY_SUPERVISOR, Role.TEACHER] },
+          active: true,
+          ...(params?.institutionId ? { institutionId: params.institutionId } : {}),
+          ...(params?.search
+            ? {
+                OR: [
+                  { name: { contains: params.search, mode: 'insensitive' as const } },
+                  { email: { contains: params.search, mode: 'insensitive' as const } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          institutionId: true,
+        },
+        orderBy: [{ name: 'asc' }],
+      }),
+      // Get all active assignments to count unique students per mentor
+      this.prisma.mentorAssignment.findMany({
+        where: { isActive: true },
+        select: { mentorId: true, studentId: true },
+      }),
+      // Get all institutions for name lookup
+      this.prisma.institution.findMany({
+        select: { id: true, name: true, code: true },
+      }),
+    ]);
+
+    // Build unique students per mentor map
+    const mentorStudentMap = new Map<string, Set<string>>();
+    for (const { mentorId, studentId } of allAssignments) {
+      if (!mentorStudentMap.has(mentorId)) {
+        mentorStudentMap.set(mentorId, new Set());
+      }
+      mentorStudentMap.get(mentorId)!.add(studentId);
+    }
+
+    // Build institution lookup map
+    const institutionMap = new Map(institutions.map(i => [i.id, { name: i.name, code: i.code }]));
+
+    return mentors.map(mentor => {
+      const institution = mentor.institutionId ? institutionMap.get(mentor.institutionId) : null;
+      return {
+        id: mentor.id,
+        name: mentor.name,
+        email: mentor.email,
+        role: mentor.role,
+        institutionId: mentor.institutionId,
+        institutionName: institution?.name || 'Unknown',
+        institutionCode: institution?.code || '',
+        activeAssignments: mentorStudentMap.get(mentor.id)?.size || 0,
+      };
+    });
+  }
+
+  /**
    * Get faculty/mentors from an institution
    */
   async getInstitutionMentors(institutionId: string) {
-    const [mentors, allAssignments] = await Promise.all([
+    const [mentors, allAssignments, institution] = await Promise.all([
       this.prisma.user.findMany({
         where: {
           institutionId,
@@ -30,6 +97,7 @@ export class StateMentorService {
           name: true,
           email: true,
           role: true,
+          institutionId: true,
         },
         orderBy: { name: 'asc' },
       }),
@@ -40,6 +108,11 @@ export class StateMentorService {
           isActive: true,
         },
         select: { mentorId: true, studentId: true },
+      }),
+      // Get institution info
+      this.prisma.institution.findUnique({
+        where: { id: institutionId },
+        select: { id: true, name: true, code: true },
       }),
     ]);
 
@@ -57,6 +130,9 @@ export class StateMentorService {
       name: mentor.name,
       email: mentor.email,
       role: mentor.role,
+      institutionId: mentor.institutionId,
+      institutionName: institution?.name || 'Unknown',
+      institutionCode: institution?.code || '',
       activeAssignments: mentorStudentMap.get(mentor.id)?.size || 0,
     }));
   }

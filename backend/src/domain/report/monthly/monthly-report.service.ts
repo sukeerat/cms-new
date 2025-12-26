@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { MonthlyReportStatus } from '@prisma/client';
+import { MonthlyReportStatus, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
+import { AuditService } from '../../../infrastructure/audit/audit.service';
 
 export interface SubmitReportDto {
   applicationId: string;
@@ -23,6 +24,7 @@ export class MonthlyReportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly auditService: AuditService,
   ) {}
 
   async submitReport(studentId: string, data: SubmitReportDto) {
@@ -86,6 +88,24 @@ export class MonthlyReportService {
 
       // Invalidate cache
       await this.cache.del(`reports:student:${studentId}`);
+
+      // Audit: Monthly report submitted
+      this.auditService.log({
+        action: AuditAction.MONTHLY_REPORT_SUBMIT,
+        entityType: 'MonthlyReport',
+        entityId: report.id,
+        userId: student.userId,
+        institutionId: student.institutionId,
+        category: AuditCategory.INTERNSHIP_WORKFLOW,
+        severity: AuditSeverity.LOW,
+        description: `Monthly report submitted for ${data.reportMonth}/${data.reportYear}`,
+        newValues: {
+          reportMonth: data.reportMonth,
+          reportYear: data.reportYear,
+          applicationId: data.applicationId,
+          studentId,
+        },
+      }).catch(() => {});
 
       return report;
     } catch (error) {
@@ -204,6 +224,26 @@ export class MonthlyReportService {
         this.cache.del(`reports:student:${report.studentId}`),
         this.cache.del(`reports:mentor:${mentorId}`),
       ]);
+
+      // Audit: Monthly report reviewed
+      const auditAction = status === MonthlyReportStatus.APPROVED
+        ? AuditAction.MONTHLY_REPORT_APPROVE
+        : status === MonthlyReportStatus.REJECTED
+          ? AuditAction.MONTHLY_REPORT_REJECT
+          : AuditAction.MONTHLY_REPORT_UPDATE;
+
+      this.auditService.log({
+        action: auditAction,
+        entityType: 'MonthlyReport',
+        entityId: id,
+        userId: mentorId,
+        institutionId: report.student.institutionId,
+        category: AuditCategory.INTERNSHIP_WORKFLOW,
+        severity: status === MonthlyReportStatus.REJECTED ? AuditSeverity.MEDIUM : AuditSeverity.LOW,
+        description: `Monthly report ${status.toLowerCase()}: ${report.monthName} ${report.reportYear}`,
+        oldValues: { status: report.status },
+        newValues: { status, reviewComments, reviewedBy: mentorId },
+      }).catch(() => {});
 
       return reviewed;
     } catch (error) {

@@ -220,7 +220,7 @@ const QuickVisitModal = React.memo(({ visible, onClose, onSubmit, students, load
         </Button>,
       ]}
       width={600}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" className="mt-4">
         {/* Student Selection - Required */}

@@ -16,6 +16,9 @@ import { RedlockService } from './redlock.service';
           port: configService.get<number>('REDIS_PORT', 6379),
           password: configService.get<string>('REDIS_PASSWORD'),
         },
+        // Use hash tag prefix for Redis Cluster compatibility
+        // All keys with {bull} will hash to the same slot
+        prefix: '{bull}',
       }),
     }),
     BullModule.registerQueue(
@@ -78,6 +81,15 @@ import { RedlockService } from './redlock.service';
         defaultJobOptions: {
           attempts: 1,
           removeOnComplete: false,
+          removeOnFail: false,
+        },
+      },
+      {
+        name: 'mail',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
           removeOnFail: false,
         },
       },

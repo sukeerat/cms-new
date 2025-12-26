@@ -137,7 +137,7 @@ const InstitutionModal = ({ open, onClose, institutionId, onSuccess }) => {
       onCancel={handleClose}
       footer={null}
       width={900}
-      destroyOnClose
+      destroyOnHidden
       centered
       className="rounded-2xl overflow-hidden"
       styles={{

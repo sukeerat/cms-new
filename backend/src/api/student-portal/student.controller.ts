@@ -286,8 +286,8 @@ export class StudentController {
   @Roles(Role.STUDENT)
   @ApiOperation({ summary: 'Delete document' })
   @ApiResponse({ status: 200, description: 'Document deleted successfully' })
-  async deleteDocument(@Param('id') id: string) {
-    return this.studentService.deleteDocument(id);
+  async deleteDocument(@Req() req, @Param('id') id: string) {
+    return this.studentService.deleteDocument(req.user.userId, id);
   }
 
   // Support

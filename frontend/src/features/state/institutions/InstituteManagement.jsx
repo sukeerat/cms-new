@@ -136,7 +136,7 @@ const InstituteManagement = () => {
           <div>
             <Text strong className="text-text-primary block">{text}</Text>
             <Space size={4} className="text-xs text-text-tertiary">
-              <Tag bordered={false} className="m-0 bg-surface text-text-secondary text-[10px]">{record.code}</Tag>
+              <Tag variant="borderless" className="m-0 bg-surface text-text-secondary text-[10px]">{record.code}</Tag>
               <span>•</span>
               <span>{record.city}, {record.state}</span>
             </Space>

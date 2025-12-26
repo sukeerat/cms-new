@@ -29,7 +29,7 @@ const { Title, Text } = Typography;
 
 const ReportStatusMonitor = ({
   reportId,
-  visible,
+  open,
   onClose,
   onComplete,
   onDownload,
@@ -115,7 +115,7 @@ const ReportStatusMonitor = ({
 
   // Start/stop polling based on visibility
   useEffect(() => {
-    if (visible && reportId) {
+    if (open && reportId) {
       completedRef.current = false;
       setStatus(null);
       setLoading(true);
@@ -126,7 +126,7 @@ const ReportStatusMonitor = ({
     }
 
     return () => stopPolling();
-  }, [visible, reportId, startPolling, stopPolling]);
+  }, [open, reportId, startPolling, stopPolling]);
 
   const handleDownload = async () => {
     if (!reportId || !status) return;
@@ -346,13 +346,12 @@ const ReportStatusMonitor = ({
       title={
         <Space>
           <FileTextOutlined />
-          Report Status
-        </Space>
-      }
-      open={visible}
-      onCancel={onClose}
-      footer={null}
-      width={560}
+                  Report Status
+                </Space>
+              }
+                open={open}
+                onCancel={onClose}
+                footer={null}      width={560}
       centered
       destroyOnHidden
     >

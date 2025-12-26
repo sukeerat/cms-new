@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { ApplicationStatus, MonthlyReportStatus, Role } from '@prisma/client';
+import { ApplicationStatus, MonthlyReportStatus, Role, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { CacheService } from '../../core/cache/cache.service';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 
 export interface AssignMentorDto {
   assignedDate?: Date;
@@ -23,6 +24,7 @@ export class MentorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly auditService: AuditService,
   ) {}
 
   private getCurrentAcademicYear(): string {
@@ -98,6 +100,23 @@ export class MentorService {
         this.cache.del(`mentor:assignments:${mentorId}`),
         this.cache.del(`mentor:student:${studentId}`),
       ]);
+
+      // Audit: Mentor assigned
+      this.auditService.log({
+        action: AuditAction.MENTOR_ASSIGN,
+        entityType: 'MentorAssignment',
+        entityId: assignment.id,
+        userId: mentorId,
+        category: AuditCategory.ADMINISTRATIVE,
+        severity: AuditSeverity.MEDIUM,
+        institutionId: student.institutionId,
+        description: `Mentor ${mentor.name} assigned to student ${student.name}`,
+        newValues: {
+          mentorId,
+          studentId,
+          assignmentDate: data?.assignedDate || new Date(),
+        },
+      }).catch(() => {});
 
       return {
         student,
@@ -250,6 +269,20 @@ export class MentorService {
           this.cache.del(`mentor:student:${assignment.studentId}`),
         ]);
 
+        // Audit: Mentor reassigned
+        this.auditService.log({
+          action: AuditAction.MENTOR_UPDATE,
+          entityType: 'MentorAssignment',
+          entityId: newAssignment.id,
+          userId: data.mentorId,
+          institutionId: newAssignment.student.institutionId,
+          category: AuditCategory.ADMINISTRATIVE,
+          severity: AuditSeverity.MEDIUM,
+          description: `Mentor reassigned from ${assignment.mentorId} to ${data.mentorId}`,
+          oldValues: { mentorId: assignment.mentorId },
+          newValues: { mentorId: data.mentorId },
+        }).catch(() => {});
+
         return newAssignment;
       }
 
@@ -387,6 +420,20 @@ export class MentorService {
         this.cache.del(`mentor:assignments:${activeAssignment.mentorId}`),
         this.cache.del(`mentor:student:${studentId}`),
       ]);
+
+      // Audit: Mentor assignment removed
+      this.auditService.log({
+        action: AuditAction.MENTOR_UNASSIGN,
+        entityType: 'MentorAssignment',
+        entityId: activeAssignment.id,
+        userId: activeAssignment.assignedBy,
+        institutionId: student.institutionId,
+        category: AuditCategory.ADMINISTRATIVE,
+        severity: AuditSeverity.MEDIUM,
+        description: `Mentor assignment removed for student ${studentId}`,
+        oldValues: { mentorId: activeAssignment.mentorId, isActive: true },
+        newValues: { isActive: false },
+      }).catch(() => {});
 
       return { success: true, message: 'Mentor assignment removed successfully' };
     } catch (error) {

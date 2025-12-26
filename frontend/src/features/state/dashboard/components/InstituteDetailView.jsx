@@ -234,10 +234,10 @@ const OverviewTab = memo(({ data, loading, error }) => {
           extra={<Tag color={data.joiningLetterStatus?.rate >= 80 ? 'green' : 'orange'} className="rounded-lg font-bold border-0 px-2 py-0.5">{data.joiningLetterStatus?.rate || 0}%</Tag>}
         >
           <div className="grid grid-cols-2 gap-y-6">
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.joiningLetterStatus?.submitted || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--color-text-primary))' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.joiningLetterStatus?.pending || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-warning-color))' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.joiningLetterStatus?.approved || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-success-color))' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Rejected</span>} value={data.joiningLetterStatus?.rejected || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-error-color))' }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.joiningLetterStatus?.submitted || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--color-text-primary))' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.joiningLetterStatus?.pending || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-warning-color))' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.joiningLetterStatus?.approved || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-success-color))' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Rejected</span>} value={data.joiningLetterStatus?.rejected || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-error-color))' } }} />
           </div>
         </Card>
 
@@ -254,10 +254,10 @@ const OverviewTab = memo(({ data, loading, error }) => {
           extra={<Tag color={data.monthlyReportStatus?.rate >= 80 ? 'green' : 'orange'} className="rounded-lg font-bold border-0 px-2 py-0.5">{data.monthlyReportStatus?.rate || 0}%</Tag>}
         >
           <div className="grid grid-cols-2 gap-y-6">
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.monthlyReportStatus?.submitted || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--color-text-primary))' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.monthlyReportStatus?.pending || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-warning-color))' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.monthlyReportStatus?.approved || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-success-color))' }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Missing</span>} value={data.monthlyReportStatus?.notSubmitted || 0} valueStyle={{ fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-error-color))' }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.monthlyReportStatus?.submitted || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--color-text-primary))' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.monthlyReportStatus?.pending || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-warning-color))' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.monthlyReportStatus?.approved || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-success-color))' } }} />
+            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Missing</span>} value={data.monthlyReportStatus?.notSubmitted || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-error-color))' } }} />
           </div>
         </Card>
       </div>
@@ -532,7 +532,7 @@ const StudentDetailModal = memo(({ visible, student, onClose }) => {
   const selfId = student.selfIdentifiedData;
 
   return (
-    <Modal title="Student Details" open={visible} onCancel={onClose} footer={null} width={800} destroyOnClose className="rounded-2xl overflow-hidden">
+    <Modal title="Student Details" open={visible} onCancel={onClose} footer={null} width={800} destroyOnHidden className="rounded-2xl overflow-hidden">
       <div className="space-y-4 pt-2">
         <Descriptions bordered column={2} size="small" title={<Text className="text-xs uppercase font-bold text-text-tertiary">Basic Information</Text>} className="rounded-xl overflow-hidden bg-background-tertiary/20">
           <Descriptions.Item label="Name"><Text strong>{student.name}</Text></Descriptions.Item>
@@ -1392,7 +1392,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
         onCancel={() => setCompanyModalVisible(false)}
         footer={null}
         width={900}
-        destroyOnClose
+        destroyOnHidden
         className="rounded-2xl overflow-hidden"
       >
         {selectedCompany && (
@@ -1558,7 +1558,7 @@ const InstituteDetailView = ({ defaultTab = null }) => {
         confirmLoading={assigningMentor}
         okButtonProps={{ disabled: !selectedMentorId, className: "rounded-xl font-bold h-10 shadow-lg shadow-primary/20" }}
         cancelButtonProps={{ className: "rounded-xl h-10 font-medium hover:bg-background-tertiary" }}
-        destroyOnClose
+        destroyOnHidden
         className="rounded-2xl overflow-hidden"
       >
         <div className="py-6">

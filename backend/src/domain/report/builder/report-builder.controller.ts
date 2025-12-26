@@ -257,14 +257,32 @@ export class ReportBuilderController {
 
   /**
    * Get queue statistics
+   * Returns queue counts for waiting, active, completed, failed, and delayed jobs.
+   * May return partial data if Redis connection issues occur.
    */
   @Get('queue/stats')
   async getQueueStats() {
-    const stats = await this.reportBuilderService.getQueueStats();
-    return {
-      success: true,
-      data: stats,
-    };
+    try {
+      const stats = await this.reportBuilderService.getQueueStats();
+      return {
+        success: !stats.error,
+        data: stats,
+        message: stats.error || undefined,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get queue stats: ${error.message}`);
+      return {
+        success: false,
+        data: {
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+        },
+        message: 'Failed to retrieve queue statistics',
+      };
+    }
   }
 
   /**
@@ -440,7 +458,41 @@ export class ReportBuilderController {
         throw new Error('Could not extract file key from URL');
       }
 
-      this.logger.log(`Extracted file key: ${fileKey}`);
+      // SECURITY: Validate file key to prevent path traversal attacks
+      // 1. Remove any path traversal sequences
+      // 2. Ensure key starts with expected prefixes (reports/ or institutions/)
+      // 3. Block absolute paths and null bytes
+      const sanitizedKey = fileKey
+        .replace(/\.\./g, '') // Remove path traversal
+        .replace(/\0/g, '')   // Remove null bytes
+        .replace(/^\/+/, ''); // Remove leading slashes
+
+      // Validate the key matches expected report file patterns
+      const validPrefixes = ['reports/', 'institutions/'];
+      const hasValidPrefix = validPrefixes.some(prefix => sanitizedKey.startsWith(prefix));
+
+      if (!hasValidPrefix) {
+        this.logger.error(`Invalid file key prefix: ${sanitizedKey}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid report file path',
+        });
+      }
+
+      // Validate file extension
+      const validExtensions = ['.xlsx', '.csv', '.pdf', '.json'];
+      const hasValidExtension = validExtensions.some(ext => sanitizedKey.toLowerCase().endsWith(ext));
+
+      if (!hasValidExtension) {
+        this.logger.error(`Invalid file extension in key: ${sanitizedKey}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid report file type',
+        });
+      }
+
+      fileKey = sanitizedKey;
+      this.logger.log(`Validated file key: ${fileKey}`);
       this.logger.log(`MinIO connected: ${this.fileStorageService.isMinioConnected()}`);
 
       // Get file from MinIO

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ReportBuilderController } from './report-builder.controller';
 import { ReportBuilderService } from './report-builder.service';
@@ -11,13 +10,14 @@ import { ReportProcessor } from './report.processor';
 import { ReportCleanupScheduler } from './report-cleanup.scheduler';
 import { PrismaModule } from '../../../core/database/prisma.module';
 import { FileStorageModule } from '../../../infrastructure/file-storage/file-storage.module';
+import { QueueModule } from '../../../core/queue/queue.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    BullModule.registerQueue({
-      name: 'report-generation',
-    }),
+    // Import QueueModule which exports BullModule with report-generation queue
+    // This ensures consistent configuration with hash tag prefix for Redis Cluster
+    QueueModule,
     PrismaModule,
     FileStorageModule,
   ],

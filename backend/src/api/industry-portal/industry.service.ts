@@ -1,13 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
 import { LruCacheService } from '../../core/cache/lru-cache.service';
-import { Prisma, ApplicationStatus, InternshipStatus, Role } from '@prisma/client';
+import { Prisma, ApplicationStatus, InternshipStatus, Role, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 
 @Injectable()
 export class IndustryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: LruCacheService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -137,16 +139,39 @@ export class IndustryService {
   async updateProfile(userId: string, updateData: Prisma.IndustryUpdateInput) {
     const industry = await this.prisma.industry.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!industry) {
       throw new NotFoundException('Industry profile not found');
     }
 
+    const oldValues = {
+      companyName: industry.companyName,
+      address: industry.address,
+      contactPersonName: industry.contactPersonName,
+    };
+
     const updated = await this.prisma.industry.update({
       where: { id: industry.id },
       data: updateData,
     });
+
+    // Audit profile update
+    this.auditService.log({
+      action: AuditAction.INDUSTRY_PROFILE_UPDATE,
+      entityType: 'Industry',
+      entityId: industry.id,
+      userId,
+      userName: industry.user?.name,
+      userRole: industry.user?.role || Role.INDUSTRY,
+      description: `Industry profile updated: ${industry.companyName}`,
+      category: AuditCategory.PROFILE_MANAGEMENT,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: industry.institutionId || undefined,
+      oldValues,
+      newValues: updateData as any,
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['industry', `industry:${industry.id}`]);
 
@@ -254,6 +279,30 @@ export class IndustryService {
       },
     });
 
+    // Get user for audit
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    // Audit internship creation
+    this.auditService.log({
+      action: AuditAction.INTERNSHIP_CREATE,
+      entityType: 'Internship',
+      entityId: internship.id,
+      userId,
+      userName: user?.name,
+      userRole: user?.role || Role.INDUSTRY,
+      description: `Internship posting created: ${internship.title}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: internship.institutionId || undefined,
+      newValues: {
+        internshipId: internship.id,
+        title: internship.title,
+        positions: internship.numberOfPositions,
+        fieldOfWork: internship.fieldOfWork,
+        companyName: industry.companyName,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['industry', `industry:${industry.id}`, 'internships']);
 
     return internship;
@@ -265,6 +314,7 @@ export class IndustryService {
   async updateInternshipPosting(userId: string, internshipId: string, updateData: Prisma.InternshipUpdateInput) {
     const industry = await this.prisma.industry.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!industry) {
@@ -282,10 +332,32 @@ export class IndustryService {
       throw new NotFoundException('Internship not found');
     }
 
+    const oldValues = {
+      title: internship.title,
+      status: internship.status,
+      numberOfPositions: internship.numberOfPositions,
+    };
+
     const updated = await this.prisma.internship.update({
       where: { id: internshipId },
       data: updateData,
     });
+
+    // Audit internship update
+    this.auditService.log({
+      action: AuditAction.INTERNSHIP_UPDATE,
+      entityType: 'Internship',
+      entityId: internshipId,
+      userId,
+      userName: industry.user?.name,
+      userRole: industry.user?.role || Role.INDUSTRY,
+      description: `Internship posting updated: ${internship.title}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: internship.institutionId || undefined,
+      oldValues,
+      newValues: updateData as any,
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['industry', `internship:${internshipId}`]);
 
@@ -298,6 +370,7 @@ export class IndustryService {
   async deleteInternshipPosting(userId: string, internshipId: string) {
     const industry = await this.prisma.industry.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!industry) {
@@ -336,6 +409,26 @@ export class IndustryService {
         status: InternshipStatus.INACTIVE,
       },
     });
+
+    // Audit internship deactivation
+    this.auditService.log({
+      action: AuditAction.INTERNSHIP_DELETE,
+      entityType: 'Internship',
+      entityId: internshipId,
+      userId,
+      userName: industry.user?.name,
+      userRole: industry.user?.role || Role.INDUSTRY,
+      description: `Internship posting deactivated: ${internship.title}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.HIGH,
+      institutionId: internship.institutionId || undefined,
+      oldValues: {
+        internshipId,
+        title: internship.title,
+        status: internship.status,
+        isActive: internship.isActive,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['industry', `internship:${internshipId}`]);
 
@@ -655,6 +748,7 @@ export class IndustryService {
   }) {
     const industry = await this.prisma.industry.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!industry) {
@@ -670,6 +764,7 @@ export class IndustryService {
       },
       include: {
         internship: true,
+        student: true,
       },
     });
 
@@ -693,6 +788,8 @@ export class IndustryService {
       throw new BadRequestException('All positions for this internship are filled');
     }
 
+    const oldStatus = application.status;
+
     const updated = await this.prisma.internshipApplication.update({
       where: { id: applicationId },
       data: {
@@ -708,6 +805,29 @@ export class IndustryService {
       },
     });
 
+    // Audit application acceptance
+    this.auditService.log({
+      action: AuditAction.APPLICATION_APPROVE,
+      entityType: 'InternshipApplication',
+      entityId: applicationId,
+      userId,
+      userName: industry.user?.name,
+      userRole: industry.user?.role || Role.INDUSTRY,
+      description: `Application accepted: ${application.student?.name} for ${application.internship?.title}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: application.internship?.institutionId || undefined,
+      oldValues: { status: oldStatus },
+      newValues: {
+        status: ApplicationStatus.SELECTED,
+        studentId: application.studentId,
+        studentName: application.student?.name,
+        internshipTitle: application.internship?.title,
+        selectionDate: selectionData?.selectionDate,
+        joiningDate: selectionData?.joiningDate,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['applications', `application:${applicationId}`]);
 
     return updated;
@@ -719,6 +839,7 @@ export class IndustryService {
   async rejectApplication(userId: string, applicationId: string, rejectionReason?: string) {
     const industry = await this.prisma.industry.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!industry) {
@@ -732,6 +853,7 @@ export class IndustryService {
           industryId: industry.id,
         },
       },
+      include: { student: true, internship: true },
     });
 
     if (!application) {
@@ -741,6 +863,8 @@ export class IndustryService {
     if (application.status !== ApplicationStatus.APPLIED) {
       throw new BadRequestException('Application is not in applied status');
     }
+
+    const oldStatus = application.status;
 
     const updated = await this.prisma.internshipApplication.update({
       where: { id: applicationId },
@@ -753,6 +877,28 @@ export class IndustryService {
         student: true,
       },
     });
+
+    // Audit application rejection
+    this.auditService.log({
+      action: AuditAction.APPLICATION_REJECT,
+      entityType: 'InternshipApplication',
+      entityId: applicationId,
+      userId,
+      userName: industry.user?.name,
+      userRole: industry.user?.role || Role.INDUSTRY,
+      description: `Application rejected: ${application.student?.name} for ${application.internship?.title}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: application.internship?.institutionId || undefined,
+      oldValues: { status: oldStatus },
+      newValues: {
+        status: ApplicationStatus.REJECTED,
+        studentId: application.studentId,
+        studentName: application.student?.name,
+        internshipTitle: application.internship?.title,
+        rejectionReason,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['applications', `application:${applicationId}`]);
 
@@ -778,6 +924,7 @@ export class IndustryService {
   }) {
     const industry = await this.prisma.industry.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!industry) {
@@ -792,6 +939,7 @@ export class IndustryService {
           industryId: industry.id,
         },
       },
+      include: { student: true },
     });
 
     if (!application) {
@@ -825,6 +973,28 @@ export class IndustryService {
       },
     });
 
+    // Audit monthly feedback submission
+    this.auditService.log({
+      action: AuditAction.MONTHLY_FEEDBACK_SUBMIT,
+      entityType: 'MonthlyFeedback',
+      entityId: feedback.id,
+      userId,
+      userName: industry.user?.name,
+      userRole: industry.user?.role || Role.INDUSTRY,
+      description: `Monthly feedback submitted for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.LOW,
+      institutionId: industry.institutionId || undefined,
+      newValues: {
+        feedbackId: feedback.id,
+        applicationId: feedbackData.applicationId,
+        studentId: application.studentId,
+        studentName: application.student?.name,
+        feedbackMonth: feedbackData.feedbackMonth,
+        overallRating: feedbackData.overallRating,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['feedback', `application:${feedbackData.applicationId}`]);
 
     return feedback;
@@ -843,6 +1013,7 @@ export class IndustryService {
   }) {
     const industry = await this.prisma.industry.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!industry) {
@@ -857,6 +1028,7 @@ export class IndustryService {
           industryId: industry.id,
         },
       },
+      include: { student: true, internship: true },
     });
 
     if (!application) {
@@ -913,6 +1085,29 @@ export class IndustryService {
         completionDate: new Date(),
       },
     });
+
+    // Audit completion feedback submission
+    this.auditService.log({
+      action: AuditAction.COMPLETION_FEEDBACK_SUBMIT,
+      entityType: 'CompletionFeedback',
+      entityId: feedback.id,
+      userId,
+      userName: industry.user?.name,
+      userRole: industry.user?.role || Role.INDUSTRY,
+      description: `Completion feedback submitted for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: industry.institutionId || undefined,
+      newValues: {
+        feedbackId: feedback.id,
+        applicationId: completionData.applicationId,
+        studentId: application.studentId,
+        studentName: application.student?.name,
+        internshipTitle: application.internship?.title,
+        industryRating: completionData.industryRating,
+        recommendForHire: completionData.recommendForHire,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['feedback', `application:${completionData.applicationId}`]);
 

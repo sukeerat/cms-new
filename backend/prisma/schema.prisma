@@ -792,8 +792,22 @@ enum AuditAction {
   // Faculty Operations
   VISIT_LOG_CREATE
   VISIT_LOG_UPDATE
+  VISIT_LOG_DELETE
   VISIT_LOG_VIEW
   FACULTY_ASSIGNMENT
+
+  // Monthly Report Operations
+  MONTHLY_REPORT_SUBMIT
+  MONTHLY_REPORT_UPDATE
+  MONTHLY_REPORT_APPROVE
+  MONTHLY_REPORT_REJECT
+  MONTHLY_REPORT_DELETE
+
+  // Joining Letter Operations
+  JOINING_LETTER_UPLOAD
+  JOINING_LETTER_VERIFY
+  JOINING_LETTER_REJECT
+  JOINING_LETTER_DELETE
 
   // Administrative Operations
   REPORT_GENERATE
@@ -802,6 +816,11 @@ enum AuditAction {
   BULK_OPERATION
   DATA_EXPORT
   DATA_IMPORT
+
+  // Institution Operations
+  INSTITUTION_CREATE
+  INSTITUTION_UPDATE
+  INSTITUTION_DELETE
 
   // System Operations
   SYSTEM_BACKUP
@@ -814,6 +833,13 @@ enum AuditAction {
   FAILED_LOGIN
   SUSPICIOUS_ACTIVITY
   DATA_BREACH_ATTEMPT
+
+  // Support Operations
+  GRIEVANCE_SUBMIT
+  GRIEVANCE_UPDATE
+  GRIEVANCE_RESOLVE
+  TECHNICAL_QUERY_SUBMIT
+  TECHNICAL_QUERY_RESOLVE
 
   // Compliance Operations
   COMPLIANCE_CHECK
@@ -834,6 +860,9 @@ enum AuditCategory {
   COMPLIANCE // Compliance and audit operations
   SYSTEM // System-level operations
   DATA_MANAGEMENT // Data operations, exports, imports
+  SUPPORT // Grievances, technical queries
+  USER_MANAGEMENT // User creation, updates, deletion
+  SYSTEM_ADMIN // System administration operations
 }
 
 enum AuditSeverity {

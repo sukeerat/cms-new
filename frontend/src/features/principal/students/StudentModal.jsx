@@ -102,7 +102,7 @@ const StudentModal = ({ open, onClose, studentId, onSuccess }) => {
       onCancel={handleClose}
       footer={null}
       width={800}
-      destroyOnClose
+      destroyOnHidden
     >
       {initialLoading ? (
         <div className="flex justify-center items-center py-12">

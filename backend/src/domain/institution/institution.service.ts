@@ -4,9 +4,10 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { Role, InstitutionType } from '@prisma/client';
+import { Role, InstitutionType, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { CacheService } from '../../core/cache/cache.service';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 import * as bcrypt from 'bcryptjs';
 
 export interface CreateInstitutionData {
@@ -53,6 +54,7 @@ export class InstitutionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -211,6 +213,25 @@ export class InstitutionService {
 
     this.logger.log(`Institution created successfully: ${institution.id}`);
 
+    // Audit: Institution created
+    this.auditService.log({
+      action: AuditAction.INSTITUTION_CREATE,
+      entityType: 'Institution',
+      entityId: institution.id,
+      institutionId: institution.id,
+      userId: principal?.id,
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.HIGH,
+      description: `Institution created: ${data.name} (${data.code})`,
+      newValues: {
+        name: data.name,
+        code: data.code,
+        type: data.type,
+        email: data.email,
+        principalCreated: !!principal,
+      },
+    }).catch(() => {});
+
     return {
       institution,
       principal,
@@ -266,6 +287,19 @@ export class InstitutionService {
     await this.cache.del(`institution:${id}`);
     await this.cache.del('institutions');
 
+    // Audit: Institution updated
+    this.auditService.log({
+      action: AuditAction.INSTITUTION_UPDATE,
+      entityType: 'Institution',
+      entityId: id,
+      institutionId: id,
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.MEDIUM,
+      description: `Institution updated: ${updated.name}`,
+      changedFields: Object.keys(data).filter(k => data[k] !== undefined),
+      newValues: data,
+    }).catch(() => {});
+
     return updated;
   }
 
@@ -288,6 +322,19 @@ export class InstitutionService {
 
     await this.cache.del(`institution:${id}`);
     await this.cache.del('institutions');
+
+    // Audit: Institution deleted
+    this.auditService.log({
+      action: AuditAction.INSTITUTION_DELETE,
+      entityType: 'Institution',
+      entityId: id,
+      institutionId: id,
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.CRITICAL,
+      description: `Institution deactivated: ${institution.name} (${institution.code})`,
+      oldValues: { isActive: true },
+      newValues: { isActive: false },
+    }).catch(() => {});
 
     return { success: true, message: 'Institution deleted successfully' };
   }

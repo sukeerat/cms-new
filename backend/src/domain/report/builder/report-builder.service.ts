@@ -598,6 +598,8 @@ export class ReportBuilderService {
 
   /**
    * Get queue statistics
+   * Note: This may fail in Redis Cluster mode if not properly configured.
+   * The {bull} prefix ensures all keys hash to the same slot for cluster compatibility.
    */
   async getQueueStats(): Promise<{
     waiting: number;
@@ -605,16 +607,31 @@ export class ReportBuilderService {
     completed: number;
     failed: number;
     delayed: number;
+    error?: string;
   }> {
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
-      this.reportQueue.getWaitingCount(),
-      this.reportQueue.getActiveCount(),
-      this.reportQueue.getCompletedCount(),
-      this.reportQueue.getFailedCount(),
-      this.reportQueue.getDelayedCount(),
-    ]);
+    try {
+      const [waiting, active, completed, failed, delayed] = await Promise.all([
+        this.reportQueue.getWaitingCount(),
+        this.reportQueue.getActiveCount(),
+        this.reportQueue.getCompletedCount(),
+        this.reportQueue.getFailedCount(),
+        this.reportQueue.getDelayedCount(),
+      ]);
 
-    return { waiting, active, completed, failed, delayed };
+      return { waiting, active, completed, failed, delayed };
+    } catch (error) {
+      this.logger.warn(`Failed to get queue statistics: ${error.message}`);
+      // Return default values when queue stats are unavailable
+      // This can happen in Redis Cluster mode or when Redis is disconnected
+      return {
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        error: 'Queue statistics temporarily unavailable',
+      };
+    }
   }
 
   /**

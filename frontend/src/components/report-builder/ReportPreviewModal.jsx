@@ -95,7 +95,7 @@ const STATUS_ICONS = {
 };
 
 const ReportPreviewModal = ({
-  visible,
+  open,
   onClose,
   report,
   onDownload,
@@ -247,7 +247,7 @@ const ReportPreviewModal = ({
           <span>Report Details</span>
         </Space>
       }
-      open={visible}
+      open={open}
       onCancel={onClose}
       width={640}
       footer={

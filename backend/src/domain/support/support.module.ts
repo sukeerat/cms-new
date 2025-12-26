@@ -5,6 +5,7 @@ import { TechnicalQueryService } from './technical-query/technical-query.service
 import { NoticeService } from './notice/notice.service';
 import { CalendarService } from './calendar/calendar.service';
 import { NotificationModule } from '../../infrastructure/notification/notification.module';
+import { AuditModule } from '../../infrastructure/audit/audit.module';
 // Help & Support
 import { SupportTicketService } from './help-support/support-ticket.service';
 import { SupportTicketController } from './help-support/support-ticket.controller';
@@ -12,7 +13,7 @@ import { FAQService } from './help-support/faq.service';
 import { FAQController } from './help-support/faq.controller';
 
 @Module({
-  imports: [NotificationModule],
+  imports: [NotificationModule, AuditModule],
   controllers: [
     GrievanceController,
     SupportTicketController,

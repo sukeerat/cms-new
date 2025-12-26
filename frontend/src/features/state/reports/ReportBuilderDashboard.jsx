@@ -503,7 +503,7 @@ const ReportBuilderDashboard = () => {
 
         {/* Generate Report Drawer */}
         <GenerateReportDrawer
-          visible={drawerVisible}
+          open={drawerVisible}
           onClose={() => {
             setDrawerVisible(false);
             setSelectedReport(null);
@@ -514,7 +514,7 @@ const ReportBuilderDashboard = () => {
 
         {/* Report Preview Modal */}
         <ReportPreviewModal
-          visible={previewModalVisible}
+          open={previewModalVisible}
           onClose={() => {
             setPreviewModalVisible(false);
             setPreviewReport(null);
@@ -527,7 +527,7 @@ const ReportBuilderDashboard = () => {
         {/* Report Status Monitor */}
         <ReportStatusMonitor
           reportId={monitoringReportId}
-          visible={statusMonitorVisible}
+          open={statusMonitorVisible}
           onClose={() => {
             setStatusMonitorVisible(false);
             setMonitoringReportId(null);

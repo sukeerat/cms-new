@@ -319,7 +319,7 @@ const BulkUpload = () => {
                   <Statistic
                     title={<span className="text-text-tertiary font-medium">Total Rows</span>}
                     value={validationResult.total || 0}
-                    valueStyle={{ fontWeight: 'bold', color: 'var(--color-text-primary)' }}
+                    styles={{ content: { fontWeight: 'bold', color: 'var(--color-text-primary)' } }}
                   />
                 </Card>
               </Col>
@@ -328,7 +328,7 @@ const BulkUpload = () => {
                   <Statistic
                     title={<span className="text-text-tertiary font-medium">Valid Rows</span>}
                     value={validationResult.valid || 0}
-                    valueStyle={{ fontWeight: 'bold', color: 'var(--ant-success-color)' }}
+                    styles={{ content: { fontWeight: 'bold', color: 'var(--ant-success-color)' } }}
                     prefix={<CheckCircleOutlined />}
                   />
                 </Card>
@@ -338,7 +338,7 @@ const BulkUpload = () => {
                   <Statistic
                     title={<span className="text-text-tertiary font-medium">Error Rows</span>}
                     value={validationResult.errors?.length || 0}
-                    valueStyle={{ fontWeight: 'bold', color: 'var(--ant-error-color)' }}
+                    styles={{ content: { fontWeight: 'bold', color: 'var(--ant-error-color)' } }}
                     prefix={<CloseCircleOutlined />}
                   />
                 </Card>
@@ -425,7 +425,7 @@ const BulkUpload = () => {
                   <Statistic
                     title={<span className="text-text-tertiary">Successfully Created</span>}
                     value={uploadResult.success || 0}
-                    valueStyle={{ color: 'var(--ant-success-color)', fontWeight: 'bold' }}
+                    styles={{ content: { color: 'var(--ant-success-color)', fontWeight: 'bold' } }}
                     prefix={<CheckCircleOutlined />}
                   />
                 </Card>
@@ -435,7 +435,7 @@ const BulkUpload = () => {
                   <Statistic
                     title={<span className="text-text-tertiary">Failed</span>}
                     value={uploadResult.failed || 0}
-                    valueStyle={{ color: 'var(--ant-error-color)', fontWeight: 'bold' }}
+                    styles={{ content: { color: 'var(--ant-error-color)', fontWeight: 'bold' } }}
                     prefix={<CloseCircleOutlined />}
                   />
                 </Card>

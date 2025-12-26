@@ -43,7 +43,7 @@ export class ReportProcessor extends WorkerHost {
       'excel': ExportFormat.EXCEL,
       'pdf': ExportFormat.PDF,
       'csv': ExportFormat.CSV,
-      'json': ExportFormat.CSV, // fallback for json
+      'json': ExportFormat.JSON,
     };
     const format = formatMap[formatStr] || ExportFormat.EXCEL;
 
@@ -95,6 +95,26 @@ export class ReportProcessor extends WorkerHost {
           mimeType = 'text/csv';
           break;
 
+        case ExportFormat.JSON:
+          // Generate JSON export with structured data
+          const jsonData = {
+            title: config.title,
+            generatedAt: new Date().toISOString(),
+            generatedBy: config.metadata?.generatedBy,
+            filters: config.metadata?.filters,
+            totalRecords: config.data.length,
+            columns: config.columns.map(col => ({
+              field: col.field,
+              header: col.header,
+              type: col.type,
+            })),
+            data: config.data,
+          };
+          fileBuffer = Buffer.from(JSON.stringify(jsonData, null, 2), 'utf-8');
+          fileName = `${reportType}_${Date.now()}.json`;
+          mimeType = 'application/json';
+          break;
+
         default:
           throw new Error(`Unsupported format: ${format}`);
       }
@@ -109,7 +129,13 @@ export class ReportProcessor extends WorkerHost {
       // Upload to MinIO
       this.logger.log('Uploading file to MinIO');
       const institutionId = filters?.institutionId as string;
-      const formatExt = format === ExportFormat.EXCEL ? 'xlsx' : format === ExportFormat.PDF ? 'pdf' : 'csv';
+      const formatExtMap: Record<ExportFormat, string> = {
+        [ExportFormat.EXCEL]: 'xlsx',
+        [ExportFormat.PDF]: 'pdf',
+        [ExportFormat.CSV]: 'csv',
+        [ExportFormat.JSON]: 'json',
+      };
+      const formatExt = formatExtMap[format] || 'xlsx';
 
       const uploadResult = await this.fileStorage.uploadReport(fileBuffer, {
         institutionId,

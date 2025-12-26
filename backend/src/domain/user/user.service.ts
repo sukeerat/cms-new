@@ -4,9 +4,10 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 import { CacheService } from '../../core/cache/cache.service';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 import * as bcrypt from 'bcryptjs';
 
 export interface CreateStudentData {
@@ -52,6 +53,7 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -226,6 +228,24 @@ export class UserService {
 
     this.logger.log(`Student created successfully: ${result.student.id}`);
 
+    // Audit: Student created
+    this.auditService.log({
+      action: AuditAction.USER_REGISTRATION,
+      entityType: 'Student',
+      entityId: result.student.id,
+      userId: result.user.id,
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.MEDIUM,
+      institutionId,
+      description: `Student created: ${data.name} (${data.enrollmentNumber})`,
+      newValues: {
+        name: data.name,
+        email: data.email,
+        enrollmentNumber: data.enrollmentNumber,
+        batchId: data.batchId,
+      },
+    }).catch(() => {});
+
     return {
       user: result.user,
       student: result.student,
@@ -269,6 +289,24 @@ export class UserService {
     await this.cache.del(`staff:${institutionId}`);
 
     this.logger.log(`Staff created successfully: ${user.id}`);
+
+    // Audit: Staff created
+    this.auditService.log({
+      action: AuditAction.USER_REGISTRATION,
+      entityType: 'Staff',
+      entityId: user.id,
+      userId: user.id,
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.MEDIUM,
+      institutionId,
+      description: `Staff created: ${data.name} (${data.role})`,
+      newValues: {
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        designation: data.designation,
+      },
+    }).catch(() => {});
 
     return {
       user,
@@ -366,6 +404,19 @@ export class UserService {
     await this.cache.del(`student:${studentId}`);
     await this.cache.del(`students:${institutionId}`);
 
+    // Audit: Student updated
+    this.auditService.log({
+      action: AuditAction.USER_PROFILE_UPDATE,
+      entityType: 'Student',
+      entityId: studentId,
+      category: AuditCategory.PROFILE_MANAGEMENT,
+      severity: AuditSeverity.LOW,
+      institutionId,
+      description: `Student updated: ${updated.name}`,
+      changedFields: Object.keys(data).filter(k => data[k] !== undefined),
+      newValues: data,
+    }).catch(() => {});
+
     return updated;
   }
 
@@ -394,6 +445,19 @@ export class UserService {
 
     await this.cache.del(`student:${studentId}`);
     await this.cache.del(`students:${institutionId}`);
+
+    // Audit: Student deleted
+    this.auditService.log({
+      action: AuditAction.USER_DEACTIVATION,
+      entityType: 'Student',
+      entityId: studentId,
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.HIGH,
+      institutionId,
+      description: `Student deactivated: ${student.name || studentId}`,
+      oldValues: { isActive: true },
+      newValues: { isActive: false },
+    }).catch(() => {});
 
     return { success: true, message: 'Student deleted successfully' };
   }

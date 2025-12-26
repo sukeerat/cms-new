@@ -54,7 +54,7 @@ const FORMAT_ICONS = {
 };
 
 const GenerateReportDrawer = ({
-  visible,
+  open,
   onClose,
   selectedReport,
   onGenerate,
@@ -76,17 +76,17 @@ const GenerateReportDrawer = ({
 
   // Load report configuration when report is selected
   useEffect(() => {
-    if (visible && selectedReport?.id) {
+    if (open && selectedReport?.id) {
       loadReportConfig(selectedReport.id);
     }
-  }, [visible, selectedReport?.id]);
+  }, [open, selectedReport?.id]);
 
   // Reset state when drawer closes
   useEffect(() => {
-    if (!visible) {
+    if (!open) {
       resetState();
     }
-  }, [visible]);
+  }, [open]);
 
   const resetState = () => {
     setCurrentStep(0);
@@ -412,7 +412,7 @@ const GenerateReportDrawer = ({
       }
       placement="right"
       size="large"
-      open={visible}
+      open={open}
       onClose={onClose}
       extra={
         <Button onClick={onClose}>Cancel</Button>

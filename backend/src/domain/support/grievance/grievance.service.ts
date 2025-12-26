@@ -2,12 +2,16 @@ import { Injectable, NotFoundException, Logger, BadRequestException } from '@nes
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { NotificationService } from '../../../infrastructure/notification/notification.service';
+import { AuditService } from '../../../infrastructure/audit/audit.service';
 import {
   GrievanceCategory,
   GrievancePriority,
   GrievanceStatus,
   EscalationLevel,
-  Role
+  Role,
+  AuditAction,
+  AuditCategory,
+  AuditSeverity,
 } from '@prisma/client';
 
 export interface SubmitGrievanceDto {
@@ -56,6 +60,7 @@ export class GrievanceService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly notificationService: NotificationService,
+    private readonly auditService: AuditService,
   ) {}
 
   // Helper to get next escalation level
@@ -170,6 +175,23 @@ export class GrievanceService {
 
       // Invalidate cache
       await this.invalidateGrievanceCache(userId, student.institutionId);
+
+      // Audit: Grievance submitted
+      this.auditService.log({
+        action: AuditAction.GRIEVANCE_SUBMIT,
+        entityType: 'Grievance',
+        entityId: grievance.id,
+        userId: userId,
+        category: AuditCategory.ADMINISTRATIVE,
+        severity: data.severity === GrievancePriority.URGENT ? AuditSeverity.HIGH : AuditSeverity.MEDIUM,
+        institutionId: student.institutionId,
+        description: `Grievance submitted: ${data.title}`,
+        newValues: {
+          title: data.title,
+          category: data.category,
+          severity: data.severity || GrievancePriority.MEDIUM,
+        },
+      }).catch(() => {});
 
       // Fetch updated grievance with status history
       return await this.prisma.grievance.findUnique({
@@ -409,6 +431,20 @@ export class GrievanceService {
         await this.cache.del(`grievances:faculty:${grievance.assignedToId}`);
       }
 
+      // Audit: Grievance assigned
+      this.auditService.log({
+        action: AuditAction.GRIEVANCE_UPDATE,
+        entityType: 'Grievance',
+        entityId: id,
+        userId: assignerId,
+        category: AuditCategory.ADMINISTRATIVE,
+        severity: AuditSeverity.MEDIUM,
+        institutionId: grievance.student.institutionId,
+        description: `Grievance assigned to ${assignee.name}`,
+        oldValues: { assignedToId: grievance.assignedToId },
+        newValues: { assignedToId: data.assigneeId, assigneeName: assignee.name },
+      }).catch(() => {});
+
       return updated;
     } catch (error) {
       this.logger.error(`Failed to assign grievance: ${error.message}`, error.stack);
@@ -473,6 +509,20 @@ export class GrievanceService {
 
       // Invalidate cache
       await this.invalidateGrievanceCache(grievance.student.userId, grievance.student.institutionId);
+
+      // Audit: Grievance responded/resolved
+      this.auditService.log({
+        action: newStatus === GrievanceStatus.RESOLVED ? AuditAction.GRIEVANCE_RESOLVE : AuditAction.GRIEVANCE_UPDATE,
+        entityType: 'Grievance',
+        entityId: id,
+        userId: responderId,
+        category: AuditCategory.ADMINISTRATIVE,
+        severity: newStatus === GrievanceStatus.RESOLVED ? AuditSeverity.MEDIUM : AuditSeverity.LOW,
+        institutionId: grievance.student.institutionId,
+        description: `Grievance ${newStatus === GrievanceStatus.RESOLVED ? 'resolved' : 'responded to'}: ${grievance.title}`,
+        oldValues: { status: grievance.status },
+        newValues: { status: newStatus, response: data.response },
+      }).catch(() => {});
 
       return updated;
     } catch (error) {
@@ -608,6 +658,20 @@ export class GrievanceService {
         await this.cache.del(`grievances:faculty:${grievance.assignedToId}`);
       }
 
+      // Audit: Grievance escalated
+      this.auditService.log({
+        action: AuditAction.GRIEVANCE_UPDATE,
+        entityType: 'Grievance',
+        entityId: id,
+        userId: escalatorId,
+        category: AuditCategory.ADMINISTRATIVE,
+        severity: AuditSeverity.HIGH,
+        institutionId: grievance.student.institutionId,
+        description: `Grievance escalated from ${grievance.escalationLevel} to ${nextLevel}`,
+        oldValues: { escalationLevel: grievance.escalationLevel, status: grievance.status },
+        newValues: { escalationLevel: nextLevel, status: GrievanceStatus.ESCALATED, reason: data.reason },
+      }).catch(() => {});
+
       return updated;
     } catch (error) {
       this.logger.error(`Failed to escalate grievance: ${error.message}`, error.stack);
@@ -733,6 +797,20 @@ export class GrievanceService {
 
       // Invalidate cache
       await this.invalidateGrievanceCache(grievance.student.userId, grievance.student.institutionId);
+
+      // Audit: Grievance rejected
+      this.auditService.log({
+        action: AuditAction.GRIEVANCE_UPDATE,
+        entityType: 'Grievance',
+        entityId: id,
+        userId: rejecterId,
+        category: AuditCategory.ADMINISTRATIVE,
+        severity: AuditSeverity.MEDIUM,
+        institutionId: grievance.student.institutionId,
+        description: `Grievance rejected: ${grievance.title}`,
+        oldValues: { status: grievance.status },
+        newValues: { status: GrievanceStatus.REJECTED, reason },
+      }).catch(() => {});
 
       return updated;
     } catch (error) {

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsEnum, IsBoolean, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsEnum, IsBoolean, MinLength, MaxLength, IsObject } from 'class-validator';
 import { Role } from '@prisma/client';
 
 /**
@@ -57,6 +57,7 @@ export class SendNotificationDto {
   sendEmail?: boolean;
 
   @IsOptional()
+  @IsObject()
   data?: Record<string, any>; // Additional data payload
 }
 
@@ -84,6 +85,7 @@ export class SendStudentReminderDto {
   sendEmail?: boolean;
 
   @IsOptional()
+  @IsObject()
   data?: Record<string, any>;
 }
 
@@ -111,6 +113,7 @@ export class SendInstitutionAnnouncementDto {
   sendEmail?: boolean;
 
   @IsOptional()
+  @IsObject()
   data?: Record<string, any>;
 }
 
@@ -142,5 +145,6 @@ export class SendSystemAnnouncementDto {
   force?: boolean; // Bypass user notification settings
 
   @IsOptional()
+  @IsObject()
   data?: Record<string, any>;
 }

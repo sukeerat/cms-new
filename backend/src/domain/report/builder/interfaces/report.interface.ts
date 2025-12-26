@@ -18,6 +18,7 @@ export enum ExportFormat {
   EXCEL = 'excel',
   PDF = 'pdf',
   CSV = 'csv',
+  JSON = 'json',
 }
 
 export interface ReportJobData {

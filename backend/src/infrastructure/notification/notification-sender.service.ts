@@ -175,7 +175,8 @@ export class NotificationSenderService {
 
       // Queue email if requested
       let emailQueued = false;
-      if (sendEmail && emailTemplate) {
+      const template = emailTemplate || 'announcement'; // Default template for notifications
+      if (sendEmail) {
         const user = await this.prisma.user.findUnique({
           where: { id: userId },
           select: { email: true, name: true },
@@ -185,7 +186,7 @@ export class NotificationSenderService {
           await this.mailService.queueMail({
             to: user.email,
             subject: title,
-            template: emailTemplate,
+            template,
             context: {
               name: user.name,
               title,

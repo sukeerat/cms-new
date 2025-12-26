@@ -2,7 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../core/database/prisma.service';
 import { LruCacheService } from '../../core/cache/lru-cache.service';
 import { FacultyVisitService } from '../../domain/report/faculty-visit/faculty-visit.service';
-import { Prisma, ApplicationStatus, InternshipStatus, MonthlyReportStatus, DocumentType } from '@prisma/client';
+import { Prisma, ApplicationStatus, InternshipStatus, MonthlyReportStatus, DocumentType, AuditAction, AuditCategory, AuditSeverity, Role } from '@prisma/client';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 
 // Month names for display
 const MONTH_NAMES = [
@@ -31,6 +32,7 @@ export class StudentService {
     private readonly prisma: PrismaService,
     private readonly cache: LruCacheService,
     private readonly facultyVisitService: FacultyVisitService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -384,6 +386,7 @@ export class StudentService {
   async updateProfile(userId: string, updateProfileDto: Prisma.StudentUpdateInput) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!student) {
@@ -400,6 +403,21 @@ export class StudentService {
       },
     });
 
+    // Audit profile update
+    this.auditService.log({
+      action: AuditAction.STUDENT_PROFILE_UPDATE,
+      entityType: 'Student',
+      entityId: student.id,
+      userId,
+      userName: student.user?.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Student profile updated: ${student.name}`,
+      category: AuditCategory.PROFILE_MANAGEMENT,
+      severity: AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      newValues: updateProfileDto as any,
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['student', `student:${updated.id}`]);
 
     return updated;
@@ -411,6 +429,7 @@ export class StudentService {
   async uploadProfileImage(userId: string, imageUrl: string) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!student) {
@@ -423,6 +442,21 @@ export class StudentService {
         profileImage: imageUrl,
       },
     });
+
+    // Audit profile image upload
+    this.auditService.log({
+      action: AuditAction.STUDENT_PROFILE_UPDATE,
+      entityType: 'Student',
+      entityId: student.id,
+      userId,
+      userName: student.user?.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Profile image uploaded for student: ${student.name}`,
+      category: AuditCategory.PROFILE_MANAGEMENT,
+      severity: AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      newValues: { profileImage: imageUrl },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['student', `student:${student.id}`]);
 
@@ -567,6 +601,7 @@ export class StudentService {
   }) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!student) {
@@ -632,6 +667,26 @@ export class StudentService {
         },
       },
     });
+
+    // Audit internship application
+    this.auditService.log({
+      action: AuditAction.APPLICATION_SUBMIT,
+      entityType: 'InternshipApplication',
+      entityId: application.id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Applied to internship: ${internship.title} at ${application.internship?.industry?.companyName || 'Unknown Company'}`,
+      category: AuditCategory.APPLICATION_PROCESS,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        applicationId: application.id,
+        internshipId,
+        internshipTitle: internship.title,
+        status: ApplicationStatus.APPLIED,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['applications', `student:${studentId}`]);
 
@@ -796,7 +851,7 @@ export class StudentService {
   async withdrawApplication(userId: string, applicationId: string) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
-      select: { id: true },
+      include: { user: true },
     });
 
     if (!student) {
@@ -805,6 +860,7 @@ export class StudentService {
 
     const application = await this.prisma.internshipApplication.findUnique({
       where: { id: applicationId },
+      include: { internship: true },
     });
 
     if (!application) {
@@ -830,6 +886,8 @@ export class StudentService {
       );
     }
 
+    const oldStatus = application.status;
+
     const updated = await this.prisma.internshipApplication.update({
       where: { id: applicationId },
       data: {
@@ -843,6 +901,22 @@ export class StudentService {
         },
       },
     });
+
+    // Audit application withdrawal
+    this.auditService.log({
+      action: AuditAction.APPLICATION_WITHDRAW,
+      entityType: 'InternshipApplication',
+      entityId: applicationId,
+      userId,
+      userName: student.user?.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Application withdrawn: ${application.internship?.title || application.companyName}`,
+      category: AuditCategory.APPLICATION_PROCESS,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: student.institutionId || undefined,
+      oldValues: { status: oldStatus },
+      newValues: { status: ApplicationStatus.WITHDRAWN },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['applications', `student:${student.id}`]);
 
@@ -875,6 +949,7 @@ export class StudentService {
   }) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!student) {
@@ -906,6 +981,28 @@ export class StudentService {
         ...selfIdentifiedDto,
       },
     });
+
+    // Audit self-identified internship submission
+    this.auditService.log({
+      action: AuditAction.APPLICATION_SUBMIT,
+      entityType: 'InternshipApplication',
+      entityId: application.id,
+      userId,
+      userName: student.user?.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Self-identified internship submitted: ${selfIdentifiedDto.companyName}`,
+      category: AuditCategory.APPLICATION_PROCESS,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        applicationId: application.id,
+        companyName: selfIdentifiedDto.companyName,
+        isSelfIdentified: true,
+        status: ApplicationStatus.APPROVED,
+        startDate: selfIdentifiedDto.startDate,
+        endDate: selfIdentifiedDto.endDate,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['applications', `student:${studentId}`]);
 
@@ -997,7 +1094,7 @@ export class StudentService {
   }) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
-      select: { id: true },
+      include: { user: true },
     });
 
     if (!student) {
@@ -1070,6 +1167,28 @@ export class StudentService {
         },
       });
 
+      // Audit monthly report submission (update)
+      this.auditService.log({
+        action: AuditAction.MONTHLY_REPORT_SUBMIT,
+        entityType: 'MonthlyReport',
+        entityId: updated.id,
+        userId,
+        userName: student.user?.name || student.name,
+        userRole: student.user?.role || Role.STUDENT,
+        description: `Monthly report submitted for ${MONTH_NAMES[reportDto.reportMonth - 1]} ${reportDto.reportYear}${isOverdue ? ' (overdue)' : ''}`,
+        category: AuditCategory.INTERNSHIP_WORKFLOW,
+        severity: isOverdue ? AuditSeverity.MEDIUM : AuditSeverity.LOW,
+        institutionId: student.institutionId || undefined,
+        newValues: {
+          reportId: updated.id,
+          reportMonth: reportDto.reportMonth,
+          reportYear: reportDto.reportYear,
+          status: MonthlyReportStatus.APPROVED,
+          isOverdue,
+          autoApproved: true,
+        },
+      }).catch(() => {});
+
       await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
 
       return {
@@ -1105,6 +1224,28 @@ export class StudentService {
       },
     });
 
+    // Audit monthly report submission (create)
+    this.auditService.log({
+      action: AuditAction.MONTHLY_REPORT_SUBMIT,
+      entityType: 'MonthlyReport',
+      entityId: report.id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Monthly report submitted for ${MONTH_NAMES[reportDto.reportMonth - 1]} ${reportDto.reportYear}${isOverdue ? ' (overdue)' : ''}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: isOverdue ? AuditSeverity.MEDIUM : AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        reportId: report.id,
+        reportMonth: reportDto.reportMonth,
+        reportYear: reportDto.reportYear,
+        status: MonthlyReportStatus.APPROVED,
+        isOverdue,
+        autoApproved: true,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
 
     return {
@@ -1125,7 +1266,7 @@ export class StudentService {
   }) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
-      select: { id: true },
+      include: { user: true },
     });
 
     if (!student) {
@@ -1142,6 +1283,12 @@ export class StudentService {
       throw new NotFoundException('Monthly report not found');
     }
 
+    const oldValues = {
+      reportFileUrl: existing.reportFileUrl,
+      monthName: existing.monthName,
+      status: existing.status,
+    };
+
     const updated = await this.prisma.monthlyReport.update({
       where: { id },
       data: {
@@ -1153,6 +1300,22 @@ export class StudentService {
       },
     });
 
+    // Audit monthly report update
+    this.auditService.log({
+      action: AuditAction.MONTHLY_REPORT_SUBMIT,
+      entityType: 'MonthlyReport',
+      entityId: id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Monthly report updated for ${existing.monthName || MONTH_NAMES[(existing.reportMonth || 1) - 1]} ${existing.reportYear}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      oldValues,
+      newValues: reportDto,
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
     return updated;
   }
@@ -1163,7 +1326,7 @@ export class StudentService {
   async deleteMonthlyReport(userId: string, id: string) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
-      select: { id: true },
+      include: { user: true },
     });
 
     if (!student) {
@@ -1188,6 +1351,26 @@ export class StudentService {
     await this.prisma.monthlyReport.delete({
       where: { id },
     });
+
+    // Audit monthly report deletion
+    this.auditService.log({
+      action: AuditAction.MONTHLY_REPORT_DELETE,
+      entityType: 'MonthlyReport',
+      entityId: id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Monthly report deleted for ${existing.monthName || MONTH_NAMES[(existing.reportMonth || 1) - 1]} ${existing.reportYear}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: student.institutionId || undefined,
+      oldValues: {
+        reportId: id,
+        reportMonth: existing.reportMonth,
+        reportYear: existing.reportYear,
+        status: existing.status,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['reports', `student:${studentId}`]);
 
@@ -1243,7 +1426,7 @@ export class StudentService {
   async uploadDocument(userId: string, file: any, documentDto: { type: string }) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
-      select: { id: true },
+      include: { user: true },
     });
 
     if (!student) {
@@ -1262,6 +1445,26 @@ export class StudentService {
       },
     });
 
+    // Audit document upload
+    this.auditService.log({
+      action: AuditAction.STUDENT_DOCUMENT_UPLOAD,
+      entityType: 'Document',
+      entityId: created.id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Document uploaded: ${fileName} (${documentDto.type})`,
+      category: AuditCategory.PROFILE_MANAGEMENT,
+      severity: AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        documentId: created.id,
+        fileName,
+        fileUrl,
+        type: documentDto.type,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['documents', `student:${student.id}`]);
     return created;
   }
@@ -1269,8 +1472,47 @@ export class StudentService {
   /**
    * Delete a document
    */
-  async deleteDocument(id: string) {
-    return this.prisma.document.delete({ where: { id } });
+  async deleteDocument(userId: string, id: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const document = await this.prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    await this.prisma.document.delete({ where: { id } });
+
+    // Audit document deletion
+    this.auditService.log({
+      action: AuditAction.STUDENT_DOCUMENT_DELETE,
+      entityType: 'Document',
+      entityId: id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Document deleted: ${document.fileName}`,
+      category: AuditCategory.PROFILE_MANAGEMENT,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: student.institutionId || undefined,
+      oldValues: {
+        documentId: id,
+        fileName: document.fileName,
+        type: document.type,
+      },
+    }).catch(() => {});
+
+    await this.cache.invalidateByTags(['documents', `student:${student.id}`]);
+    return { success: true, message: 'Document deleted successfully' };
   }
 
   /**
@@ -1350,6 +1592,7 @@ export class StudentService {
   }) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!student) {
@@ -1373,6 +1616,29 @@ export class StudentService {
         status: 'PENDING',
       },
     });
+
+    // Audit grievance submission
+    this.auditService.log({
+      action: AuditAction.GRIEVANCE_SUBMIT,
+      entityType: 'Grievance',
+      entityId: grievance.id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Grievance submitted: ${grievanceDto.title} (${grievanceDto.category})`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: grievanceDto.severity === 'HIGH' || grievanceDto.severity === 'CRITICAL'
+        ? AuditSeverity.HIGH
+        : AuditSeverity.MEDIUM,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        grievanceId: grievance.id,
+        title: grievanceDto.title,
+        category: grievanceDto.category,
+        severity: grievanceDto.severity || 'MEDIUM',
+        status: 'PENDING',
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['grievances', `student:${studentId}`]);
 
@@ -1475,6 +1741,26 @@ export class StudentService {
         institutionId: student.institutionId,
       },
     });
+
+    // Audit technical query submission
+    this.auditService.log({
+      action: AuditAction.TECHNICAL_QUERY_SUBMIT,
+      entityType: 'TechnicalQuery',
+      entityId: query.id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Technical query submitted: ${queryDto.title || 'Untitled'}`,
+      category: AuditCategory.SUPPORT,
+      severity: AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        queryId: query.id,
+        title: queryDto.title,
+        priority: queryDto.priority || 'MEDIUM',
+        status: 'OPEN',
+      },
+    }).catch(() => {});
 
     return query;
   }
@@ -1711,7 +1997,7 @@ export class StudentService {
   }) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
-      select: { id: true },
+      include: { user: true },
     });
 
     if (!student) {
@@ -1751,6 +2037,26 @@ export class StudentService {
         data: { reportFileUrl: reportDto.reportFileUrl },
       });
 
+      // Audit report file upload (update)
+      this.auditService.log({
+        action: AuditAction.MONTHLY_REPORT_UPDATE,
+        entityType: 'MonthlyReport',
+        entityId: updated.id,
+        userId,
+        userName: student.user?.name || student.name,
+        userRole: student.user?.role || Role.STUDENT,
+        description: `Report file uploaded for ${MONTH_NAMES[reportDto.reportMonth - 1]} ${reportDto.reportYear}`,
+        category: AuditCategory.INTERNSHIP_WORKFLOW,
+        severity: AuditSeverity.LOW,
+        institutionId: student.institutionId || undefined,
+        newValues: {
+          reportId: updated.id,
+          reportMonth: reportDto.reportMonth,
+          reportYear: reportDto.reportYear,
+          reportFileUrl: reportDto.reportFileUrl,
+        },
+      }).catch(() => {});
+
       await this.cache.invalidateByTags(['reports', `student:${student.id}`]);
       return updated;
     }
@@ -1780,6 +2086,27 @@ export class StudentService {
         periodEndDate,
       },
     });
+
+    // Audit report file upload (create draft)
+    this.auditService.log({
+      action: AuditAction.MONTHLY_REPORT_UPDATE,
+      entityType: 'MonthlyReport',
+      entityId: report.id,
+      userId,
+      userName: student.user?.name || student.name,
+      userRole: student.user?.role || Role.STUDENT,
+      description: `Report file uploaded (draft) for ${MONTH_NAMES[reportDto.reportMonth - 1]} ${reportDto.reportYear}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.LOW,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        reportId: report.id,
+        reportMonth: reportDto.reportMonth,
+        reportYear: reportDto.reportYear,
+        reportFileUrl: reportDto.reportFileUrl,
+        status: MonthlyReportStatus.DRAFT,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['reports', `student:${student.id}`]);
     return report;

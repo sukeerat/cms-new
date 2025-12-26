@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
+import { AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { BulkInstitutionRowDto, BulkInstitutionResultDto, BulkInstitutionValidationResultDto } from './dto/bulk-institution.dto';
 import { InstitutionService, CreateInstitutionData, CreatePrincipalData } from '../../domain/institution/institution.service';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 import * as XLSX from 'xlsx';
 
 @Injectable()
@@ -11,6 +13,7 @@ export class BulkInstitutionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly institutionService: InstitutionService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -179,10 +182,26 @@ export class BulkInstitutionService {
   async bulkUploadInstitutions(
     institutions: BulkInstitutionRowDto[],
     createdBy: string,
+    performedByUserId?: string,
   ): Promise<BulkInstitutionResultDto> {
     const startTime = Date.now();
     const successRecords: any[] = [];
     const failedRecords: any[] = [];
+
+    // Audit: Bulk institution upload initiated
+    this.auditService.log({
+      action: AuditAction.DATA_IMPORT,
+      entityType: 'BulkInstitutionUpload',
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.HIGH,
+      userId: performedByUserId,
+      description: `Bulk institution upload started: ${institutions.length} institutions`,
+      newValues: {
+        operation: 'bulk_institution_upload_started',
+        totalInstitutions: institutions.length,
+        createdBy,
+      },
+    }).catch(() => {});
 
     // First, validate all institutions
     const validation = await this.validateInstitutions(institutions);
@@ -247,6 +266,26 @@ export class BulkInstitutionService {
     this.logger.log(
       `Bulk upload completed: ${successRecords.length} success, ${failedRecords.length} failed in ${processingTime}ms`,
     );
+
+    // Audit: Bulk institution upload completed
+    this.auditService.log({
+      action: AuditAction.DATA_IMPORT,
+      entityType: 'BulkInstitutionUpload',
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: failedRecords.length > 0 ? AuditSeverity.CRITICAL : AuditSeverity.HIGH,
+      userId: performedByUserId,
+      description: `Bulk institution upload completed: ${successRecords.length} success, ${failedRecords.length} failed`,
+      newValues: {
+        operation: 'bulk_institution_upload_completed',
+        totalInstitutions: institutions.length,
+        successCount: successRecords.length,
+        failedCount: failedRecords.length,
+        processingTimeMs: processingTime,
+        createdBy,
+        createdCodes: successRecords.map(r => r.code).filter(Boolean),
+        failedCodes: failedRecords.map(r => r.code).filter(Boolean),
+      },
+    }).catch(() => {});
 
     return {
       total: institutions.length,

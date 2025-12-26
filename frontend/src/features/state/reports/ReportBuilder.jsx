@@ -112,6 +112,7 @@ const ReportBuilder = () => {
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [pollingInterval, setPollingInterval] = useState(2000); // Start with 2s
   const pollingIntervalRef = useRef(2000);
+  const isMountedRef = useRef(true); // Track mounted state for cleanup
 
   const { catalog: catalogData, config, history: historyData, generating, loading, error } = useSelector(
     (state) => state.state.reportBuilder
@@ -197,6 +198,14 @@ const ReportBuilder = () => {
     dispatch(fetchReportHistory({ page: 1, limit: 10 }));
   }, [dispatch]);
 
+  // Cleanup on unmount - prevent state updates after component is unmounted
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Load templates when report type changes
   useEffect(() => {
     if (selectedType) {
@@ -225,17 +234,29 @@ const ReportBuilder = () => {
     if (pollingReports.size === 0 && activeReports.length === 0) {
       // Reset polling interval when no active reports
       pollingIntervalRef.current = 2000;
-      setPollingInterval(2000);
+      if (isMountedRef.current) {
+        setPollingInterval(2000);
+      }
       return;
     }
 
     const poll = async () => {
+      // Check if component is still mounted before processing
+      if (!isMountedRef.current) return;
+
       let hasChanges = false;
       const reportIds = Array.from(pollingReports);
 
       for (const id of reportIds) {
+        // Check mounted state before each async operation
+        if (!isMountedRef.current) return;
+
         try {
           const result = await dispatch(checkReportStatus(id)).unwrap();
+
+          // Check mounted state after async operation
+          if (!isMountedRef.current) return;
+
           if (result.status === 'completed' || result.status === 'failed' || result.status === 'cancelled') {
             hasChanges = true;
             setPollingReports((prev) => {
@@ -254,8 +275,14 @@ const ReportBuilder = () => {
         }
       }
 
+      // Check mounted state before queue refresh
+      if (!isMountedRef.current) return;
+
       // Refresh queue data
       await loadQueueData();
+
+      // Check mounted state before final state updates
+      if (!isMountedRef.current) return;
 
       if (hasChanges) {
         // Reset interval on changes
@@ -910,7 +937,7 @@ const ReportBuilder = () => {
                 }
                 loading={loading && Object.keys(catalogByCategory).length === 0}
                 className="mb-4"
-                bodyStyle={{ maxHeight: 600, overflow: 'auto' }}
+                styles={{ body: { maxHeight: 600, overflow: 'auto' } }}
               >
                 {renderCatalog()}
               </Card>

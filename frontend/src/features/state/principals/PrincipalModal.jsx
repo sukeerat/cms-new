@@ -98,8 +98,8 @@ const PrincipalModal = ({ open, onClose, principalId, onSuccess }) => {
       open={open}
       onCancel={handleClose}
       footer={null}
-      width={700}
-      destroyOnClose
+      width={800}
+      destroyOnHidden
     >
       {dataLoading ? (
         <div className="py-12 text-center">

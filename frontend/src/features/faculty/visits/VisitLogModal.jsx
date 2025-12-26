@@ -134,7 +134,7 @@ const VisitLogModal = ({ open, onClose, visitLogId, onSuccess }) => {
       onCancel={handleClose}
       footer={null}
       width={800}
-      destroyOnClose
+      destroyOnHidden
     >
       {dataLoading ? (
         <div className="py-12 text-center">

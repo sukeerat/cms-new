@@ -10,6 +10,7 @@ import { MentorModule } from '../../domain/mentor/mentor.module';
 import { AcademicModule } from '../../domain/academic/academic.module';
 import { InstitutionModule } from '../../domain/institution/institution.module';
 import { UserModule } from '../../domain/user/user.module';
+import { AuditModule } from '../../infrastructure/audit/audit.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UserModule } from '../../domain/user/user.module';
     AcademicModule,
     InstitutionModule,
     UserModule,
+    AuditModule,
   ],
   controllers: [StateController],
   providers: [StateService],

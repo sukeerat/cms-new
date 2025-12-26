@@ -1,5 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
+import { Module } from '@nestjs/common';
 import { BulkUserModule } from './bulk-user/bulk-user.module';
 import { BulkStudentModule } from './bulk-student/bulk-student.module';
 import { BulkInstitutionModule } from './bulk-institution/bulk-institution.module';
@@ -10,35 +9,21 @@ import { BulkJobService } from './shared/bulk-job.service';
 import { BulkQueueService } from './shared/bulk-queue.service';
 import { BulkJobController } from './shared/bulk-job.controller';
 import { PrismaModule } from '../core/database/prisma.module';
-import { BulkUserService } from './bulk-user/bulk-user.service';
-import { BulkStudentService } from './bulk-student/bulk-student.service';
-import { BulkInstitutionService } from './bulk-institution/bulk-institution.service';
 import { BulkSelfInternshipService } from './bulk-self-internship/bulk-self-internship.service';
 import { BulkSelfInternshipController } from './bulk-self-internship/bulk-self-internship.controller';
+import { AuditModule } from '../infrastructure/audit/audit.module';
+import { QueueModule } from '../core/queue/queue.module';
 
 @Module({
   imports: [
     PrismaModule,
+    AuditModule,
     BulkUserModule,
     BulkStudentModule,
     BulkInstitutionModule,
-    BullModule.registerQueue({
-      name: 'bulk-operations',
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-        removeOnComplete: {
-          count: 100,
-          age: 24 * 3600,
-        },
-        removeOnFail: {
-          count: 50,
-        },
-      },
-    }),
+    // Import QueueModule which exports BullModule with bulk-operations queue
+    // This ensures consistent configuration with hash tag prefix for Redis Cluster
+    QueueModule,
   ],
   controllers: [TemplateController, BulkJobController, BulkSelfInternshipController],
   providers: [

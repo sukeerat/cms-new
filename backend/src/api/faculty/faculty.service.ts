@@ -1,13 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
 import { LruCacheService } from '../../core/cache/lru-cache.service';
-import { Prisma, ApplicationStatus, MonthlyReportStatus } from '@prisma/client';
+import { Prisma, ApplicationStatus, MonthlyReportStatus, AuditAction, AuditCategory, AuditSeverity, Role } from '@prisma/client';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 
 @Injectable()
 export class FacultyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: LruCacheService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -514,6 +516,32 @@ export class FacultyService {
       },
     });
 
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit visit log creation
+    this.auditService.log({
+      action: AuditAction.VISIT_LOG_CREATE,
+      entityType: 'FacultyVisitLog',
+      entityId: visitLog.id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Faculty visit log created: ${visitType} at ${visitLocation}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.LOW,
+      institutionId: faculty?.institutionId || undefined,
+      newValues: {
+        visitLogId: visitLog.id,
+        applicationId: application.id,
+        studentId: visitLog.application?.student?.id,
+        studentName: visitLog.application?.student?.name,
+        visitType,
+        visitLocation,
+        visitDate: visitLog.visitDate,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['visits', `application:${application.id}`, `faculty:${facultyId}`]);
 
     return visitLog;
@@ -522,14 +550,22 @@ export class FacultyService {
   /**
    * Update visit log
    */
-  async updateVisitLog(id: string, updateVisitLogDto: any) {
+  async updateVisitLog(id: string, updateVisitLogDto: any, facultyId?: string) {
     const visitLog = await this.prisma.facultyVisitLog.findUnique({
       where: { id },
+      include: { application: { include: { student: true } } },
     });
 
     if (!visitLog) {
       throw new NotFoundException('Visit log not found');
     }
+
+    const oldValues = {
+      visitType: visitLog.visitType,
+      visitLocation: visitLog.visitLocation,
+      visitDate: visitLog.visitDate,
+      status: visitLog.status,
+    };
 
     const updated = await this.prisma.facultyVisitLog.update({
       where: { id },
@@ -543,6 +579,26 @@ export class FacultyService {
       },
     });
 
+    // Get faculty for audit
+    const userId = facultyId || visitLog.facultyId;
+    const faculty = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    // Audit visit log update
+    this.auditService.log({
+      action: AuditAction.VISIT_LOG_UPDATE,
+      entityType: 'FacultyVisitLog',
+      entityId: id,
+      userId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Faculty visit log updated`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.LOW,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues,
+      newValues: updateVisitLogDto,
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['visits', `visit:${id}`]);
 
     return updated;
@@ -551,18 +607,48 @@ export class FacultyService {
   /**
    * Delete visit log
    */
-  async deleteVisitLog(id: string) {
+  async deleteVisitLog(id: string, facultyId?: string) {
     const visitLog = await this.prisma.facultyVisitLog.findUnique({
       where: { id },
+      include: { application: { include: { student: true } } },
     });
 
     if (!visitLog) {
       throw new NotFoundException('Visit log not found');
     }
 
+    const deletedInfo = {
+      visitLogId: id,
+      applicationId: visitLog.applicationId,
+      studentId: visitLog.application?.studentId,
+      studentName: visitLog.application?.student?.name,
+      visitType: visitLog.visitType,
+      visitLocation: visitLog.visitLocation,
+      visitDate: visitLog.visitDate,
+    };
+
     await this.prisma.facultyVisitLog.delete({
       where: { id },
     });
+
+    // Get faculty for audit
+    const userId = facultyId || visitLog.facultyId;
+    const faculty = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    // Audit visit log deletion
+    this.auditService.log({
+      action: AuditAction.VISIT_LOG_DELETE,
+      entityType: 'FacultyVisitLog',
+      entityId: id,
+      userId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Faculty visit log deleted`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: deletedInfo,
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['visits', `visit:${id}`]);
 
@@ -660,6 +746,8 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to review this report');
     }
 
+    const oldStatus = report.status;
+
     const updated = await this.prisma.monthlyReport.update({
       where: { id },
       data: {
@@ -679,6 +767,31 @@ export class FacultyService {
         },
       },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: reviewDto.facultyId } });
+
+    // Audit report review
+    this.auditService.log({
+      action: reviewDto.isApproved ? AuditAction.MONTHLY_REPORT_APPROVE : AuditAction.MONTHLY_REPORT_REJECT,
+      entityType: 'MonthlyReport',
+      entityId: id,
+      userId: reviewDto.facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Monthly report ${reviewDto.isApproved ? 'approved' : 'rejected'}: ${report.monthName} ${report.reportYear}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: { status: oldStatus },
+      newValues: {
+        status: updated.status,
+        isApproved: reviewDto.isApproved,
+        reviewComments: reviewDto.reviewComments,
+        studentId: updated.application?.studentId,
+        studentName: updated.application?.student?.name,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['reports', `report:${id}`]);
 
@@ -763,6 +876,7 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to approve this application');
     }
 
+    const oldStatus = application.status;
     const newStatus = approvalDto.status === 'APPROVED'
       ? ApplicationStatus.APPROVED
       : ApplicationStatus.REJECTED;
@@ -783,6 +897,31 @@ export class FacultyService {
       },
     });
 
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: approvalDto.facultyId } });
+
+    // Audit self-identified internship approval/rejection
+    this.auditService.log({
+      action: approvalDto.status === 'APPROVED' ? AuditAction.APPLICATION_APPROVE : AuditAction.APPLICATION_REJECT,
+      entityType: 'InternshipApplication',
+      entityId: id,
+      userId: approvalDto.facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Self-identified internship ${approvalDto.status.toLowerCase()}: ${updated.student?.name} at ${application.companyName}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: { status: oldStatus },
+      newValues: {
+        status: newStatus,
+        studentId: updated.studentId,
+        studentName: updated.student?.name,
+        companyName: application.companyName,
+        reviewRemarks: approvalDto.reviewRemarks,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['applications', `application:${id}`]);
 
     return updated;
@@ -800,6 +939,7 @@ export class FacultyService {
         id: applicationId,
         mentorId: facultyId,
       },
+      include: { student: true },
     });
 
     if (!application) {
@@ -818,6 +958,30 @@ export class FacultyService {
         ...feedbackData,
       },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit feedback submission
+    this.auditService.log({
+      action: AuditAction.MONTHLY_FEEDBACK_SUBMIT,
+      entityType: 'MonthlyFeedback',
+      entityId: feedback.id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Monthly feedback submitted for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.LOW,
+      institutionId: faculty?.institutionId || undefined,
+      newValues: {
+        feedbackId: feedback.id,
+        applicationId,
+        studentId: application.studentId,
+        studentName: application.student?.name,
+        feedbackMonth: feedbackData.feedbackMonth,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['feedback', `application:${applicationId}`]);
 
@@ -942,6 +1106,12 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to update this application');
     }
 
+    const oldValues = {
+      status: application.status,
+      hasJoined: application.hasJoined,
+      isSelected: application.isSelected,
+    };
+
     const updated = await this.prisma.internshipApplication.update({
       where: { id },
       data: {
@@ -963,6 +1133,25 @@ export class FacultyService {
       },
     });
 
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit internship update
+    this.auditService.log({
+      action: AuditAction.APPLICATION_UPDATE,
+      entityType: 'InternshipApplication',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Internship application updated for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues,
+      newValues: updateDto,
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['applications', `application:${id}`]);
 
     return {
@@ -978,6 +1167,7 @@ export class FacultyService {
   async deleteInternship(id: string, facultyId: string) {
     const application = await this.prisma.internshipApplication.findUnique({
       where: { id },
+      include: { student: true },
     });
 
     if (!application) {
@@ -989,9 +1179,35 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to delete this application');
     }
 
+    const deletedInfo = {
+      applicationId: id,
+      studentId: application.studentId,
+      studentName: application.student?.name,
+      companyName: application.companyName,
+      status: application.status,
+    };
+
     await this.prisma.internshipApplication.delete({
       where: { id },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit internship deletion
+    this.auditService.log({
+      action: AuditAction.APPLICATION_WITHDRAW,
+      entityType: 'InternshipApplication',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Internship application deleted for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.HIGH,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: deletedInfo,
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['applications', `application:${id}`]);
 
@@ -1010,7 +1226,7 @@ export class FacultyService {
     const report = await this.prisma.monthlyReport.findUnique({
       where: { id },
       include: {
-        application: true,
+        application: { include: { student: true } },
       },
     });
 
@@ -1022,6 +1238,8 @@ export class FacultyService {
     if (report.application?.mentorId && report.application.mentorId !== facultyId) {
       throw new BadRequestException('You are not authorized to approve this report');
     }
+
+    const oldStatus = report.status;
 
     const updated = await this.prisma.monthlyReport.update({
       where: { id },
@@ -1035,6 +1253,30 @@ export class FacultyService {
         reviewComments: remarks,
       },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit report approval
+    this.auditService.log({
+      action: AuditAction.MONTHLY_REPORT_APPROVE,
+      entityType: 'MonthlyReport',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Monthly report approved: ${report.monthName} ${report.reportYear} for ${report.application?.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: { status: oldStatus },
+      newValues: {
+        status: 'APPROVED',
+        remarks,
+        studentId: report.studentId,
+        studentName: report.application?.student?.name,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['reports', `report:${id}`]);
 
@@ -1052,7 +1294,7 @@ export class FacultyService {
     const report = await this.prisma.monthlyReport.findUnique({
       where: { id },
       include: {
-        application: true,
+        application: { include: { student: true } },
       },
     });
 
@@ -1065,6 +1307,8 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to reject this report');
     }
 
+    const oldStatus = report.status;
+
     const updated = await this.prisma.monthlyReport.update({
       where: { id },
       data: {
@@ -1075,6 +1319,30 @@ export class FacultyService {
         reviewComments: reason,
       },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit report rejection
+    this.auditService.log({
+      action: AuditAction.MONTHLY_REPORT_REJECT,
+      entityType: 'MonthlyReport',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Monthly report rejected: ${report.monthName} ${report.reportYear} for ${report.application?.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: { status: oldStatus },
+      newValues: {
+        status: 'REJECTED',
+        reason,
+        studentId: report.studentId,
+        studentName: report.application?.student?.name,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['reports', `report:${id}`]);
 
@@ -1092,7 +1360,7 @@ export class FacultyService {
     const report = await this.prisma.monthlyReport.findUnique({
       where: { id },
       include: {
-        application: true,
+        application: { include: { student: true } },
       },
     });
 
@@ -1105,9 +1373,37 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to delete this report');
     }
 
+    const deletedInfo = {
+      reportId: id,
+      reportMonth: report.reportMonth,
+      reportYear: report.reportYear,
+      monthName: report.monthName,
+      studentId: report.studentId,
+      studentName: report.application?.student?.name,
+      status: report.status,
+    };
+
     await this.prisma.monthlyReport.delete({
       where: { id },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit report deletion
+    this.auditService.log({
+      action: AuditAction.MONTHLY_REPORT_DELETE,
+      entityType: 'MonthlyReport',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Monthly report deleted: ${report.monthName} ${report.reportYear} for ${report.application?.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.HIGH,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: deletedInfo,
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['reports', `report:${id}`]);
 
@@ -1192,6 +1488,7 @@ export class FacultyService {
   async verifyJoiningLetter(id: string, remarks: string, facultyId: string) {
     const application = await this.prisma.internshipApplication.findUnique({
       where: { id },
+      include: { student: true },
     });
 
     if (!application) {
@@ -1212,6 +1509,29 @@ export class FacultyService {
       },
     });
 
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit joining letter verification
+    this.auditService.log({
+      action: AuditAction.JOINING_LETTER_VERIFY,
+      entityType: 'InternshipApplication',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Joining letter verified for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      newValues: {
+        applicationId: id,
+        studentId: application.studentId,
+        studentName: application.student?.name,
+        remarks,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['applications', `application:${id}`]);
 
     return {
@@ -1227,6 +1547,7 @@ export class FacultyService {
   async rejectJoiningLetter(id: string, reason: string, facultyId: string) {
     const application = await this.prisma.internshipApplication.findUnique({
       where: { id },
+      include: { student: true },
     });
 
     if (!application) {
@@ -1247,6 +1568,29 @@ export class FacultyService {
       },
     });
 
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit joining letter rejection
+    this.auditService.log({
+      action: AuditAction.JOINING_LETTER_REJECT,
+      entityType: 'InternshipApplication',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Joining letter rejected for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: faculty?.institutionId || undefined,
+      newValues: {
+        applicationId: id,
+        studentId: application.studentId,
+        studentName: application.student?.name,
+        reason,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['applications', `application:${id}`]);
 
     return {
@@ -1262,6 +1606,7 @@ export class FacultyService {
   async deleteJoiningLetter(id: string, facultyId: string) {
     const application = await this.prisma.internshipApplication.findUnique({
       where: { id },
+      include: { student: true },
     });
 
     if (!application) {
@@ -1273,6 +1618,13 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to delete this joining letter');
     }
 
+    const deletedInfo = {
+      applicationId: id,
+      studentId: application.studentId,
+      studentName: application.student?.name,
+      joiningLetterUrl: application.joiningLetterUrl,
+    };
+
     const updated = await this.prisma.internshipApplication.update({
       where: { id },
       data: {
@@ -1283,6 +1635,24 @@ export class FacultyService {
         reviewRemarks: null,
       },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit joining letter deletion
+    this.auditService.log({
+      action: AuditAction.JOINING_LETTER_DELETE,
+      entityType: 'InternshipApplication',
+      entityId: id,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Joining letter deleted for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.HIGH,
+      institutionId: faculty?.institutionId || undefined,
+      oldValues: deletedInfo,
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['applications', `application:${id}`]);
 
@@ -1350,6 +1720,29 @@ export class FacultyService {
         },
       },
     });
+
+    // Get faculty for audit
+    const faculty = await this.prisma.user.findUnique({ where: { id: facultyId } });
+
+    // Audit joining letter upload
+    this.auditService.log({
+      action: AuditAction.JOINING_LETTER_UPLOAD,
+      entityType: 'InternshipApplication',
+      entityId: applicationId,
+      userId: facultyId,
+      userName: faculty?.name,
+      userRole: faculty?.role || Role.TEACHER,
+      description: `Joining letter uploaded for student: ${application.student?.name}`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.LOW,
+      institutionId: faculty?.institutionId || undefined,
+      newValues: {
+        applicationId,
+        studentId: application.student?.id,
+        studentName: application.student?.name,
+        joiningLetterUrl,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['applications', `application:${applicationId}`]);
 

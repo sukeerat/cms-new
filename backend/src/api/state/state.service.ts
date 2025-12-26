@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
 import { LruCacheService } from '../../core/cache/lru-cache.service';
-import { Prisma, ApplicationStatus, InternshipStatus, Role, MonthlyReportStatus } from '@prisma/client';
+import { Prisma, ApplicationStatus, InternshipStatus, Role, MonthlyReportStatus, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 // Import domain services for business logic reuse
@@ -10,6 +10,7 @@ import { PlacementService } from '../../domain/placement/placement.service';
 import { InternshipApplicationService } from '../../domain/internship/application/internship-application.service';
 import { FacultyVisitService } from '../../domain/report/faculty-visit/faculty-visit.service';
 import { MonthlyReportService } from '../../domain/report/monthly/monthly-report.service';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 
 @Injectable()
 export class StateService {
@@ -24,6 +25,7 @@ export class StateService {
     private readonly applicationService: InternshipApplicationService,
     private readonly facultyVisitService: FacultyVisitService,
     private readonly monthlyReportService: MonthlyReportService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -1746,7 +1748,7 @@ export class StateService {
   /**
    * Create a new institution
    */
-  async createInstitution(data: Prisma.InstitutionCreateInput) {
+  async createInstitution(data: Prisma.InstitutionCreateInput, userId?: string) {
     const institution = await this.prisma.institution.create({
       data,
       include: {
@@ -1759,6 +1761,23 @@ export class StateService {
       },
     });
 
+    // Audit institution creation
+    this.auditService.log({
+      action: AuditAction.INSTITUTION_CREATE,
+      entityType: 'Institution',
+      entityId: institution.id,
+      userId: userId || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Institution created: ${institution.name}`,
+      category: AuditCategory.SYSTEM_ADMIN,
+      severity: AuditSeverity.HIGH,
+      newValues: {
+        institutionId: institution.id,
+        name: institution.name,
+        code: institution.code,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['state', 'institutions']);
     return institution;
   }
@@ -1766,7 +1785,7 @@ export class StateService {
   /**
    * Update institution details
    */
-  async updateInstitution(id: string, data: Prisma.InstitutionUpdateInput) {
+  async updateInstitution(id: string, data: Prisma.InstitutionUpdateInput, userId?: string) {
     const institution = await this.prisma.institution.findUnique({
       where: { id },
     });
@@ -1780,6 +1799,21 @@ export class StateService {
       data,
     });
 
+    // Audit institution update
+    this.auditService.log({
+      action: AuditAction.INSTITUTION_UPDATE,
+      entityType: 'Institution',
+      entityId: id,
+      userId: userId || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Institution updated: ${institution.name}`,
+      category: AuditCategory.SYSTEM_ADMIN,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: id,
+      oldValues: { name: institution.name, code: institution.code },
+      newValues: data as any,
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['state', 'institutions', `institution:${id}`]);
     return updated;
   }
@@ -1787,7 +1821,7 @@ export class StateService {
   /**
    * Delete institution (soft delete)
    */
-  async deleteInstitution(id: string) {
+  async deleteInstitution(id: string, userId?: string) {
     const institution = await this.prisma.institution.findUnique({
       where: { id },
     });
@@ -1810,6 +1844,21 @@ export class StateService {
       where: { id },
       data: { isActive: false },
     });
+
+    // Audit institution deletion (soft delete)
+    this.auditService.log({
+      action: AuditAction.INSTITUTION_DELETE,
+      entityType: 'Institution',
+      entityId: id,
+      userId: userId || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Institution deactivated: ${institution.name}`,
+      category: AuditCategory.SYSTEM_ADMIN,
+      severity: AuditSeverity.HIGH,
+      institutionId: id,
+      oldValues: { isActive: true },
+      newValues: { isActive: false },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['state', 'institutions', `institution:${id}`]);
     return deleted;
@@ -1874,7 +1923,7 @@ export class StateService {
     institutionId: string;
     phoneNo?: string;
     designation?: string;
-  }) {
+  }, createdBy?: string) {
     const institution = await this.prisma.institution.findUnique({
       where: { id: data.institutionId },
     });
@@ -1904,6 +1953,26 @@ export class StateService {
       },
       include: { Institution: true },
     });
+
+    // Audit principal creation
+    this.auditService.log({
+      action: AuditAction.USER_REGISTRATION,
+      entityType: 'User',
+      entityId: principal.id,
+      userId: createdBy || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Principal account created: ${data.name} for ${institution.name}`,
+      category: AuditCategory.USER_MANAGEMENT,
+      severity: AuditSeverity.HIGH,
+      institutionId: data.institutionId,
+      newValues: {
+        userId: principal.id,
+        name: data.name,
+        email: data.email,
+        role: Role.PRINCIPAL,
+        institutionId: data.institutionId,
+      },
+    }).catch(() => {});
 
     // Remove password from response
     const { password: _, ...principalWithoutPassword } = principal;
@@ -1946,7 +2015,7 @@ export class StateService {
     dob?: string;
     dateOfBirth?: string;
     designation?: string;
-  }) {
+  }, updatedBy?: string) {
     const existingPrincipal = await this.prisma.user.findUnique({
       where: { id, role: 'PRINCIPAL' },
     });
@@ -1997,6 +2066,25 @@ export class StateService {
       },
     });
 
+    // Audit principal update
+    this.auditService.log({
+      action: AuditAction.USER_PROFILE_UPDATE,
+      entityType: 'User',
+      entityId: id,
+      userId: updatedBy || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Principal account updated: ${existingPrincipal.name}`,
+      category: AuditCategory.USER_MANAGEMENT,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: existingPrincipal.institutionId || undefined,
+      oldValues: {
+        name: existingPrincipal.name,
+        email: existingPrincipal.email,
+        active: existingPrincipal.active,
+      },
+      newValues: updateData,
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['state', 'principals']);
     return updatedPrincipal;
   }
@@ -2004,7 +2092,7 @@ export class StateService {
   /**
    * Delete principal by ID
    */
-  async deletePrincipal(id: string) {
+  async deletePrincipal(id: string, deletedBy?: string) {
     const existingPrincipal = await this.prisma.user.findUnique({
       where: { id, role: 'PRINCIPAL' },
     });
@@ -2017,6 +2105,25 @@ export class StateService {
       where: { id },
     });
 
+    // Audit principal deletion
+    this.auditService.log({
+      action: AuditAction.USER_DEACTIVATION,
+      entityType: 'User',
+      entityId: id,
+      userId: deletedBy || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Principal account deleted: ${existingPrincipal.name}`,
+      category: AuditCategory.USER_MANAGEMENT,
+      severity: AuditSeverity.HIGH,
+      institutionId: existingPrincipal.institutionId || undefined,
+      oldValues: {
+        userId: id,
+        name: existingPrincipal.name,
+        email: existingPrincipal.email,
+        role: Role.PRINCIPAL,
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['state', 'principals']);
     return { success: true, message: 'Principal deleted successfully' };
   }
@@ -2024,7 +2131,7 @@ export class StateService {
   /**
    * Reset principal password
    */
-  async resetPrincipalPassword(id: string) {
+  async resetPrincipalPassword(id: string, resetBy?: string) {
     const existingPrincipal = await this.prisma.user.findUnique({
       where: { id, role: 'PRINCIPAL' },
     });
@@ -2035,13 +2142,13 @@ export class StateService {
 
     // Generate a new random password
     const newPassword = this.generateRandomPassword();
-    
+
     this.logger.log(`Resetting password for principal: ${existingPrincipal.email}`);
     this.logger.log(`New password (plain): ${newPassword}`);
 
     // Hash the new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
+
     this.logger.log(`New password (hashed): ${hashedPassword}`);
 
     // Update the user's password
@@ -2049,8 +2156,25 @@ export class StateService {
       where: { id },
       data: { password: hashedPassword },
     });
-    
+
     this.logger.log(`Password updated in database for user: ${updatedUser.email}`);
+
+    // Audit password reset
+    this.auditService.log({
+      action: AuditAction.PASSWORD_RESET,
+      entityType: 'User',
+      entityId: id,
+      userId: resetBy || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Password reset for principal: ${existingPrincipal.name}`,
+      category: AuditCategory.AUTHENTICATION,
+      severity: AuditSeverity.HIGH,
+      institutionId: existingPrincipal.institutionId || undefined,
+      newValues: {
+        userId: id,
+        passwordReset: true,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['state', 'principals']);
 
@@ -2792,6 +2916,25 @@ export class StateService {
       },
     });
 
+    // Audit industry approval
+    this.auditService.log({
+      action: AuditAction.INDUSTRY_APPROVAL,
+      entityType: 'Industry',
+      entityId: industryId,
+      userId: approvedBy,
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Industry approved: ${industry.companyName}`,
+      category: AuditCategory.SYSTEM_ADMIN,
+      severity: AuditSeverity.HIGH,
+      newValues: {
+        industryId,
+        companyName: industry.companyName,
+        isApproved: true,
+        approvedBy,
+        approvedAt: new Date(),
+      },
+    }).catch(() => {});
+
     await this.cache.invalidateByTags(['state', 'industries', `industry:${industryId}`]);
     return updated;
   }
@@ -2799,7 +2942,7 @@ export class StateService {
   /**
    * Reject industry registration
    */
-  async rejectIndustry(industryId: string, reason?: string) {
+  async rejectIndustry(industryId: string, reason?: string, rejectedBy?: string) {
     const industry = await this.prisma.industry.findUnique({
       where: { id: industryId },
     });
@@ -2816,6 +2959,24 @@ export class StateService {
       where: { id: industryId },
       data: { isApproved: false, isVerified: false },
     });
+
+    // Audit industry rejection
+    this.auditService.log({
+      action: AuditAction.INDUSTRY_REJECTION,
+      entityType: 'Industry',
+      entityId: industryId,
+      userId: rejectedBy || 'SYSTEM',
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Industry rejected: ${industry.companyName}${reason ? ` - ${reason}` : ''}`,
+      category: AuditCategory.SYSTEM_ADMIN,
+      severity: AuditSeverity.HIGH,
+      newValues: {
+        industryId,
+        companyName: industry.companyName,
+        isApproved: false,
+        rejectionReason: reason,
+      },
+    }).catch(() => {});
 
     await this.cache.invalidateByTags(['state', 'industries', `industry:${industryId}`]);
     return { ...updated, rejectionReason: reason };
@@ -3429,6 +3590,27 @@ export class StateService {
         mentor: { select: { id: true, name: true, email: true } },
       },
     });
+
+    // Audit mentor assignment
+    this.auditService.log({
+      action: AuditAction.MENTOR_ASSIGN,
+      entityType: 'MentorAssignment',
+      entityId: assignment.id,
+      userId: assignedBy,
+      userRole: Role.STATE_DIRECTORATE,
+      description: `Mentor ${mentor.name} assigned to student ${student.name} by State Directorate`,
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      institutionId: student.institutionId || undefined,
+      newValues: {
+        assignmentId: assignment.id,
+        studentId,
+        studentName: student.name,
+        mentorId,
+        mentorName: mentor.name,
+        assignedBy,
+      },
+    }).catch(() => {});
 
     // Invalidate cache
     await Promise.all([

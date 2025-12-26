@@ -1,15 +1,19 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
-import { Role } from '@prisma/client';
+import { Role, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { BulkUserRowDto, BulkUserResultDto, BulkUserValidationResultDto } from './dto/bulk-user.dto';
 import * as XLSX from 'xlsx';
 import * as bcrypt from 'bcryptjs';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 
 @Injectable()
 export class BulkUserService {
   private readonly logger = new Logger(BulkUserService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   /**
    * Parse CSV/Excel file and extract user data
@@ -157,10 +161,27 @@ export class BulkUserService {
     users: BulkUserRowDto[],
     institutionId: string,
     createdBy: string,
+    performedByUserId?: string,
   ): Promise<BulkUserResultDto> {
     const startTime = Date.now();
     const successRecords: any[] = [];
     const failedRecords: any[] = [];
+
+    // Audit: Bulk user upload initiated
+    this.auditService.log({
+      action: AuditAction.USER_REGISTRATION,
+      entityType: 'BulkUserUpload',
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.MEDIUM,
+      userId: performedByUserId,
+      institutionId,
+      description: `Bulk user upload started: ${users.length} users`,
+      newValues: {
+        operation: 'bulk_user_upload_started',
+        totalUsers: users.length,
+        createdBy,
+      },
+    }).catch(() => {});
 
     // First, validate all users
     const validation = await this.validateUsers(users, institutionId);
@@ -226,6 +247,26 @@ export class BulkUserService {
     this.logger.log(
       `Bulk upload completed: ${successRecords.length} success, ${failedRecords.length} failed in ${processingTime}ms`,
     );
+
+    // Audit: Bulk user upload completed
+    this.auditService.log({
+      action: AuditAction.USER_REGISTRATION,
+      entityType: 'BulkUserUpload',
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: failedRecords.length > 0 ? AuditSeverity.HIGH : AuditSeverity.MEDIUM,
+      userId: performedByUserId,
+      institutionId,
+      description: `Bulk user upload completed: ${successRecords.length} success, ${failedRecords.length} failed`,
+      newValues: {
+        operation: 'bulk_user_upload_completed',
+        totalUsers: users.length,
+        successCount: successRecords.length,
+        failedCount: failedRecords.length,
+        processingTimeMs: processingTime,
+        createdBy,
+        failedEmails: failedRecords.map(r => r.email).filter(Boolean),
+      },
+    }).catch(() => {});
 
     return {
       total: users.length,

@@ -513,13 +513,46 @@ export class NotificationsService {
           );
           break;
 
+        case NotificationTarget.MY_STUDENTS:
+          // Faculty only - redirect to sendStudentReminder
+          if (!([Role.TEACHER, Role.FACULTY_SUPERVISOR] as Role[]).includes(user.role)) {
+            throw new ForbiddenException('Only faculty can send to their students');
+          }
+          return this.sendStudentReminder(user, {
+            title,
+            body,
+            sendEmail,
+            data,
+          });
+
         case NotificationTarget.BROADCAST:
           // Only State/Admin can broadcast
           if (!([Role.STATE_DIRECTORATE, Role.SYSTEM_ADMIN] as Role[]).includes(user.role)) {
             throw new ForbiddenException('Only State/Admin can broadcast');
           }
+          // Broadcast via WebSocket AND save to database for all active users
           this.notificationSender.broadcast('ANNOUNCEMENT', title, body, data);
-          result = { success: true, message: 'Broadcast sent' };
+
+          const allUsers = await this.prisma.user.findMany({
+            where: { active: true },
+            select: { id: true },
+          });
+
+          const broadcastResult = await this.notificationSender.sendBulk({
+            userIds: allUsers.map((u) => u.id),
+            type: 'ANNOUNCEMENT',
+            title,
+            body,
+            data,
+            sendEmail,
+            sendRealtime: false, // Already broadcast via WebSocket
+          });
+
+          let broadcastSent = 0;
+          for (const r of broadcastResult.values()) {
+            if (r.success) broadcastSent++;
+          }
+          result = { sentCount: broadcastSent, skippedCount: allUsers.length - broadcastSent };
           break;
 
         default:
@@ -553,7 +586,7 @@ export class NotificationsService {
    * Faculty: Send reminder to assigned students
    */
   async sendStudentReminder(user: UserContext, dto: SendStudentReminderDto) {
-    if (!['FACULTY', 'TEACHER', 'FACULTY_SUPERVISOR'].includes(user.role)) {
+    if (!([Role.TEACHER, Role.FACULTY_SUPERVISOR] as Role[]).includes(user.role)) {
       throw new ForbiddenException('Only faculty can send student reminders');
     }
 

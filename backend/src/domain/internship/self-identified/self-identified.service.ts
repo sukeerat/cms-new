@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
+import { AuditService } from '../../../infrastructure/audit/audit.service';
 
 export interface SubmitSelfIdentifiedDto {
   companyName: string;
@@ -26,6 +27,7 @@ export class SelfIdentifiedService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly auditService: AuditService,
   ) {}
 
   async submitSelfIdentified(studentId: string, data: SubmitSelfIdentifiedDto) {
@@ -73,6 +75,25 @@ export class SelfIdentifiedService {
 
       // Invalidate cache
       await this.cache.del(`self-identified:student:${studentId}`);
+
+      // Audit: Self-identified internship submitted
+      this.auditService.log({
+        action: AuditAction.APPLICATION_SUBMIT,
+        entityType: 'SelfIdentifiedInternship',
+        entityId: selfIdentified.id,
+        userId: student.userId,
+        institutionId: student.institutionId,
+        category: AuditCategory.INTERNSHIP_WORKFLOW,
+        severity: AuditSeverity.MEDIUM,
+        description: `Self-identified internship submitted: ${data.companyName}`,
+        newValues: {
+          companyName: data.companyName,
+          role: data.role,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          studentId,
+        },
+      }).catch(() => {});
 
       return selfIdentified;
     } catch (error) {
@@ -142,6 +163,20 @@ export class SelfIdentifiedService {
       // Invalidate cache
       await this.cache.del(`self-identified:student:${selfIdentified.studentId}`);
 
+      // Audit: Self-identified internship approved
+      this.auditService.log({
+        action: AuditAction.APPLICATION_APPROVE,
+        entityType: 'SelfIdentifiedInternship',
+        entityId: id,
+        userId: mentorId,
+        institutionId: approved.student.institutionId,
+        category: AuditCategory.INTERNSHIP_WORKFLOW,
+        severity: AuditSeverity.MEDIUM,
+        description: `Self-identified internship approved: ${selfIdentified.companyName}`,
+        oldValues: { status: selfIdentified.status },
+        newValues: { status: ApplicationStatus.APPROVED, mentorId, remarks },
+      }).catch(() => {});
+
       return approved;
     } catch (error) {
       this.logger.error(`Failed to approve self-identified internship: ${error.message}`, error.stack);
@@ -185,6 +220,20 @@ export class SelfIdentifiedService {
 
       // Invalidate cache
       await this.cache.del(`self-identified:student:${selfIdentified.studentId}`);
+
+      // Audit: Self-identified internship rejected
+      this.auditService.log({
+        action: AuditAction.APPLICATION_REJECT,
+        entityType: 'SelfIdentifiedInternship',
+        entityId: id,
+        userId: mentorId,
+        institutionId: rejected.student.institutionId,
+        category: AuditCategory.INTERNSHIP_WORKFLOW,
+        severity: AuditSeverity.MEDIUM,
+        description: `Self-identified internship rejected: ${selfIdentified.companyName}`,
+        oldValues: { status: selfIdentified.status },
+        newValues: { status: ApplicationStatus.REJECTED, reason },
+      }).catch(() => {});
 
       return rejected;
     } catch (error) {

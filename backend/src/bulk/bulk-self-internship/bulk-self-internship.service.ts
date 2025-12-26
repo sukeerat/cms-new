@@ -5,14 +5,18 @@ import {
   BulkSelfInternshipResultDto,
   BulkSelfInternshipValidationResultDto,
 } from './dto/bulk-self-internship.dto';
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus, AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 import * as XLSX from 'xlsx';
 
 @Injectable()
 export class BulkSelfInternshipService {
   private readonly logger = new Logger(BulkSelfInternshipService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   /**
    * Parse CSV/Excel file and extract self-identified internship data
@@ -275,10 +279,27 @@ export class BulkSelfInternshipService {
     internships: BulkSelfInternshipRowDto[],
     institutionId: string,
     createdBy: string,
+    performedByUserId?: string,
   ): Promise<BulkSelfInternshipResultDto> {
     const startTime = Date.now();
     const successRecords: any[] = [];
     const failedRecords: any[] = [];
+
+    // Audit: Bulk self-identified internship upload initiated
+    this.auditService.log({
+      action: AuditAction.DATA_IMPORT,
+      entityType: 'BulkSelfInternshipUpload',
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: AuditSeverity.MEDIUM,
+      userId: performedByUserId,
+      institutionId,
+      description: `Bulk self-internship upload started: ${internships.length} internships`,
+      newValues: {
+        operation: 'bulk_self_internship_upload_started',
+        totalInternships: internships.length,
+        createdBy,
+      },
+    }).catch(() => {});
 
     // First validate
     const validation = await this.validateInternships(internships, institutionId);
@@ -464,6 +485,27 @@ export class BulkSelfInternshipService {
     this.logger.log(
       `Bulk self-internship upload completed: ${successRecords.length} success, ${failedRecords.length} failed in ${processingTime}ms`,
     );
+
+    // Audit: Bulk self-identified internship upload completed
+    this.auditService.log({
+      action: AuditAction.DATA_IMPORT,
+      entityType: 'BulkSelfInternshipUpload',
+      category: AuditCategory.INTERNSHIP_WORKFLOW,
+      severity: failedRecords.length > 0 ? AuditSeverity.HIGH : AuditSeverity.MEDIUM,
+      userId: performedByUserId,
+      institutionId,
+      description: `Bulk self-internship upload completed: ${successRecords.length} success, ${failedRecords.length} failed`,
+      newValues: {
+        operation: 'bulk_self_internship_upload_completed',
+        totalInternships: internships.length,
+        successCount: successRecords.length,
+        failedCount: failedRecords.length,
+        processingTimeMs: processingTime,
+        createdBy,
+        successfulCompanies: successRecords.map(r => r.companyName).filter(Boolean).slice(0, 10),
+        failedStudentEmails: failedRecords.map(r => r.studentEmail).filter(Boolean),
+      },
+    }).catch(() => {});
 
     return {
       total: internships.length,

@@ -464,7 +464,7 @@ const CriticalAlertsModal = ({ open, onClose, alerts, defaultTab = 'lowComplianc
         </div>
       }
       width={1000}
-      destroyOnClose
+      destroyOnHidden
       styles={{
         body: { padding: '16px 24px' },
       }}

@@ -101,8 +101,8 @@ const StaffModal = ({ open, onClose, staffId, onSuccess }) => {
       open={open}
       onCancel={handleClose}
       footer={null}
-      width={800}
-      destroyOnClose
+      width={600}
+      destroyOnHidden
     >
       {initialLoading ? (
         <div className="flex justify-center items-center py-12">

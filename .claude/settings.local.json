@@ -75,7 +75,8 @@
       "Bash(tr:*)",
       "Bash(cmd.exe /c \"dir /s /b \"\"C:\\\\Program Files\\\\MongoDB\\\\Tools\\\\*mongodump.exe\"\" 2>nul\")",
       "Bash(cmd.exe /c \"dir /s /b \"\"C:\\\\Program Files\\\\MongoDB\"\" 2>nul\")",
-      "Bash(cmd.exe /c \"setx PATH \"\"%PATH%;C:\\\\Program Files\\\\MongoDB\\\\Tools\\\\100\\\\bin\"\" /M\")"
+      "Bash(cmd.exe /c \"setx PATH \"\"%PATH%;C:\\\\Program Files\\\\MongoDB\\\\Tools\\\\100\\\\bin\"\" /M\")",
+      "Bash(xargs cat:*)"
     ]
   }
 }

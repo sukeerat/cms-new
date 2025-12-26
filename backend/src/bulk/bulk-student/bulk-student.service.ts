@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
+import { AuditAction, AuditCategory, AuditSeverity } from '@prisma/client';
 import { BulkStudentRowDto, BulkStudentResultDto, BulkStudentValidationResultDto } from './dto/bulk-student.dto';
 import { UserService, CreateStudentData } from '../../domain/user/user.service';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 import * as XLSX from 'xlsx';
 
 @Injectable()
@@ -11,6 +13,7 @@ export class BulkStudentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -247,10 +250,27 @@ export class BulkStudentService {
     students: BulkStudentRowDto[],
     institutionId: string,
     createdBy: string,
+    performedByUserId?: string,
   ): Promise<BulkStudentResultDto> {
     const startTime = Date.now();
     const successRecords: any[] = [];
     const failedRecords: any[] = [];
+
+    // Audit: Bulk student upload initiated
+    this.auditService.log({
+      action: AuditAction.USER_REGISTRATION,
+      entityType: 'BulkStudentUpload',
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: AuditSeverity.MEDIUM,
+      userId: performedByUserId,
+      institutionId,
+      description: `Bulk student upload started: ${students.length} students`,
+      newValues: {
+        operation: 'bulk_student_upload_started',
+        totalStudents: students.length,
+        createdBy,
+      },
+    }).catch(() => {});
 
     // First, validate all students
     const validation = await this.validateStudents(students, institutionId);
@@ -324,6 +344,26 @@ export class BulkStudentService {
     this.logger.log(
       `Bulk upload completed: ${successRecords.length} success, ${failedRecords.length} failed in ${processingTime}ms`,
     );
+
+    // Audit: Bulk student upload completed
+    this.auditService.log({
+      action: AuditAction.USER_REGISTRATION,
+      entityType: 'BulkStudentUpload',
+      category: AuditCategory.ADMINISTRATIVE,
+      severity: failedRecords.length > 0 ? AuditSeverity.HIGH : AuditSeverity.MEDIUM,
+      userId: performedByUserId,
+      institutionId,
+      description: `Bulk student upload completed: ${successRecords.length} success, ${failedRecords.length} failed`,
+      newValues: {
+        operation: 'bulk_student_upload_completed',
+        totalStudents: students.length,
+        successCount: successRecords.length,
+        failedCount: failedRecords.length,
+        processingTimeMs: processingTime,
+        createdBy,
+        failedEnrollments: failedRecords.map(r => r.enrollmentNumber).filter(Boolean),
+      },
+    }).catch(() => {});
 
     return {
       total: students.length,

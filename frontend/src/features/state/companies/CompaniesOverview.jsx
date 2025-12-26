@@ -502,7 +502,7 @@ const CompaniesOverview = () => {
         onCancel={handleCloseModal}
         footer={null}
         width={1000}
-        destroyOnClose
+        destroyOnHidden
         className="rounded-2xl overflow-hidden"
         styles={{ content: { borderRadius: '16px' } }}
       >

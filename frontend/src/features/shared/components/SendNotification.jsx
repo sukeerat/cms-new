@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Form,
@@ -9,7 +9,6 @@ import {
   Space,
   message,
   Alert,
-  Spin,
   Tag,
   Divider,
 } from 'antd';
@@ -27,17 +26,22 @@ import NotificationService from '../../../services/notification.service';
 const { TextArea } = Input;
 const { Option } = Select;
 
-// Role display names
+// Role display names (matching backend Role enum)
 const ROLE_LABELS = {
   STUDENT: 'Students',
-  FACULTY: 'Faculty',
-  FACULTY_SUPERVISOR: 'Faculty Supervisors',
   TEACHER: 'Teachers',
+  FACULTY_SUPERVISOR: 'Faculty Supervisors',
   PRINCIPAL: 'Principals',
   STATE_DIRECTORATE: 'State Directorate',
   SYSTEM_ADMIN: 'System Admins',
   INDUSTRY: 'Industry Partners',
   INDUSTRY_SUPERVISOR: 'Industry Supervisors',
+  ACCOUNTANT: 'Accountants',
+  ADMISSION_OFFICER: 'Admission Officers',
+  EXAMINATION_OFFICER: 'Examination Officers',
+  PLACEMENT_OFFICER: 'Placement Officers',
+  PMS_OFFICER: 'PMS Officers',
+  EXTRACURRICULAR_HEAD: 'Extracurricular Heads',
 };
 
 const SendNotification = () => {
@@ -52,7 +56,7 @@ const SendNotification = () => {
   const getSendOptions = () => {
     const options = [];
 
-    if (['FACULTY', 'TEACHER', 'FACULTY_SUPERVISOR'].includes(userRole)) {
+    if (['TEACHER', 'FACULTY_SUPERVISOR'].includes(userRole)) {
       options.push({
         key: 'student-reminder',
         label: 'Send to My Students',
@@ -132,7 +136,7 @@ const SendNotification = () => {
         case 'role':
           response = await NotificationService.send({
             target: 'role',
-            role: values.targetRoles?.[0],
+            role: values.targetRoles, // Single value from non-multiple Select
             title: values.title,
             body: values.body,
             sendEmail: values.sendEmail,
@@ -158,7 +162,18 @@ const SendNotification = () => {
   // Get available roles for targeting based on user's role
   const getTargetRoles = () => {
     if (userRole === 'PRINCIPAL') {
-      return ['STUDENT', 'FACULTY', 'FACULTY_SUPERVISOR', 'TEACHER'];
+      // All institution staff and student roles
+      return [
+        'STUDENT',
+        'TEACHER',
+        'FACULTY_SUPERVISOR',
+        'ACCOUNTANT',
+        'ADMISSION_OFFICER',
+        'EXAMINATION_OFFICER',
+        'PLACEMENT_OFFICER',
+        'PMS_OFFICER',
+        'EXTRACURRICULAR_HEAD',
+      ];
     }
     if (['STATE_DIRECTORATE', 'SYSTEM_ADMIN'].includes(userRole)) {
       return Object.keys(ROLE_LABELS);

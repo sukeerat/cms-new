@@ -52,6 +52,8 @@ const FilterBuilder = ({
   const dispatch = useDispatch();
   const [dynamicOptions, setDynamicOptions] = useState({});
   const [loadingOptions, setLoadingOptions] = useState({});
+  const [errorOptions, setErrorOptions] = useState({}); // Track filter load errors
+  const [pendingRequests, setPendingRequests] = useState({}); // Prevent duplicate requests
 
   // Redux institution data
   const institutions = useSelector(selectInstitutions);
@@ -85,6 +87,13 @@ const FilterBuilder = ({
     dispatch(forceRefreshInstitutions());
   }, [dispatch]);
 
+  // Define dependent filters - when parent changes, reload child filters
+  const FILTER_DEPENDENCIES = useMemo(() => ({
+    branchId: 'institutionId',
+    departmentId: 'institutionId',
+    batchId: 'institutionId',
+  }), []);
+
   // Load dynamic filter options when filters change
   useEffect(() => {
     filters.forEach((filter) => {
@@ -98,10 +107,33 @@ const FilterBuilder = ({
     });
   }, [filters, reportType]);
 
-  const loadDynamicOptions = async (filterId) => {
+  // Reload dependent filters when parent filter value changes
+  useEffect(() => {
+    const institutionId = values?.institutionId;
+    if (institutionId) {
+      // Reload filters that depend on institutionId
+      filters.forEach((filter) => {
+        const dependency = FILTER_DEPENDENCIES[filter.id];
+        if (dependency === 'institutionId' && filter.dynamic) {
+          loadDynamicOptions(filter.id, institutionId);
+        }
+      });
+    }
+  }, [values?.institutionId, filters, FILTER_DEPENDENCIES]);
+
+  const loadDynamicOptions = async (filterId, institutionId = null) => {
+    // Prevent duplicate requests for the same filter
+    const requestKey = `${filterId}-${institutionId || 'all'}`;
+    if (pendingRequests[requestKey]) {
+      return;
+    }
+
+    setPendingRequests((prev) => ({ ...prev, [requestKey]: true }));
     setLoadingOptions((prev) => ({ ...prev, [filterId]: true }));
+    setErrorOptions((prev) => ({ ...prev, [filterId]: null })); // Clear previous error
+
     try {
-      const response = await getFilterValues(reportType, filterId);
+      const response = await getFilterValues(reportType, filterId, institutionId);
       // Response.data contains the options array directly
       const options = response?.data || [];
       setDynamicOptions((prev) => ({
@@ -110,14 +142,29 @@ const FilterBuilder = ({
       }));
     } catch (error) {
       console.error(`Error loading options for ${filterId}:`, error);
+      const errorMessage = error.message || 'Failed to load options';
+      setErrorOptions((prev) => ({
+        ...prev,
+        [filterId]: errorMessage,
+      }));
       setDynamicOptions((prev) => ({
         ...prev,
         [filterId]: [],
       }));
     } finally {
       setLoadingOptions((prev) => ({ ...prev, [filterId]: false }));
+      setPendingRequests((prev) => {
+        const { [requestKey]: _, ...rest } = prev;
+        return rest;
+      });
     }
   };
+
+  // Retry loading a specific filter
+  const handleRetryFilter = useCallback((filterId) => {
+    const institutionId = values?.institutionId;
+    loadDynamicOptions(filterId, institutionId);
+  }, [values?.institutionId, reportType]);
 
   const handleFilterChange = (filterId, value) => {
     onChange?.({
@@ -169,6 +216,25 @@ const FilterBuilder = ({
               size="small"
               icon={<ReloadOutlined />}
               onClick={handleRetryInstitutions}
+            >
+              Retry
+            </Button>
+          </div>
+        );
+      }
+
+      // Show error state for dynamic filters that failed to load
+      if (filter.dynamic && errorOptions[filter.id]) {
+        return (
+          <div className="py-2 text-center">
+            <Text type="danger" className="text-xs block mb-1">
+              {errorOptions[filter.id]}
+            </Text>
+            <Button
+              type="link"
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={() => handleRetryFilter(filter.id)}
             >
               Retry
             </Button>

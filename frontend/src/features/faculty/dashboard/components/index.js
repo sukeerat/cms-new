@@ -5,3 +5,4 @@ export { default as VisitLogsCard } from './VisitLogsCard';
 export { default as PendingApprovalsCard } from './PendingApprovalsCard';
 export { default as MonthlyReportsCard } from './MonthlyReportsCard';
 export { default as JoiningLettersCard } from './JoiningLettersCard';
+export { default as StudentDetailsModal } from './StudentDetailsModal';

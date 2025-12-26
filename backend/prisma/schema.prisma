@@ -1348,6 +1348,10 @@ model MonthlyReport {
   submissionWindowEnd   DateTime? // 10th of next month
   isOverdue             Boolean   @default(false)
 
+  // Late submission tracking
+  isLateSubmission Boolean @default(false)
+  daysLate         Int?
+
   // Report Period Details
   periodStartDate DateTime? // First day of internship month
   periodEndDate   DateTime? // Last day of internship month

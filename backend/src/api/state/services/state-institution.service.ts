@@ -76,9 +76,11 @@ export class StateInstitutionService {
       query.skip = Math.max(0, (pageNum - 1) * limitNum);
     }
 
-    const [institutions, total] = await Promise.all([
+    const [institutions, total, totalStudents] = await Promise.all([
       this.prisma.institution.findMany(query),
       this.prisma.institution.count({ where }),
+      // Get total students count separately to match dashboard
+      this.prisma.student.count(),
     ]);
 
     const nextCursor = institutions.length === limitNum
@@ -88,6 +90,7 @@ export class StateInstitutionService {
     return {
       data: institutions,
       total,
+      totalStudents, // Total students across all institutions (matches dashboard)
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
@@ -104,7 +107,8 @@ export class StateInstitutionService {
     limit?: number;
     search?: string;
   }) {
-    const { page = 1, limit = 10, search } = params;
+    // Default to 100 to show all institutions (currently 23 in Punjab)
+    const { page = 1, limit = 100, search } = params;
     const skip = (page - 1) * limit;
 
     // Get current month info
@@ -147,6 +151,7 @@ export class StateInstitutionService {
     // Batch all stats queries - run once for all institutions instead of N+1
     const [
       studentCounts,
+      activeStudentCounts,
       internshipCounts,
       approvedInternshipCounts,
       joiningLetterCounts,
@@ -156,10 +161,17 @@ export class StateInstitutionService {
       facultyCounts,
       internshipsInTrainingCounts, // Internships currently in their training period
     ] = await Promise.all([
-      // 1. Total students per institution (no isActive filter - matches getInstitutionOverview)
+      // 1. Total students per institution
       this.prisma.student.groupBy({
         by: ['institutionId'],
         where: { institutionId: { in: institutionIds } },
+        _count: true,
+      }),
+
+      // 1b. Active students per institution (isActive = true) - used for compliance calculation
+      this.prisma.student.groupBy({
+        by: ['institutionId'],
+        where: { institutionId: { in: institutionIds }, isActive: true },
         _count: true,
       }),
 
@@ -251,10 +263,18 @@ export class StateInstitutionService {
       }),
 
       // 6. Faculty visits this month per institution
+      // Only count visits for internships that have started (startDate <= now)
       this.prisma.facultyVisitLog.findMany({
         where: {
           visitDate: { gte: startOfMonth, lte: endOfMonth },
-          application: { student: { institutionId: { in: institutionIds } } },
+          application: {
+            student: { institutionId: { in: institutionIds } },
+            // Only count visits for internships that have started
+            OR: [
+              { startDate: null }, // Legacy data without startDate
+              { startDate: { lte: now } }, // Internship has started
+            ],
+          },
         },
         select: {
           application: { select: { student: { select: { institutionId: true } } } },
@@ -334,11 +354,13 @@ export class StateInstitutionService {
 
     // Build lookup maps for O(1) access
     const studentCountMap = new Map(studentCounts.map(c => [c.institutionId, c._count]));
+    const activeStudentCountMap = new Map(activeStudentCounts.map(c => [c.institutionId, c._count]));
     const facultyCountMap = new Map(facultyCounts.map(c => [c.institutionId, c._count]));
 
     // Build institutions with stats
     const institutionsWithStats = institutions.map((inst) => {
       const totalStudents = studentCountMap.get(inst.id) || 0;
+      const activeStudents = activeStudentCountMap.get(inst.id) || 0;
       const studentsWithInternships = internshipCounts.get(inst.id) || 0;
       const selfIdentifiedApproved = approvedInternshipCounts.get(inst.id) || 0;
       const joiningLettersSubmitted = joiningLetterCounts.get(inst.id) || 0;
@@ -349,27 +371,32 @@ export class StateInstitutionService {
       // Internships currently in training period (for expected reports/visits calculation)
       const internshipsInTraining = internshipsInTrainingCounts.get(inst.id) || 0;
 
-      // Calculate unassigned students (total students - students with mentors)
-      const unassignedStudents = Math.max(0, totalStudents - activeAssignments);
+      // Calculate unassigned students (active students - students with mentors)
+      const unassignedStudents = Math.max(0, activeStudents - activeAssignments);
 
       // Calculate missing reports based on internships CURRENTLY IN TRAINING
       // Not all approved internships - only those where current date is within training period
       const expectedReportsThisMonth = internshipsInTraining;
       const missingReports = Math.max(0, expectedReportsThisMonth - reportsSubmittedThisMonth);
 
-      // Calculate compliance score (same formula as getInstitutionOverview)
-      // Use totalStudents as denominator for mentor assignment rate
+      // Calculate compliance score using 2-metric formula:
+      // Compliance = (MentorRate + JoiningLetterRate) / 2
+      // Denominator: activeStudents for both metrics
       // Cap all rates at 100% to prevent impossible percentages
-      const mentorAssignmentRate = totalStudents > 0
-        ? Math.min((activeAssignments / totalStudents) * 100, 100)
-        : 100;
-      const joiningLetterRate = selfIdentifiedApproved > 0
-        ? Math.min((joiningLettersSubmitted / selfIdentifiedApproved) * 100, 100)
-        : 0;
+      // Return null when activeStudents = 0 (N/A on frontend)
+      const mentorAssignmentRate = activeStudents > 0
+        ? Math.min((activeAssignments / activeStudents) * 100, 100)
+        : null;
+      const joiningLetterRate = activeStudents > 0
+        ? Math.min((joiningLettersSubmitted / activeStudents) * 100, 100)
+        : null;
+      // Monthly report rate calculated separately (NOT included in compliance score)
       const monthlyReportRate = internshipsInTraining > 0
         ? Math.min((reportsSubmittedThisMonth / internshipsInTraining) * 100, 100)
-        : 100;
-      const complianceScore = Math.round((mentorAssignmentRate + joiningLetterRate + monthlyReportRate) / 3);
+        : null;
+      // Calculate compliance score using only mentor and joining letter rates
+      const validRates = [mentorAssignmentRate, joiningLetterRate].filter(r => r !== null) as number[];
+      const complianceScore = validRates.length > 0 ? Math.round(validRates.reduce((a, b) => a + b, 0) / validRates.length) : null;
 
       return {
         ...inst,
@@ -480,6 +507,7 @@ export class StateInstitutionService {
     // Use Promise.all for parallel queries
     const [
       totalStudents,
+      activeStudents,
       assignedStudents,
       internshipsAdded,
       internshipsActive,
@@ -514,6 +542,9 @@ export class StateInstitutionService {
     ] = await Promise.all([
       // Total students
       this.prisma.student.count({ where: { institutionId: id } }),
+
+      // Active students (isActive = true) - used for compliance calculation
+      this.prisma.student.count({ where: { institutionId: id, isActive: true } }),
 
       // Assigned students (unique students with active mentor assignment - all students)
       this.prisma.mentorAssignment.findMany({
@@ -856,21 +887,32 @@ export class StateInstitutionService {
       }),
     ]);
 
-    // Calculate unassigned students (total students - students with mentors)
-    const unassignedStudents = Math.max(0, totalStudents - assignedStudents);
+    // Calculate unassigned students (active students - students with mentors)
+    const unassignedStudents = Math.max(0, activeStudents - assignedStudents);
 
-    // Calculate compliance score
-    // - mentorAssignmentRate: uses totalStudents (all students should have mentors)
-    // - joiningLetterRate: uses selfIdentifiedApproved (all approved need joining letters)
-    // - monthlyReportRate: uses internshipsInTraining (only those currently in training need monthly reports)
-    const mentorAssignmentRate = totalStudents > 0 ? (assignedStudents / totalStudents) * 100 : 100;
-    const joiningLetterRate = selfIdentifiedApproved > 0 ? (joiningLettersSubmitted / selfIdentifiedApproved) * 100 : 0;
-    const monthlyReportRate = internshipsInTraining > 0 ? ((monthlyReportsSubmitted + monthlyReportsApproved) / internshipsInTraining) * 100 : 100;
-    const complianceScore = Math.round((mentorAssignmentRate + joiningLetterRate + monthlyReportRate) / 3);
+    // Calculate compliance score using 2-metric formula:
+    // Compliance = (MentorRate + JoiningLetterRate) / 2
+    // Denominator: activeStudents for both metrics
+    // Cap all rates at 100% to prevent impossible percentages
+    // Return null when activeStudents = 0 (N/A on frontend)
+    const mentorAssignmentRate = activeStudents > 0
+      ? Math.min((assignedStudents / activeStudents) * 100, 100)
+      : null;
+    const joiningLetterRate = activeStudents > 0
+      ? Math.min((joiningLettersSubmitted / activeStudents) * 100, 100)
+      : null;
+    // Monthly report rate calculated separately (NOT included in compliance score)
+    const monthlyReportRate = internshipsInTraining > 0
+      ? Math.min(((monthlyReportsSubmitted + monthlyReportsApproved) / internshipsInTraining) * 100, 100)
+      : null;
+    // Calculate compliance score using only mentor and joining letter rates
+    const validRates = [mentorAssignmentRate, joiningLetterRate].filter(r => r !== null) as number[];
+    const complianceScore = validRates.length > 0 ? Math.round(validRates.reduce((a, b) => a + b, 0) / validRates.length) : null;
 
     return {
       institution: normalizedInstitution,
       totalStudents,
+      activeStudents,
       assignedStudents,
       unassignedStudents,
       internshipsAdded,
@@ -882,14 +924,15 @@ export class StateInstitutionService {
         pending: selfIdentifiedPending,
         rejected: selfIdentifiedRejected,
         // Show % of students with approved internships, not % of all students
-        rate: selfIdentifiedApproved > 0 ? Math.round((selfIdentifiedApproved / totalStudents) * 100) : 0,
+        rate: activeStudents > 0 ? Math.round((selfIdentifiedApproved / activeStudents) * 100) : 0,
       },
       joiningLetterStatus: {
         submitted: joiningLettersSubmitted,
         pending: joiningLettersPending,
         approved: joiningLettersApproved,
         rejected: joiningLettersRejected,
-        rate: selfIdentifiedApproved > 0 ? Math.round((joiningLettersSubmitted / selfIdentifiedApproved) * 100) : 0,
+        // Rate uses activeStudents as denominator (per compliance formula)
+        rate: activeStudents > 0 ? Math.min(Math.round((joiningLettersSubmitted / activeStudents) * 100), 100) : null,
       },
       monthlyReportStatus: {
         submitted: monthlyReportsSubmitted,
@@ -897,7 +940,8 @@ export class StateInstitutionService {
         approved: monthlyReportsApproved,
         rejected: monthlyReportsRejected,
         notSubmitted: monthlyReportsNotSubmitted,
-        rate: internshipsInTraining > 0 ? Math.round(((monthlyReportsSubmitted + monthlyReportsApproved) / internshipsInTraining) * 100) : 100,
+        // Rate is tracked separately (NOT included in compliance score)
+        rate: monthlyReportRate !== null ? Math.round(monthlyReportRate) : null,
         currentMonth: currentMonth,
         currentYear: currentYear,
       },
@@ -910,6 +954,7 @@ export class StateInstitutionService {
       mentorAssignment: {
         assigned: assignedStudents,
         unassigned: unassignedStudents,
+        // Rate uses activeStudents as denominator (per compliance formula)
         rate: mentorAssignmentRate,
       },
       branchWiseData: branchWiseStudents.map(b => ({
@@ -1447,10 +1492,15 @@ export class StateInstitutionService {
           isSelfIdentifiedCompany: true,
           students: [],
           branchWiseData: [],
+          applicationCount: 0, // Track total applications (not deduplicated)
         });
       }
       const company = selfIdCompanyMap.get(normalizedKey);
-      // Avoid duplicate students
+
+      // Always count the application to match institution overview count
+      company.applicationCount++;
+
+      // Avoid duplicate students for the students list
       if (!company.students.find((s: any) => s.id === app.student.id)) {
         company.students.push({
           id: app.student.id,
@@ -1481,7 +1531,8 @@ export class StateInstitutionService {
         selfIdentified: data.selfIdentified,
       }));
       company.studentCount = company.students.length;
-      company.selfIdentifiedCount = company.students.length;
+      // Use applicationCount to match institution overview total
+      company.selfIdentifiedCount = company.applicationCount || company.students.length;
     });
 
     // Merge Industry companies and self-identified companies
@@ -1494,8 +1545,19 @@ export class StateInstitutionService {
       .sort((a, b) => b.studentCount - a.studentCount);
 
     // Calculate summary
-    const totalStudents = filteredCompanies.reduce((sum, c) => sum + c.studentCount, 0);
-    const totalSelfIdentified = filteredCompanies.reduce((sum, c) => sum + c.selfIdentifiedCount, 0);
+    // For self-identified companies, use applicationCount to match institution overview
+    const totalStudents = filteredCompanies.reduce((sum, c) => {
+      if (c.isSelfIdentifiedCompany) {
+        return sum + (c.applicationCount || c.studentCount);
+      }
+      return sum + c.studentCount;
+    }, 0);
+    const totalSelfIdentified = filteredCompanies.reduce((sum, c) => {
+      if (c.isSelfIdentifiedCompany) {
+        return sum + (c.applicationCount || c.selfIdentifiedCount);
+      }
+      return sum + (c.selfIdentifiedCount || 0);
+    }, 0);
 
     return {
       companies: filteredCompanies,

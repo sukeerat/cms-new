@@ -134,16 +134,41 @@ export class StateDashboardService {
             select: { studentId: true },
             distinct: ['studentId'],
           }),
-          // Faculty visits - this month
+          // Faculty visits - this month (only for internships that have started)
           this.prisma.facultyVisitLog.count({
-            where: { visitDate: { gte: startOfCurrentMonth } },
+            where: {
+              visitDate: { gte: startOfCurrentMonth },
+              application: {
+                OR: [
+                  { startDate: null }, // Legacy data
+                  { startDate: { lte: now } }, // Internship has started
+                ],
+              },
+            },
           }),
-          // Faculty visits - last month
+          // Faculty visits - last month (only for internships that have started)
           this.prisma.facultyVisitLog.count({
-            where: { visitDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+            where: {
+              visitDate: { gte: startOfPrevMonth, lte: endOfPrevMonth },
+              application: {
+                OR: [
+                  { startDate: null }, // Legacy data
+                  { startDate: { lte: now } }, // Internship has started
+                ],
+              },
+            },
           }),
-          // Total faculty visits
-          this.prisma.facultyVisitLog.count(),
+          // Total faculty visits (only for internships that have started)
+          this.prisma.facultyVisitLog.count({
+            where: {
+              application: {
+                OR: [
+                  { startDate: null }, // Legacy data
+                  { startDate: { lte: now } }, // Internship has started
+                ],
+              },
+            },
+          }),
           // Monthly reports - submitted this month
           this.prisma.monthlyReport.count({
             where: {
@@ -268,9 +293,10 @@ export class StateDashboardService {
             lastMonth: visitsLastMonth,
             expectedThisMonth: expectedVisitsThisMonth,
             pendingThisMonth: pendingVisitsThisMonth,
+            // Return null when no data to show N/A on frontend
             completionRate: expectedVisitsThisMonth > 0
               ? ((visitsThisMonth / expectedVisitsThisMonth) * 100).toFixed(1)
-              : '100',
+              : null,
           },
           // Monthly Reports Card with details
           monthlyReports: {
@@ -282,9 +308,10 @@ export class StateDashboardService {
             expectedThisMonth: expectedReportsThisMonth,
             missingThisMonth: missingReportsThisMonth,
             missingLastMonth: missingReportsLastMonth,
+            // Return null when no data to show N/A on frontend
             submissionRate: expectedReportsThisMonth > 0
               ? ((reportsSubmittedThisMonth / expectedReportsThisMonth) * 100).toFixed(1)
-              : '100',
+              : null,
           },
           compliance: {
             totalVisits: totalFacultyVisits,
@@ -320,7 +347,6 @@ export class StateDashboardService {
         const currentMonth = now.getMonth() + 1;
         const currentYear = now.getFullYear();
         const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
         // Run all independent queries in parallel
@@ -334,18 +360,10 @@ export class StateDashboardService {
           // 1. Get institutions with stats
           getInstitutionsWithStats({ page: 1, limit: 100 }),
 
-          // 2. Students without mentors for > 7 days since internship start
-          // Use startDate instead of createdAt for grace period
+          // 2. All students without mentors (no day limit)
           this.prisma.student.findMany({
             where: {
               isActive: true,
-              internshipApplications: {
-                some: {
-                  isSelfIdentified: true,
-                  status: ApplicationStatus.APPROVED,
-                  startDate: { lte: sevenDaysAgo },
-                },
-              },
               mentorAssignments: {
                 none: { isActive: true },
               },
@@ -359,10 +377,10 @@ export class StateDashboardService {
                 where: { isSelfIdentified: true, status: ApplicationStatus.APPROVED },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
-                select: { createdAt: true },
+                select: { createdAt: true, startDate: true },
               },
             },
-            take: 20,
+            take: 50,
           }),
 
           // 3. Missing monthly reports (overdue by > 5 days since internship start)
@@ -474,17 +492,23 @@ export class StateDashboardService {
           },
           alerts: {
             lowComplianceInstitutions: lowCompliance,
-            studentsWithoutMentors: studentsWithoutMentors.map(s => ({
-              studentId: s.id,
-              studentName: s.name,
-              rollNumber: s.rollNumber,
-              institutionId: s.Institution?.id,
-              institutionName: s.Institution?.name,
-              institutionCode: s.Institution?.code,
-              daysSinceInternshipStarted: s.internshipApplications[0]
-                ? Math.floor((now.getTime() - new Date(s.internshipApplications[0].createdAt).getTime()) / (1000 * 60 * 60 * 24))
-                : null,
-            })),
+            studentsWithoutMentors: studentsWithoutMentors.map(s => {
+              const internship = s.internshipApplications[0];
+              const startDate = internship?.startDate ? new Date(internship.startDate) : null;
+              return {
+                studentId: s.id,
+                studentName: s.name,
+                rollNumber: s.rollNumber,
+                institutionId: s.Institution?.id,
+                institutionName: s.Institution?.name,
+                institutionCode: s.Institution?.code,
+                hasInternship: !!internship,
+                internshipStartDate: startDate?.toISOString() || null,
+                daysSinceInternshipStarted: startDate
+                  ? Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+                  : null,
+              };
+            }),
             missingReports: missingReports.map(s => ({
               studentId: s.id,
               studentName: s.name,
@@ -568,35 +592,37 @@ export class StateDashboardService {
         ]);
 
         // Institutions requiring intervention (compliance < 30%)
-        // Use selfIdentifiedApproved as denominator for consistency with main dashboard
+        // Use activeStudents as denominator per approved specification
+        // Compliance = (MentorRate + JoiningLetterRate) / 2
         const requiresIntervention = institutionsWithStats.data
           .filter((inst: any) => {
             const { stats } = inst;
-            if (stats.selfIdentifiedApproved === 0) return false;
+            // Use activeStudents as denominator
+            if (stats.activeStudents === 0) return false;
 
-            const assignmentRate = (stats.assigned / stats.selfIdentifiedApproved) * 100;
-            const visitRate = stats.facultyVisits > 0
-              ? Math.min((stats.facultyVisits / stats.selfIdentifiedApproved) * 100, 100)
-              : 0;
-            const reportRate = (stats.reportsSubmitted / stats.selfIdentifiedApproved) * 100;
-            const overallCompliance = (assignmentRate + visitRate + reportRate) / 3;
+            // 2-metric formula: MentorRate + JoiningLetterRate
+            const assignmentRate = Math.min((stats.assigned / stats.activeStudents) * 100, 100);
+            const joiningLetterRate = Math.min((stats.joiningLettersSubmitted / stats.activeStudents) * 100, 100);
+            const overallCompliance = (assignmentRate + joiningLetterRate) / 2;
             return overallCompliance < 30;
           })
-          .map((inst: any) => ({
-            institutionId: inst.id,
-            institutionName: inst.name,
-            institutionCode: inst.code,
-            city: inst.city,
-            complianceScore: Math.round(
-              ((inst.stats.assigned / inst.stats.selfIdentifiedApproved) * 100 +
-                (inst.stats.facultyVisits > 0 ? Math.min((inst.stats.facultyVisits / inst.stats.selfIdentifiedApproved) * 100, 100) : 0) +
-                (inst.stats.reportsSubmitted / inst.stats.selfIdentifiedApproved) * 100) / 3),
-            issues: [
-              inst.stats.unassigned > 0 && `${inst.stats.unassigned} students without mentors`,
-              inst.stats.facultyVisits === 0 && 'No faculty visits this month',
-              inst.stats.reportsMissing > 0 && `${inst.stats.reportsMissing} missing reports`,
-            ].filter(Boolean),
-          }));
+          .map((inst: any) => {
+            const { stats } = inst;
+            const assignmentRate = Math.min((stats.assigned / stats.activeStudents) * 100, 100);
+            const joiningLetterRate = Math.min((stats.joiningLettersSubmitted / stats.activeStudents) * 100, 100);
+            return {
+              institutionId: inst.id,
+              institutionName: inst.name,
+              institutionCode: inst.code,
+              city: inst.city,
+              complianceScore: Math.round((assignmentRate + joiningLetterRate) / 2),
+              issues: [
+                stats.unassigned > 0 && `${stats.unassigned} students without mentors`,
+                stats.facultyVisits === 0 && 'No faculty visits this month',
+                stats.reportsMissing > 0 && `${stats.reportsMissing} missing reports`,
+              ].filter(Boolean),
+            };
+          });
 
         return {
           timestamp: now.toISOString(),
@@ -654,35 +680,39 @@ export class StateDashboardService {
         // Run state-wide counts AND institution stats in parallel
         const [
           totalInstitutions,
+          activeStudents,
           totalStudentsWithInternships,
           totalAssignments,
+          totalJoiningLetters,
           totalVisitsThisMonth,
           totalReportsThisMonth,
           institutionsWithStats,
         ] = await Promise.all([
           this.prisma.institution.count({ where: { isActive: true } }),
+          // Count active students (denominator for compliance)
+          this.prisma.student.count({ where: { isActive: true } }),
           this.prisma.internshipApplication.count({
             where: {
               isSelfIdentified: true,
               status: ApplicationStatus.APPROVED,
             },
           }),
-          // Count unique students with active mentor assignments WHO HAVE approved self-identified internships
+          // Count unique students with active mentor assignments
           this.prisma.mentorAssignment.findMany({
             where: {
               isActive: true,
-              student: {
-                internshipApplications: {
-                  some: {
-                    isSelfIdentified: true,
-                    status: ApplicationStatus.APPROVED,
-                  },
-                },
-              },
             },
             select: { studentId: true },
             distinct: ['studentId'],
           }).then(results => results.length),
+          // Count joining letters submitted (students with approved internships who have joining letter)
+          this.prisma.internshipApplication.count({
+            where: {
+              isSelfIdentified: true,
+              status: ApplicationStatus.APPROVED,
+              joiningLetterUrl: { not: null },
+            },
+          }),
           this.prisma.facultyVisitLog.count({
             where: { visitDate: { gte: startOfMonth } },
           }),
@@ -697,31 +727,52 @@ export class StateDashboardService {
           getInstitutionsWithStats({ page: 1, limit: 100 }),
         ]);
 
-        // Calculate state-wide compliance rates (cap at 100%)
-        const mentorCoverageRate = totalStudentsWithInternships > 0
-          ? Math.round(Math.min((totalAssignments / totalStudentsWithInternships) * 100, 100))
-          : 100;
+        // Calculate state-wide compliance rates (cap at 100%, null when no data)
+        // NEW FORMULA: Compliance = (MentorCoverage + JoiningLetterRate) / 2
+        // Denominator: activeStudents (per approved specification)
+        const mentorCoverageRate = activeStudents > 0
+          ? Math.round(Math.min((totalAssignments / activeStudents) * 100, 100))
+          : null;
+        const joiningLetterRate = activeStudents > 0
+          ? Math.round(Math.min((totalJoiningLetters / activeStudents) * 100, 100))
+          : null;
+        // Visit and report rates are tracked separately (NOT in compliance score)
         const visitComplianceRate = totalStudentsWithInternships > 0
           ? Math.round(Math.min((totalVisitsThisMonth / totalStudentsWithInternships) * 100, 100))
-          : 100;
+          : null;
         const reportComplianceRate = totalStudentsWithInternships > 0
           ? Math.round(Math.min((totalReportsThisMonth / totalStudentsWithInternships) * 100, 100))
-          : 100;
-        const overallCompliance = Math.round((mentorCoverageRate + visitComplianceRate + reportComplianceRate) / 3);
+          : null;
+        // Calculate overall compliance from 2 metrics only (MentorCoverage + JoiningLetterRate)
+        const stateValidRates = [mentorCoverageRate, joiningLetterRate].filter(r => r !== null) as number[];
+        const overallCompliance = stateValidRates.length > 0
+          ? Math.round(stateValidRates.reduce((a, b) => a + b, 0) / stateValidRates.length)
+          : null;
 
-        // Process institution-wise compliance breakdown (cap at 100%)
+        // Process institution-wise compliance breakdown (cap at 100%, null when no data)
+        // NEW FORMULA: Compliance = (MentorCoverage + JoiningLetterRate) / 2
+        // Denominator: activeStudents (per approved specification)
         const institutionCompliance = institutionsWithStats.data.map((inst: any) => {
           const { stats } = inst;
-          const mentorCov = stats.studentsWithInternships > 0
-            ? Math.round(Math.min((stats.assigned / stats.studentsWithInternships) * 100, 100))
-            : 100;
+          // Use activeStudents as denominator for compliance metrics
+          const mentorCov = stats.activeStudents > 0
+            ? Math.round(Math.min((stats.assigned / stats.activeStudents) * 100, 100))
+            : null;
+          const joiningLetterCov = stats.activeStudents > 0
+            ? Math.round(Math.min((stats.joiningLettersSubmitted / stats.activeStudents) * 100, 100))
+            : null;
+          // Visit and report rates tracked separately (NOT in compliance score)
           const visitComp = stats.studentsWithInternships > 0
             ? Math.round(Math.min((stats.facultyVisits / stats.studentsWithInternships) * 100, 100))
-            : 100;
+            : null;
           const reportComp = stats.studentsWithInternships > 0
             ? Math.round(Math.min((stats.reportsSubmitted / stats.studentsWithInternships) * 100, 100))
-            : 100;
-          const overall = Math.round((mentorCov + visitComp + reportComp) / 3);
+            : null;
+          // Calculate overall from 2 metrics only (MentorCoverage + JoiningLetterRate)
+          const instValidRates = [mentorCov, joiningLetterCov].filter(r => r !== null) as number[];
+          const overall = instValidRates.length > 0
+            ? Math.round(instValidRates.reduce((a, b) => a + b, 0) / instValidRates.length)
+            : null;
 
           return {
             institutionId: inst.id,
@@ -730,10 +781,14 @@ export class StateDashboardService {
             city: inst.city,
             overallScore: overall,
             mentorCoverage: mentorCov,
+            joiningLetterRate: joiningLetterCov,
+            // Keep visit and report as separate tracked metrics (not in compliance)
             visitCompliance: visitComp,
             reportCompliance: reportComp,
+            activeStudents: stats.activeStudents,
             studentsWithInternships: stats.studentsWithInternships,
             studentsWithMentors: stats.assigned,
+            joiningLettersSubmitted: stats.joiningLettersSubmitted,
             visitsThisMonth: stats.facultyVisits,
             reportsThisMonth: stats.reportsSubmitted,
           };
@@ -745,20 +800,26 @@ export class StateDashboardService {
           year: currentYear,
           stateWide: {
             totalInstitutions,
+            activeStudents,
             totalStudentsWithInternships,
             totalMentorAssignments: totalAssignments,
+            totalJoiningLetters,
             totalVisitsThisMonth,
             totalReportsThisMonth,
+            // Overall compliance based on 2 metrics: MentorCoverage + JoiningLetterRate
             overallComplianceScore: overallCompliance,
             mentorCoverageRate,
+            joiningLetterRate,
+            // Visit and report rates tracked separately (NOT in compliance score)
             visitComplianceRate,
             reportComplianceRate,
           },
           distribution: {
-            excellent: institutionCompliance.filter((i: any) => i.overallScore >= 80).length,
-            good: institutionCompliance.filter((i: any) => i.overallScore >= 60 && i.overallScore < 80).length,
-            needsImprovement: institutionCompliance.filter((i: any) => i.overallScore >= 40 && i.overallScore < 60).length,
-            critical: institutionCompliance.filter((i: any) => i.overallScore < 40).length,
+            excellent: institutionCompliance.filter((i: any) => i.overallScore >= 90).length,
+            good: institutionCompliance.filter((i: any) => i.overallScore >= 70 && i.overallScore < 90).length,
+            warning: institutionCompliance.filter((i: any) => i.overallScore >= 50 && i.overallScore < 70).length,
+            critical: institutionCompliance.filter((i: any) => i.overallScore >= 30 && i.overallScore < 50).length,
+            interventionRequired: institutionCompliance.filter((i: any) => i.overallScore !== null && i.overallScore < 30).length,
           },
           institutions: institutionCompliance,
         };

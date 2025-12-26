@@ -3,9 +3,10 @@ import { InternshipApplicationService } from './application/internship-applicati
 import { SelfIdentifiedService } from './self-identified/self-identified.service';
 import { InternshipPostingService } from './posting/internship-posting.service';
 import { AuditModule } from '../../infrastructure/audit/audit.module';
+import { SystemAdminModule } from '../../api/system-admin/system-admin.module';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, SystemAdminModule],
   providers: [
     InternshipApplicationService,
     SelfIdentifiedService,

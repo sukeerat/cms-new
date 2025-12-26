@@ -10,6 +10,7 @@ import {
   Progress,
   Empty,
   Badge,
+  Tooltip,
   message,
 } from 'antd';
 import {
@@ -159,15 +160,18 @@ const CriticalAlertsModal = ({ open, onClose, alerts, defaultTab = 'lowComplianc
       ),
     },
     {
-      title: 'Days Without Mentor',
-      dataIndex: 'daysSinceInternshipStarted',
-      key: 'daysSinceInternshipStarted',
-      width: 150,
-      sorter: (a, b) => (a.daysSinceInternshipStarted || 0) - (b.daysSinceInternshipStarted || 0),
-      render: (days) => (
-        <Tag color={days > 14 ? 'red' : days > 7 ? 'orange' : 'gold'}>
-          {days || 0} days
-        </Tag>
+      title: 'Internship Status',
+      dataIndex: 'hasInternship',
+      key: 'hasInternship',
+      width: 140,
+      render: (hasInternship, record) => (
+        hasInternship ? (
+          <Tooltip title={record.daysSinceInternshipStarted ? `Started ${record.daysSinceInternshipStarted} days ago` : 'Internship approved'}>
+            <Tag color="blue">Has Internship</Tag>
+          </Tooltip>
+        ) : (
+          <Tag color="default">No Internship</Tag>
+        )
       ),
     },
     {

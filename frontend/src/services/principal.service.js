@@ -32,7 +32,11 @@ export const principalService = {
 
   // Students
   async getStudents(params = {}) {
-    const queryParams = new URLSearchParams(params).toString();
+    // Filter out empty/undefined values to avoid sending "undefined" strings
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    );
+    const queryParams = new URLSearchParams(cleanParams).toString();
     const url = queryParams ? `/principal/students?${queryParams}` : '/principal/students';
     const response = await API.get(url);
     return response.data;

@@ -33,6 +33,21 @@ const JoiningLettersCard = ({ letters = [], loading, onRefresh, onViewAll }) => 
   const [remarks, setRemarks] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Helper to extract student info from letter
+  const getStudentInfo = (letter) => {
+    return letter.student ||
+           letter.application?.student ||
+           letter.studentData ||
+           null;
+  };
+
+  // Helper to extract company info from letter
+  const getCompanyInfo = (letter) => {
+    return letter.company ||
+           letter.application?.internship?.industry ||
+           { companyName: letter.companyName || letter.application?.companyName || 'N/A' };
+  };
+
   const handleVerify = async () => {
     if (!actionModal.letter) return;
     setActionLoading(true);
@@ -120,8 +135,8 @@ const JoiningLettersCard = ({ letters = [], loading, onRefresh, onViewAll }) => 
           <div className="flex flex-col">
             {letters.slice(0, 5).map((letter, index) => {
               const statusConfig = getStatusConfig(letter.status);
-              const student = letter.student || letter.application?.student;
-              const company = letter.company || letter.application?.internship?.industry;
+              const student = getStudentInfo(letter);
+              const company = getCompanyInfo(letter);
 
               return (
                 <div
@@ -228,8 +243,8 @@ const JoiningLettersCard = ({ letters = [], loading, onRefresh, onViewAll }) => 
       >
         {actionModal.letter && (
           <div className="mb-4">
-            <p><strong>Student:</strong> {actionModal.letter.student?.name || actionModal.letter.application?.student?.name}</p>
-            <p><strong>Company:</strong> {actionModal.letter.company?.companyName || actionModal.letter.application?.internship?.industry?.companyName}</p>
+            <p><strong>Student:</strong> {getStudentInfo(actionModal.letter)?.name || 'Unknown'}</p>
+            <p><strong>Company:</strong> {getCompanyInfo(actionModal.letter)?.companyName || 'N/A'}</p>
           </div>
         )}
         <TextArea

@@ -14,6 +14,7 @@ import {
   PendingApprovalsCard,
   MonthlyReportsCard,
   JoiningLettersCard,
+  StudentDetailsModal,
 } from './components';
 import QuickVisitModal from '../visits/QuickVisitModal';
 import { facultyService } from '../../../services/faculty.service';
@@ -56,6 +57,8 @@ const FacultyDashboard = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingVisit, setEditingVisit] = useState(null);
   const [quickVisitModalVisible, setQuickVisitModalVisible] = useState(false);
+  const [studentDetailsModalVisible, setStudentDetailsModalVisible] = useState(false);
+  const [selectedStudentForDetails, setSelectedStudentForDetails] = useState(null);
 
   // Handle creating a new visit log
   const handleNewVisit = useCallback((student = null) => {
@@ -166,10 +169,19 @@ const FacultyDashboard = () => {
     });
   }, [handleRejectApplication]);
 
-  // Navigate to student details
+  // Open student details modal
   const handleViewStudent = useCallback((studentId) => {
-    navigate(`/students/${studentId}`);
-  }, [navigate]);
+    // Find the student from the list
+    const student = students.find(s =>
+      s.id === studentId ||
+      s.studentId === studentId ||
+      s.student?.id === studentId
+    );
+    if (student) {
+      setSelectedStudentForDetails(student);
+      setStudentDetailsModalVisible(true);
+    }
+  }, [students]);
 
   // Handle quick visit submission
   const handleQuickVisitSubmit = useCallback(async (formData) => {
@@ -316,11 +328,19 @@ const FacultyDashboard = () => {
               rules={[{ required: true, message: 'Please select a student' }]}
             >
               <Select placeholder="Select a student" className="rounded-lg">
-                {students.map((student) => (
-                  <Option key={student.applicationId || student.id} value={student.applicationId || student.id}>
-                    {student.name} - {student.companyName || 'Company'}
-                  </Option>
-                ))}
+                {students.map((student) => {
+                  // Handle nested data structure from API
+                  const studentName = student.name || student.student?.name || 'Unknown';
+                  const internshipApp = student.student?.internshipApplications?.[0] || student.internshipApplications?.[0];
+                  const companyName = student.companyName || internshipApp?.companyName || 'Company';
+                  const applicationId = internshipApp?.id || student.applicationId || student.id;
+
+                  return (
+                    <Option key={applicationId} value={applicationId}>
+                      {studentName} - {companyName}
+                    </Option>
+                  );
+                })}
               </Select>
             </Form.Item>
           )}
@@ -377,6 +397,19 @@ const FacultyDashboard = () => {
           height: 60,
         }}
         badge={{ count: 'Quick Log', color: '#52c41a' }}
+      />
+
+      {/* Student Details Modal */}
+      <StudentDetailsModal
+        visible={studentDetailsModalVisible}
+        student={selectedStudentForDetails}
+        onClose={() => {
+          setStudentDetailsModalVisible(false);
+          setSelectedStudentForDetails(null);
+        }}
+        onScheduleVisit={handleCreateVisitLog}
+        onRefresh={refresh}
+        loading={isLoading}
       />
     </>
   );

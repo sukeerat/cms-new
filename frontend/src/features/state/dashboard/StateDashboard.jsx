@@ -177,7 +177,7 @@ const StateDashboard = () => {
     setUserName(user?.name || 'Administrator');
 
     dispatch(fetchDashboardStats());
-    dispatch(fetchInstitutionsWithStats({ limit: 15 }));
+    dispatch(fetchInstitutionsWithStats({}));
     dispatch(fetchTopPerformers());
     dispatch(fetchMonthlyAnalytics());
     // Fetch new dashboard data
@@ -190,7 +190,7 @@ const StateDashboard = () => {
   // Refresh handler
   const handleRefresh = useCallback(() => {
     dispatch(fetchDashboardStats({ forceRefresh: true }));
-    dispatch(fetchInstitutionsWithStats({ limit: 15, forceRefresh: true }));
+    dispatch(fetchInstitutionsWithStats({ forceRefresh: true }));
     dispatch(fetchTopPerformers({ forceRefresh: true }));
     dispatch(fetchMonthlyAnalytics({ forceRefresh: true }));
     // Refresh new dashboard data
@@ -343,7 +343,7 @@ const StateDashboard = () => {
                     <TeamOutlined className="text-warning text-lg mt-0.5" />
                     <div className="flex-1">
                       <Text strong className="text-text-primary block">Students Without Mentors</Text>
-                      <Text className="text-text-secondary text-sm">{criticalAlerts.summary?.studentsWithoutMentorsCount} students in active internships need mentors</Text>
+                      <Text className="text-text-secondary text-sm">{criticalAlerts.summary?.studentsWithoutMentorsCount} students need mentor assignment</Text>
                     </div>
                     <Button type="link" size="small" className="text-warning p-0 h-auto shrink-0">View →</Button>
                   </div>

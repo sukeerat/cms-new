@@ -151,7 +151,7 @@ export class StateIndustryService {
       where: {
         isSelfIdentified: true,
         status: ApplicationStatus.APPROVED,
-        companyName: { not: null },
+        companyName: { not: '' },
       },
       select: {
         companyName: true,
@@ -461,6 +461,7 @@ export class StateIndustryService {
           isVerified: false,
           isSelfIdentifiedCompany: true,
           totalStudents: 0,
+          totalApplications: 0, // Track total applications (not deduplicated)
           institutionCount: 0,
           institutionMap: new Map(),
           studentSet: new Set(),
@@ -470,6 +471,9 @@ export class StateIndustryService {
       const company = selfIdCompanyMap.get(companyKey);
       const student = app.student;
       if (!student?.institutionId) return;
+
+      // Always count the application
+      company.totalApplications++;
 
       if (!company.studentSet.has(student.id)) {
         company.studentSet.add(student.id);
@@ -528,6 +532,7 @@ export class StateIndustryService {
           isVerified: company.isVerified,
           isSelfIdentifiedCompany: company.isSelfIdentifiedCompany,
           totalStudents: company.totalStudents,
+          totalApplications: company.totalApplications, // Total internship applications (not deduplicated)
           institutionCount: institutions.length,
           institutions,
         });
@@ -561,8 +566,16 @@ export class StateIndustryService {
     const paginatedCompanies = companies.slice(skip, skip + limit);
 
     // Calculate summary
-    const totalStudentsPlaced = companies.reduce((sum, c) => sum + c.totalStudents, 0);
-    const totalSelfIdentified = companies.filter(c => c.isSelfIdentifiedCompany).reduce((sum, c) => sum + c.totalStudents, 0);
+    // For self-identified companies, use totalApplications to match institution overview count
+    const totalStudentsPlaced = companies.reduce((sum, c) => {
+      if (c.isSelfIdentifiedCompany) {
+        return sum + (c.totalApplications || c.totalStudents);
+      }
+      return sum + c.totalStudents;
+    }, 0);
+    const totalSelfIdentified = companies
+      .filter(c => c.isSelfIdentifiedCompany)
+      .reduce((sum, c) => sum + (c.totalApplications || c.totalStudents), 0);
     const uniqueIndustryTypes = [...new Set(industryTypes.map(t => t.industryType).filter(Boolean)), 'Self-Identified'];
 
     return {
@@ -599,7 +612,7 @@ export class StateIndustryService {
             { isSelfIdentified: true },
             { internshipStatus: 'SELF_IDENTIFIED' },
           ],
-          companyName: { not: null },
+          companyName: { not: '' },
         },
         select: {
           id: true,

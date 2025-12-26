@@ -14,13 +14,16 @@ import {
 
 const { Text, Title } = Typography;
 
-// Get compliance score from stats (use backend-calculated score for consistency)
+// Get compliance score from stats (use backend-calculated 2-metric score)
+// Formula: (MentorRate + JoiningLetterRate) / 2
+// Note: Reports and Visits are NOT part of compliance score
 const calculateComplianceScore = (item) => {
   // If item already has a score or placementRate, use that
   if (item.score !== undefined) return item.score;
   if (item.placementRate !== undefined) return item.placementRate;
 
   // Use backend-calculated complianceScore for consistency with Institution Overview
+  // Backend calculates: (MentorRate + JoiningLetterRate) / 2
   const stats = item.stats;
   if (!stats) return 0;
   return stats.complianceScore ?? 0;
@@ -59,11 +62,11 @@ const PerformerItem = ({ item, rank, type }) => {
           </Tooltip>
           {stats.studentsWithInternships !== undefined ? (
             <div className="flex gap-2 text-xs text-text-tertiary">
-              <Tooltip title="Internships">
+              <Tooltip title="Total approved self-identified internships">
                 <span>{stats.studentsWithInternships || 0} interns</span>
               </Tooltip>
               {stats.unassigned > 0 && (
-                <Tooltip title="Unassigned students">
+                <Tooltip title={`${stats.unassigned} students without an assigned mentor (out of ${stats.totalStudents || 0} total students)`}>
                   <Tag color="warning" className="text-[10px] m-0 leading-tight px-1 py-0 border-0 rounded-sm font-bold">
                     {stats.unassigned} NEED MENTOR
                   </Tag>
@@ -76,24 +79,26 @@ const PerformerItem = ({ item, rank, type }) => {
             </Text>
           )}
         </div>
-        <div className="text-right shrink-0">
-          <div className="flex items-center justify-end gap-1">
-            {isTop ? (
-              <RiseOutlined className="text-success text-xs" />
-            ) : (
-              <FallOutlined className="text-error text-xs" />
-            )}
-            <Text
-              strong
-              className={`text-sm ${isTop ? 'text-success' : 'text-error'}`}
-            >
-              {score}%
+        <Tooltip title="Compliance Score = (Mentor Assignment Rate + Joining Letter Rate) / 2. Reports and Visits are tracked separately.">
+          <div className="text-right shrink-0 cursor-help">
+            <div className="flex items-center justify-end gap-1">
+              {isTop ? (
+                <RiseOutlined className="text-success text-xs" />
+              ) : (
+                <FallOutlined className="text-error text-xs" />
+              )}
+              <Text
+                strong
+                className={`text-sm ${isTop ? 'text-success' : 'text-error'}`}
+              >
+                {score}%
+              </Text>
+            </div>
+            <Text className="text-[10px] uppercase font-bold text-text-tertiary tracking-wider">
+              compliance
             </Text>
           </div>
-          <Text className="text-[10px] uppercase font-bold text-text-tertiary tracking-wider">
-            compliance
-          </Text>
-        </div>
+        </Tooltip>
       </div>
     </div>
   );

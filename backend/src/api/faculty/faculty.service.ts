@@ -1692,6 +1692,7 @@ export class FacultyService {
       data: {
         joiningLetterUrl: null,
         joiningLetterUploadedAt: null,
+        hasJoined: false, // Reset hasJoined when joining letter is deleted
         reviewedBy: null,
         reviewedAt: null,
         reviewRemarks: null,
@@ -1752,14 +1753,16 @@ export class FacultyService {
       throw new BadRequestException('You are not authorized to upload a joining letter for this application');
     }
 
-    // Update the application with joining letter URL and clear previous review data
+    // Update the application with joining letter URL and auto-approve joining
+    // When joiningLetterUrl is uploaded, automatically set hasJoined = true
     const updated = await this.prisma.internshipApplication.update({
       where: { id: applicationId },
       data: {
         joiningLetterUrl,
         joiningLetterUploadedAt: new Date(),
-        reviewedBy: null,
-        reviewedAt: null,
+        hasJoined: true, // Auto-approve: joining letter upload confirms joining
+        reviewedBy: facultyId, // Track who uploaded (auto-approved by uploader)
+        reviewedAt: new Date(),
         reviewRemarks: null,
       },
       include: {

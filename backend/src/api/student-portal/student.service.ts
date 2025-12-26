@@ -986,6 +986,8 @@ export class StudentService {
     }
 
     // Self-identified internships are auto-approved
+    // If joiningLetterUrl is provided, auto-approve joining as well
+    const hasJoiningLetter = !!selfIdentifiedDto.joiningLetterUrl;
     const application = await this.prisma.internshipApplication.create({
       data: {
         studentId,
@@ -993,6 +995,9 @@ export class StudentService {
         status: ApplicationStatus.APPROVED,
         internshipStatus: 'ONGOING',
         reviewedAt: new Date(),
+        reviewedBy: hasJoiningLetter ? 'SYSTEM' : null, // Auto-approve joining letter
+        hasJoined: hasJoiningLetter, // Auto-set hasJoined when joining letter is provided
+        joiningLetterUploadedAt: hasJoiningLetter ? new Date() : null,
         ...selfIdentifiedDto,
       },
     });

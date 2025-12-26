@@ -118,6 +118,16 @@ const DEFAULT_CONFIGS: SystemConfigItem[] = [
     defaultValue: false,
   },
 
+  // Internship Settings
+  {
+    key: 'internship.minimumStartDate',
+    value: '2026-01-10',
+    category: ConfigCategory.GENERAL,
+    description: 'Minimum allowed internship start date (YYYY-MM-DD format). Internships cannot start before this date.',
+    type: 'string',
+    defaultValue: '2026-01-10',
+  },
+
   // Feature Flags
   {
     key: 'features.selfRegistration',

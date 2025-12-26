@@ -22,6 +22,22 @@ const PendingApprovalsCard = ({
 }) => {
   const navigate = useNavigate();
 
+  // Helper to extract student name from application
+  const getStudentName = (app) => {
+    return app.student?.name ||
+           app.studentName ||
+           app.application?.student?.name ||
+           'Student';
+  };
+
+  // Helper to extract company name from application
+  const getCompanyName = (app) => {
+    return app.companyName ||
+           app.internship?.industry?.companyName ||
+           app.application?.companyName ||
+           'Company';
+  };
+
   // Filter for pending approvals
   const pendingApplications = applications.filter(app =>
     app.status === 'PENDING' || app.status === 'UNDER_REVIEW' || app.isSelfIdentified
@@ -53,12 +69,12 @@ const PendingApprovalsCard = ({
                 <Avatar icon={<UserOutlined />} className="bg-warning-100 text-warning-600 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <Text className="text-sm font-medium block truncate">
-                    {app.student?.name || 'Student'}
+                    {getStudentName(app)}
                   </Text>
                   <div className="flex items-center gap-2 text-xs text-text-secondary">
                     <BankOutlined />
                     <span className="truncate">
-                      {app.companyName || app.internship?.industry?.companyName || 'Company'}
+                      {getCompanyName(app)}
                     </span>
                   </div>
                   {app.isSelfIdentified && (

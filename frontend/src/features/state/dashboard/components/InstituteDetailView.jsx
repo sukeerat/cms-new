@@ -86,254 +86,177 @@ const getStatusColor = (status) => STATUS_COLORS[status] || 'default';
 // Memoized Overview Tab Component
 const OverviewTab = memo(({ data, loading, error }) => {
   if (loading) return <div className="flex justify-center py-20"><Spin size="large" /></div>;
-  if (error) return <Alert type="error" title="Failed to load overview" description={error} showIcon className="rounded-xl border-error/20 bg-error/5" />;
-  if (!data) return <Empty description="No data available" />;
+  if (error) return <Alert type="error" message="Failed to load overview" description={error} showIcon className="rounded-xl" />;
+  if (!data) return <Empty description="No data available" className="py-20" />;
 
   return (
-    <div className="space-y-6 p-1">
-      {/* Compliance Score & Key Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="rounded-2xl border-border shadow-soft bg-surface overflow-hidden h-full">
-          <div className="flex flex-col items-center justify-center h-full py-6">
-            <Progress
-              type="circle"
-              percent={data.complianceScore || 0}
-              size={140}
-              strokeColor={{ '0%': 'rgb(var(--color-info))', '100%': 'rgb(var(--color-success))' }}
-              format={(p) => (
-                <div className="flex flex-col items-center">
-                  <span className="text-4xl font-black text-text-primary">{p}%</span>
-                  <span className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest mt-1">Score</span>
-                </div>
-              )}
-            />
-            <div className="mt-6 text-center">
-              <Text className="text-xl font-bold text-text-primary block">Compliance Status</Text>
-              <Text className="text-text-secondary text-sm">Overall performance rating</Text>
+    <div className="space-y-5 max-w-6xl mx-auto">
+      {/* Top Stats Row - Simplified */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <div className="text-3xl font-bold text-text-primary">{data.totalStudents || 0}</div>
+          <div className="text-xs text-text-tertiary mt-1">Students</div>
+        </div>
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <div className="text-3xl font-bold text-text-primary">{data.companiesCount || 0}</div>
+          <div className="text-xs text-text-tertiary mt-1">Companies</div>
+        </div>
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <div className="text-3xl font-bold text-text-primary">{data.facultyCount || 0}</div>
+          <div className="text-xs text-text-tertiary mt-1">Faculty</div>
+        </div>
+        <div className="bg-surface rounded-xl border border-border p-4 text-center">
+          <Progress
+            type="circle"
+            percent={data.complianceScore || 0}
+            size={48}
+            strokeWidth={6}
+            strokeColor={data.complianceScore >= 80 ? 'rgb(var(--color-success))' : data.complianceScore >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))'}
+          />
+          <div className="text-xs text-text-tertiary mt-1">Compliance</div>
+        </div>
+      </div>
+
+      {/* Two Column Layout for Main Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Self-Identified Internships */}
+        <Card
+          size="small"
+          title={<span className="text-sm font-semibold">Self-Identified Internships</span>}
+          extra={<Tag color="blue" className="text-xs">{data.selfIdentifiedInternships?.rate || 0}%</Tag>}
+          className="rounded-xl border-border"
+        >
+          <div className="grid grid-cols-4 gap-3">
+            <div className="text-center">
+              <div className="text-xl font-bold text-text-primary">{data.selfIdentifiedInternships?.total || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Total</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-success">{data.selfIdentifiedInternships?.approved || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Approved</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-warning">{data.selfIdentifiedInternships?.pending || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Pending</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-error">{data.selfIdentifiedInternships?.rejected || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Rejected</div>
             </div>
           </div>
         </Card>
 
-        <Card className="lg:col-span-2 rounded-2xl border-border shadow-soft bg-surface h-full">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-              <BankOutlined className="text-xl" />
+        {/* Mentor Assignment */}
+        <Card
+          size="small"
+          title={<span className="text-sm font-semibold">Mentor Assignment</span>}
+          extra={<Tag color={data.mentorAssignment?.rate >= 80 ? 'green' : 'orange'} className="text-xs">{Math.round(data.mentorAssignment?.rate || 0)}%</Tag>}
+          className="rounded-xl border-border"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1 grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <div className="text-xl font-bold text-success">{data.mentorAssignment?.assigned || 0}</div>
+                <div className="text-[10px] text-text-tertiary">Assigned</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-error">{data.mentorAssignment?.unassigned || 0}</div>
+                <div className="text-[10px] text-text-tertiary">Unassigned</div>
+              </div>
             </div>
-            <Title level={4} className="!mb-0 !text-lg font-bold text-text-primary">Key Metrics</Title>
           </div>
-          
-          <div className="grid grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-background-tertiary/50 border border-border flex flex-col items-center justify-center text-center transition-all hover:bg-background-tertiary">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3">
-                <TeamOutlined className="text-xl" />
-              </div>
-              <div className="text-3xl font-black text-text-primary mb-1">{data.totalStudents || 0}</div>
-              <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Total Students</div>
+        </Card>
+
+        {/* Joining Letters */}
+        <Card
+          size="small"
+          title={<span className="text-sm font-semibold">Joining Letters</span>}
+          extra={<Tag color={data.joiningLetterStatus?.rate >= 80 ? 'green' : 'orange'} className="text-xs">{data.joiningLetterStatus?.rate || 0}%</Tag>}
+          className="rounded-xl border-border"
+        >
+          <div className="grid grid-cols-4 gap-3">
+            <div className="text-center">
+              <div className="text-xl font-bold text-text-primary">{data.joiningLetterStatus?.submitted || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Submitted</div>
             </div>
-            <div className="p-6 rounded-2xl bg-background-tertiary/50 border border-border flex flex-col items-center justify-center text-center transition-all hover:bg-background-tertiary">
-              <div className="w-12 h-12 rounded-xl bg-success/10 text-success flex items-center justify-center mb-3">
-                <BankOutlined className="text-xl" />
-              </div>
-              <div className="text-3xl font-black text-text-primary mb-1">{data.companiesCount || 0}</div>
-              <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Companies</div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-warning">{data.joiningLetterStatus?.pending || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Pending</div>
             </div>
-            <div className="p-6 rounded-2xl bg-background-tertiary/50 border border-border flex flex-col items-center justify-center text-center transition-all hover:bg-background-tertiary">
-              <div className="w-12 h-12 rounded-xl bg-warning/10 text-warning flex items-center justify-center mb-3">
-                <UserOutlined className="text-xl" />
-              </div>
-              <div className="text-3xl font-black text-text-primary mb-1">{data.facultyCount || 0}</div>
-              <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Faculty</div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-success">{data.joiningLetterStatus?.approved || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Approved</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-error">{data.joiningLetterStatus?.rejected || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Rejected</div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Monthly Reports */}
+        <Card
+          size="small"
+          title={<span className="text-sm font-semibold">Monthly Reports</span>}
+          extra={<Tag color={data.monthlyReportStatus?.rate >= 80 ? 'green' : 'orange'} className="text-xs">{data.monthlyReportStatus?.rate || 0}%</Tag>}
+          className="rounded-xl border-border"
+        >
+          <div className="grid grid-cols-4 gap-3">
+            <div className="text-center">
+              <div className="text-xl font-bold text-text-primary">{data.monthlyReportStatus?.submitted || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Submitted</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-warning">{data.monthlyReportStatus?.pending || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Pending</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-success">{data.monthlyReportStatus?.approved || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Approved</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-error">{data.monthlyReportStatus?.notSubmitted || 0}</div>
+              <div className="text-[10px] text-text-tertiary">Missing</div>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Self-Identified Internships */}
+      {/* Faculty Visits - Full Width */}
       <Card
-        title={
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
-              <SafetyCertificateOutlined className="text-purple-500 text-lg" />
-            </div>
-            <span className="font-bold text-text-primary text-lg">Self-Identified Internships</span>
-          </div>
-        }
-        className="rounded-2xl border-border shadow-soft bg-surface"
-        extra={
-          <Tag color="blue" className="rounded-lg font-bold px-3 py-1 text-sm border-0">
-            {data.totalStudents > 0 ? `${data.selfIdentifiedInternships?.rate || 0}% of students` : 'N/A'}
-          </Tag>
-        }
+        size="small"
+        title={<span className="text-sm font-semibold">Faculty Visits (This Month)</span>}
+        extra={<Tag color={data.facultyVisits?.completionRate >= 80 ? 'green' : 'orange'} className="text-xs">{data.facultyVisits?.completionRate || 0}%</Tag>}
+        className="rounded-xl border-border"
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-          <div className="text-center p-4 bg-background-tertiary/30 rounded-xl border border-border/50">
-            <div className="text-3xl font-bold text-text-primary">{data.selfIdentifiedInternships?.total || 0}</div>
-            <div className="text-xs text-text-tertiary uppercase tracking-wider font-bold mt-1">Total</div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="text-center p-3 bg-background-tertiary/30 rounded-lg">
+            <div className="text-2xl font-bold text-text-primary">{data.facultyVisits?.scheduled || 0}</div>
+            <div className="text-xs text-text-tertiary">Scheduled</div>
           </div>
-          <div className="text-center p-4 bg-success/5 rounded-xl border border-success/10">
-            <div className="text-3xl font-bold text-success">{data.selfIdentifiedInternships?.approved || 0}</div>
-            <div className="text-xs text-success-700 uppercase tracking-wider font-bold mt-1">Approved</div>
+          <div className="text-center p-3 bg-success/5 rounded-lg">
+            <div className="text-2xl font-bold text-success">{data.facultyVisits?.completed || 0}</div>
+            <div className="text-xs text-text-tertiary">Completed</div>
           </div>
-          <div className="text-center p-4 bg-warning/5 rounded-xl border border-warning/10">
-            <div className="text-3xl font-bold text-warning">{data.selfIdentifiedInternships?.pending || 0}</div>
-            <div className="text-xs text-warning-700 uppercase tracking-wider font-bold mt-1">Pending</div>
-          </div>
-          <div className="text-center p-4 bg-error/5 rounded-xl border border-error/10">
-            <div className="text-3xl font-bold text-error">{data.selfIdentifiedInternships?.rejected || 0}</div>
-            <div className="text-xs text-error-700 uppercase tracking-wider font-bold mt-1">Rejected</div>
+          <div className="text-center p-3 bg-warning/5 rounded-lg">
+            <div className="text-2xl font-bold text-warning">{data.facultyVisits?.toBeDone || 0}</div>
+            <div className="text-xs text-text-tertiary">Pending</div>
           </div>
         </div>
       </Card>
 
-      {/* Mentor Assignment */}
-      <Card 
-        title={
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
-              <TeamOutlined className="text-indigo-500 text-lg" />
-            </div>
-            <span className="font-bold text-text-primary text-lg">Mentor Assignment</span>
-          </div>
-        }
-        className="rounded-2xl border-border shadow-soft bg-surface"
-      >
-        <div className="flex flex-col md:flex-row items-center gap-8 py-2">
-          <div className="flex-1 w-full">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="p-6 rounded-2xl bg-success/5 border border-success/20 text-center">
-                <div className="text-4xl font-black text-success mb-1">{data.mentorAssignment?.assigned || 0}</div>
-                <div className="text-xs font-bold text-success-700 uppercase tracking-wider">Assigned Students</div>
-              </div>
-              <div className="p-6 rounded-2xl bg-error/5 border border-error/20 text-center">
-                <div className="text-4xl font-black text-error mb-1">{data.mentorAssignment?.unassigned || 0}</div>
-                <div className="text-xs font-bold text-error-700 uppercase tracking-wider">Unassigned Students</div>
-              </div>
-            </div>
-          </div>
-          <div className="text-center shrink-0 px-8 border-l border-border/50 hidden md:block">
-            <Progress 
-              type="circle" 
-              percent={Math.round(data.mentorAssignment?.rate || 0)} 
-              size={100} 
-              strokeColor="rgb(var(--color-primary))"
-              format={(p) => <span className="text-xl font-bold text-text-primary">{p}%</span>}
-            />
-            <div className="text-xs uppercase font-bold text-text-tertiary mt-3 tracking-wide">Coverage Rate</div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Joining Letters & Monthly Reports */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card
-          title={
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-                <FileProtectOutlined className="text-blue-500 text-lg" />
-              </div>
-              <span className="font-bold text-text-primary text-lg">Joining Letters</span>
-            </div>
-          }
-          className="rounded-2xl border-border shadow-soft bg-surface"
-          extra={
-            <Tag
-              color={data.joiningLetterStatus?.rate >= 80 ? 'green' : 'orange'}
-              className="rounded-lg font-bold border-0 px-2 py-0.5"
-            >
-              {data.joiningLetterStatus?.total > 0 ? `${data.joiningLetterStatus?.rate || 0}%` : 'N/A'}
-            </Tag>
-          }
-        >
-          <div className="grid grid-cols-2 gap-y-6">
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.joiningLetterStatus?.submitted || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--color-text-primary))' } }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.joiningLetterStatus?.pending || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-warning-color))' } }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.joiningLetterStatus?.approved || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-success-color))' } }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Rejected</span>} value={data.joiningLetterStatus?.rejected || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-error-color))' } }} />
-          </div>
-        </Card>
-
-        <Card
-          title={
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
-                <CalendarOutlined className="text-orange-500 text-lg" />
-              </div>
-              <span className="font-bold text-text-primary text-lg">Monthly Reports</span>
-            </div>
-          }
-          className="rounded-2xl border-border shadow-soft bg-surface"
-          extra={
-            <Tag
-              color={data.monthlyReportStatus?.rate >= 80 ? 'green' : 'orange'}
-              className="rounded-lg font-bold border-0 px-2 py-0.5"
-            >
-              {data.monthlyReportStatus?.total > 0 ? `${data.monthlyReportStatus?.rate || 0}%` : 'N/A'}
-            </Tag>
-          }
-        >
-          <div className="grid grid-cols-2 gap-y-6">
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Submitted</span>} value={data.monthlyReportStatus?.submitted || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--color-text-primary))' } }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Pending</span>} value={data.monthlyReportStatus?.pending || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-warning-color))' } }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Approved</span>} value={data.monthlyReportStatus?.approved || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-success-color))' } }} />
-            <Statistic title={<span className="text-xs uppercase font-bold text-text-tertiary">Missing</span>} value={data.monthlyReportStatus?.notSubmitted || 0} styles={{ content: { fontSize: '24px', fontWeight: 'bold', color: 'rgb(var(--ant-error-color))' } }} />
-          </div>
-        </Card>
-      </div>
-
-      {/* Faculty Visits */}
-      <Card
-        title={
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center shrink-0">
-              <EnvironmentOutlined className="text-teal-500 text-lg" />
-            </div>
-            <span className="font-bold text-text-primary text-lg">Faculty Visits (This Month)</span>
-          </div>
-        }
-        className="rounded-2xl border-border shadow-soft bg-surface"
-        extra={
-          <Tag
-            color={data.facultyVisits?.completionRate >= 80 ? 'green' : 'orange'}
-            className="rounded-lg font-bold border-0 px-2 py-0.5"
-          >
-            {data.facultyVisits?.scheduled > 0 ? `${data.facultyVisits?.completionRate || 0}% Complete` : 'N/A'}
-          </Tag>
-        }
-      >
-        <div className="grid grid-cols-3 gap-6 text-center pt-2">
-          <div className="p-4 bg-background-tertiary/30 rounded-2xl">
-            <div className="text-3xl font-black text-text-primary">{data.facultyVisits?.scheduled || 0}</div>
-            <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest mt-1">Scheduled</div>
-          </div>
-          <div className="p-4 bg-success/5 border border-success/20 rounded-2xl">
-            <div className="text-3xl font-black text-success">{data.facultyVisits?.completed || 0}</div>
-            <div className="text-[10px] uppercase font-bold text-success-700 tracking-widest mt-1">Completed</div>
-          </div>
-          <div className="p-4 bg-warning/5 border border-warning/20 rounded-2xl">
-            <div className="text-3xl font-black text-warning">{data.facultyVisits?.toBeDone || 0}</div>
-            <div className="text-[10px] uppercase font-bold text-warning-700 tracking-widest mt-1">Pending</div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Branch-wise Distribution */}
+      {/* Branch Distribution */}
       {data.branchWiseData?.length > 0 && (
-        <Card 
-          title={
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <AuditOutlined className="text-primary text-lg" />
-              </div>
-              <span className="font-bold text-text-primary text-lg">Branch Distribution</span>
-            </div>
-          }
-          className="rounded-2xl border-border shadow-soft bg-surface"
+        <Card
+          size="small"
+          title={<span className="text-sm font-semibold">Branch Distribution</span>}
+          className="rounded-xl border-border"
         >
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="flex flex-wrap gap-2">
             {data.branchWiseData.map((branch, index) => (
-              <div key={index} className="p-4 rounded-xl bg-background-tertiary/50 border border-border text-center hover:bg-background-tertiary transition-colors">
-                <div className="text-2xl font-black text-primary">{branch.count}</div>
-                <div className="text-[10px] text-text-secondary truncate font-bold uppercase tracking-wide mt-1" title={branch.branch}>{branch.branch}</div>
+              <div key={index} className="px-3 py-2 rounded-lg bg-background-tertiary/50 border border-border flex items-center gap-2">
+                <span className="text-lg font-bold text-primary">{branch.count}</span>
+                <span className="text-xs text-text-secondary">{branch.branch}</span>
               </div>
             ))}
           </div>
@@ -349,199 +272,108 @@ OverviewTab.displayName = 'OverviewTab';
 const FacultyTab = memo(({ principal, faculty, summary, loading, error }) => {
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
+      <div className="flex justify-center py-20">
         <Spin size="large" />
-        <Text className="text-text-tertiary">Loading faculty information...</Text>
       </div>
     );
   }
 
   if (error) {
-    return (
-      <Alert
-        type="error"
-        title="Failed to load faculty data"
-        description={error}
-        showIcon
-        className="rounded-xl"
-      />
-    );
+    return <Alert type="error" message="Failed to load faculty data" description={error} showIcon className="rounded-xl" />;
   }
 
-  // Empty state
   if (!principal && (!faculty || faculty.length === 0)) {
     return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <div className="w-20 h-20 rounded-2xl bg-background-tertiary flex items-center justify-center mb-4">
-          <TeamOutlined className="text-3xl text-text-tertiary" />
-        </div>
-        <Text className="text-text-primary font-medium text-lg mb-1">No Faculty Data</Text>
-        <Text className="text-text-tertiary">Faculty and principal information will appear here</Text>
-      </div>
+      <Empty description="No faculty data available" className="py-20" />
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-6xl mx-auto">
       {/* Stats Summary Row */}
       {summary && (
-        <Row gutter={[16, 16]}>
-          <Col xs={12} sm={6}>
-            <div className="bg-surface rounded-xl border border-border p-4 text-center">
-              <div className="text-2xl font-bold text-text-primary">{summary.totalFaculty || 0}</div>
-              <div className="text-xs text-text-tertiary mt-1">Total Faculty</div>
-            </div>
-          </Col>
-          <Col xs={12} sm={6}>
-            <div className="bg-surface rounded-xl border border-border p-4 text-center">
-              <div className="text-2xl font-bold text-primary">{summary.totalStudentsAssigned || 0}</div>
-              <div className="text-xs text-text-tertiary mt-1">Students Assigned</div>
-            </div>
-          </Col>
-          <Col xs={12} sm={6}>
-            <div className="bg-surface rounded-xl border border-border p-4 text-center">
-              <div className="text-2xl font-bold text-success">{summary.totalVisitsCompleted || 0}</div>
-              <div className="text-xs text-text-tertiary mt-1">Visits Completed</div>
-            </div>
-          </Col>
-          <Col xs={12} sm={6}>
-            <div className="bg-surface rounded-xl border border-border p-4 text-center">
-              <Progress
-                type="circle"
-                percent={summary.overallVisitCompletionRate || 0}
-                size={48}
-                strokeWidth={8}
-                strokeColor="rgb(var(--color-primary))"
-              />
-              <div className="text-xs text-text-tertiary mt-1">Visit Rate</div>
-            </div>
-          </Col>
-        </Row>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-surface rounded-xl border border-border p-4 text-center">
+            <div className="text-2xl font-bold text-text-primary">{summary.totalFaculty || 0}</div>
+            <div className="text-xs text-text-tertiary mt-1">Total Faculty</div>
+          </div>
+          <div className="bg-surface rounded-xl border border-border p-4 text-center">
+            <div className="text-2xl font-bold text-primary">{summary.totalStudentsAssigned || 0}</div>
+            <div className="text-xs text-text-tertiary mt-1">Students Assigned</div>
+          </div>
+          <div className="bg-surface rounded-xl border border-border p-4 text-center">
+            <div className="text-2xl font-bold text-success">{summary.totalVisitsCompleted || 0}</div>
+            <div className="text-xs text-text-tertiary mt-1">Visits Completed</div>
+          </div>
+          <div className="bg-surface rounded-xl border border-border p-4 text-center">
+            <Progress type="circle" percent={summary.overallVisitCompletionRate || 0} size={40} strokeWidth={6} />
+            <div className="text-xs text-text-tertiary mt-1">Visit Rate</div>
+          </div>
+        </div>
       )}
 
       {/* Principal Card */}
       {principal && (
-        <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl border border-indigo-200/50 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
-              <IdcardOutlined className="text-white text-sm" />
-            </div>
-            <Text className="font-bold text-text-primary">Principal</Text>
-          </div>
-
-          <div className="flex items-start gap-5">
-            <Avatar size={64} icon={<UserOutlined />} className="bg-indigo-500 shrink-0" />
+        <Card size="small" className="rounded-xl border-border">
+          <div className="flex items-center gap-4">
+            <Avatar size={48} icon={<UserOutlined />} className="bg-indigo-500" />
             <div className="flex-1 min-w-0">
-              <Text className="text-xl font-bold text-text-primary block">{principal.name}</Text>
-              <div className="flex flex-col gap-1 mt-2">
-                <div className="flex items-center gap-2 text-sm text-text-secondary">
-                  <MailOutlined className="text-text-tertiary" />
-                  <span>{principal.email}</span>
-                </div>
-                {principal.phoneNo && (
-                  <div className="flex items-center gap-2 text-sm text-text-secondary">
-                    <PhoneOutlined className="text-text-tertiary" />
-                    <span>{principal.phoneNo}</span>
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                <Text className="font-semibold text-text-primary">{principal.name}</Text>
+                <Tag color="purple" className="text-xs">Principal</Tag>
               </div>
-              {principal.stats && (
-                <div className="flex flex-wrap gap-3 mt-4">
-                  <div className="bg-white/50 rounded-lg px-3 py-1.5 text-center">
-                    <div className="text-lg font-bold text-text-primary">{principal.stats.totalStudents || 0}</div>
-                    <div className="text-[10px] text-text-tertiary uppercase">Students</div>
-                  </div>
-                  <div className="bg-white/50 rounded-lg px-3 py-1.5 text-center">
-                    <div className="text-lg font-bold text-text-primary">{principal.stats.totalFaculty || 0}</div>
-                    <div className="text-[10px] text-text-tertiary uppercase">Faculty</div>
-                  </div>
-                  <div className="bg-white/50 rounded-lg px-3 py-1.5 text-center">
-                    <div className="text-lg font-bold text-warning">{principal.stats.pendingApprovals || 0}</div>
-                    <div className="text-[10px] text-text-tertiary uppercase">Pending</div>
-                  </div>
-                </div>
-              )}
+              <div className="flex items-center gap-4 mt-1 text-xs text-text-tertiary">
+                <span><MailOutlined className="mr-1" />{principal.email}</span>
+                {principal.phoneNo && <span><PhoneOutlined className="mr-1" />{principal.phoneNo}</span>}
+              </div>
             </div>
+            {principal.stats && (
+              <div className="flex gap-4 text-center">
+                <div>
+                  <div className="text-lg font-bold text-text-primary">{principal.stats.totalStudents || 0}</div>
+                  <div className="text-[10px] text-text-tertiary">Students</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-text-primary">{principal.stats.totalFaculty || 0}</div>
+                  <div className="text-[10px] text-text-tertiary">Faculty</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-warning">{principal.stats.pendingApprovals || 0}</div>
+                  <div className="text-[10px] text-text-tertiary">Pending</div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Faculty Grid */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <TeamOutlined className="text-primary" />
-          <Text className="font-bold text-text-primary">Faculty Members</Text>
-          {faculty && <Tag className="m-0 rounded-full text-xs bg-primary/10 text-primary border-0">{faculty.length}</Tag>}
-        </div>
-
-        {(!faculty || faculty.length === 0) ? (
-          <div className="bg-surface rounded-xl border border-border p-8 text-center">
-            <Text className="text-text-tertiary">No faculty members found</Text>
-          </div>
-        ) : (
-          <Row gutter={[16, 16]}>
+      {/* Faculty List */}
+      {faculty && faculty.length > 0 && (
+        <Card
+          size="small"
+          title={<span className="text-sm font-semibold">Faculty Members ({faculty.length})</span>}
+          className="rounded-xl border-border"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {faculty.map((member, index) => (
-              <Col xs={24} md={12} key={member.id || index}>
-                <div className="bg-surface rounded-xl border border-border p-4 h-full hover:border-primary/30 hover:shadow-md transition-all">
-                  <div className="flex items-start gap-4">
-                    <Avatar
-                      size={48}
-                      icon={<UserOutlined />}
-                      className={member.role === 'HOD' ? 'bg-purple-500' : 'bg-primary'}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Text className="font-semibold text-text-primary">{member.name}</Text>
-                        <Tag
-                          color={member.role === 'HOD' ? 'purple' : 'blue'}
-                          className="m-0 text-[10px] rounded px-1.5"
-                        >
-                          {member.role}
-                        </Tag>
-                        {member.branchName && (
-                          <Tag className="m-0 text-[10px] rounded bg-background-tertiary text-text-tertiary border-0">
-                            {member.branchName}
-                          </Tag>
-                        )}
-                      </div>
-                      <Text className="text-xs text-text-tertiary block mt-1 truncate">{member.email}</Text>
-
-                      {/* Stats Row */}
-                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
-                        <Tooltip title="Students Assigned">
-                          <div className="flex items-center gap-1.5">
-                            <TeamOutlined className="text-text-tertiary text-xs" />
-                            <span className="text-sm font-medium text-text-primary">
-                              {member.stats?.assignedStudents || 0}
-                            </span>
-                          </div>
-                        </Tooltip>
-                        <Tooltip title="Visits Completed">
-                          <div className="flex items-center gap-1.5">
-                            <EnvironmentOutlined className="text-text-tertiary text-xs" />
-                            <span className="text-sm font-medium text-text-primary">
-                              {member.stats?.visitsCompleted || 0}
-                              <span className="text-text-tertiary">/{member.stats?.visitsScheduled || 0}</span>
-                            </span>
-                          </div>
-                        </Tooltip>
-                        <Tooltip title="Reports Reviewed">
-                          <div className="flex items-center gap-1.5">
-                            <FileTextOutlined className="text-text-tertiary text-xs" />
-                            <span className="text-sm font-medium text-text-primary">
-                              {member.stats?.reportsReviewed || 0}
-                            </span>
-                          </div>
-                        </Tooltip>
-                      </div>
-                    </div>
+              <div key={member.id || index} className="flex items-center gap-3 p-3 rounded-lg bg-background-tertiary/30 border border-border/50 hover:border-primary/30 transition-colors">
+                <Avatar size={36} icon={<UserOutlined />} className={member.role === 'HOD' ? 'bg-purple-500' : 'bg-primary'} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Text className="font-medium text-text-primary text-sm truncate">{member.name}</Text>
+                    <Tag color={member.role === 'HOD' ? 'purple' : 'blue'} className="text-[10px]">{member.role}</Tag>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-[11px] text-text-tertiary">
+                    {member.branchName && <span>{member.branchName}</span>}
+                    <span><TeamOutlined className="mr-1" />{member.stats?.assignedStudents || 0}</span>
+                    <span><EnvironmentOutlined className="mr-1" />{member.stats?.visitsCompleted || 0}/{member.stats?.visitsScheduled || 0}</span>
                   </div>
                 </div>
-              </Col>
+              </div>
             ))}
-          </Row>
-        )}
-      </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 });
@@ -648,6 +480,9 @@ const InstituteDetailView = ({ defaultTab = null }) => {
 
   // Track if initial fetch done
   const fetchedTabsRef = useRef({ students: false, companies: false, faculty: false });
+  // Track if search effects have skipped their first run (to prevent duplicate with tab fetch)
+  const studentSearchInitializedRef = useRef(false);
+  const companySearchInitializedRef = useRef(false);
 
   // Get available branches
   const availableBranches = useMemo(() => students.filters?.branches || [], [students.filters]);
@@ -657,6 +492,9 @@ const InstituteDetailView = ({ defaultTab = null }) => {
     if (selectedInstitute?.id) {
       dispatch(fetchInstituteOverview(selectedInstitute.id));
       fetchedTabsRef.current = { students: false, companies: false, faculty: false };
+      // Reset search skip flags for new institute
+      studentSearchInitializedRef.current = false;
+      companySearchInitializedRef.current = false;
     }
   }, [dispatch, selectedInstitute?.id]);
 
@@ -676,29 +514,45 @@ const InstituteDetailView = ({ defaultTab = null }) => {
     }
   }, [activeTab, selectedInstitute?.id, dispatch]);
 
-  // Handle debounced student search
+  // Handle debounced student search - only trigger on actual search/filter changes
+  // NOT on tab changes (tab changes are handled by the tab effect above)
   useEffect(() => {
     if (!selectedInstitute?.id || activeTab !== 'students') return;
-    if (debouncedStudentSearch !== undefined) {
-      dispatch(fetchInstituteStudents({
-        institutionId: selectedInstitute.id,
-        limit: 20,
-        search: debouncedStudentSearch || undefined,
-        filter: studentFilter,
-        branch: branchFilter !== 'all' ? branchFilter : undefined,
-        reportStatus: reportStatusFilter !== 'all' ? reportStatusFilter : undefined,
-        selfIdentified: selfIdentifiedFilter !== 'all' ? selfIdentifiedFilter : undefined,
-      }));
-    }
-  }, [debouncedStudentSearch, selectedInstitute?.id, activeTab, dispatch, studentFilter, branchFilter, reportStatusFilter, selfIdentifiedFilter]);
 
-  // Handle debounced company search
+    // Skip the very first run - the tab change effect handles initial fetch
+    if (!studentSearchInitializedRef.current) {
+      studentSearchInitializedRef.current = true;
+      return;
+    }
+
+    dispatch(fetchInstituteStudents({
+      institutionId: selectedInstitute.id,
+      limit: 20,
+      search: debouncedStudentSearch || undefined,
+      filter: studentFilter,
+      branch: branchFilter !== 'all' ? branchFilter : undefined,
+      reportStatus: reportStatusFilter !== 'all' ? reportStatusFilter : undefined,
+      selfIdentified: selfIdentifiedFilter !== 'all' ? selfIdentifiedFilter : undefined,
+    }));
+    // Note: activeTab is intentionally NOT in dependencies - tab switches are handled by fetchedTabsRef
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedStudentSearch, selectedInstitute?.id, dispatch, studentFilter, branchFilter, reportStatusFilter, selfIdentifiedFilter]);
+
+  // Handle debounced company search - only trigger on actual search changes
+  // NOT on tab changes (tab changes are handled by the tab effect above)
   useEffect(() => {
     if (!selectedInstitute?.id || activeTab !== 'companies') return;
-    if (debouncedCompanySearch !== undefined && fetchedTabsRef.current.companies) {
-      dispatch(fetchInstituteCompanies({ institutionId: selectedInstitute.id, search: debouncedCompanySearch || undefined }));
+
+    // Skip the very first run - the tab change effect handles initial fetch
+    if (!companySearchInitializedRef.current) {
+      companySearchInitializedRef.current = true;
+      return;
     }
-  }, [debouncedCompanySearch, selectedInstitute?.id, activeTab, dispatch]);
+
+    dispatch(fetchInstituteCompanies({ institutionId: selectedInstitute.id, search: debouncedCompanySearch || undefined }));
+    // Note: activeTab is intentionally NOT in dependencies - tab switches are handled by fetchedTabsRef
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedCompanySearch, selectedInstitute?.id, dispatch]);
 
   // Apply filters
   const applyFilters = useCallback(() => {
@@ -752,7 +606,8 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       setMentorsLoading(true);
       try {
         const result = await dispatch(fetchInstitutionMentors(selectedInstitute.id)).unwrap();
-        setMentors(result || []);
+        // API returns { success: true, data: mentors[] }
+        setMentors(result?.data || result || []);
       } catch {
         message.error('Failed to load mentors');
       } finally {
@@ -954,226 +809,94 @@ const InstituteDetailView = ({ defaultTab = null }) => {
   // Memoized company columns
   const companyColumns = useMemo(() => [
     {
-      title: 'Company', key: 'company', width: 300, fixed: 'left',
+      title: 'Company', key: 'company', width: 280,
       render: (_, record) => (
-        <div className="flex items-center gap-4 py-1">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm border ${
-            record.isSelfIdentifiedCompany 
-              ? 'bg-purple-500/10 border-purple-500/20 text-purple-600' 
-              : 'bg-primary/10 border-primary/20 text-primary'
+        <div className="flex items-center gap-3 py-0.5">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+            record.isSelfIdentifiedCompany ? 'bg-purple-500/10 text-purple-600' : 'bg-primary/10 text-primary'
           }`}>
-            <BankOutlined className="text-xl" />
+            <BankOutlined className="text-sm" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Text strong className="text-sm text-text-primary truncate max-w-[180px]" title={record.companyName}>
-                {record.companyName || 'Unknown Company'}
-              </Text>
-              {record.isSelfIdentifiedCompany && (
-                <Badge status="processing" color="purple" title="Self-Identified" />
-              )}
+            <div className="flex items-center gap-1.5">
+              <Text className="text-sm font-medium text-text-primary truncate max-w-[180px]">{record.companyName || 'Unknown'}</Text>
+              {record.isSelfIdentifiedCompany && <Tag color="purple" className="text-[9px] m-0 px-1">Self-ID</Tag>}
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-text-tertiary font-medium">
-              <EnvironmentOutlined className="text-[10px]" />
-              <span className="truncate max-w-[200px]">
-                {record.isSelfIdentifiedCompany
-                  ? (record.companyAddress || 'Address not provided')
-                  : `${record.city || 'N/A'}${record.state ? `, ${record.state}` : ''}`}
-              </span>
-            </div>
+            <Text className="text-[11px] text-text-tertiary truncate block">
+              {record.isSelfIdentifiedCompany ? (record.companyAddress || '-') : `${record.city || '-'}${record.state ? `, ${record.state}` : ''}`}
+            </Text>
           </div>
         </div>
       ),
     },
     {
-      title: 'Industry', key: 'industry', width: 140,
-      render: (_, record) => (
-        <Tag
-          variant="borderless"
-          className={`font-bold rounded-md m-0 px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-            record.isSelfIdentifiedCompany
-              ? 'bg-purple-500/10 text-purple-600'
-              : 'bg-cyan-500/10 text-cyan-600'
-          }`}
-        >
-          {record.industryType || 'General'}
-        </Tag>
-      ),
+      title: 'Industry', dataIndex: 'industryType', key: 'industry', width: 120,
+      render: (text) => <Text className="text-xs text-text-secondary">{text || 'General'}</Text>,
     },
     {
-      title: 'Contact Details', key: 'contact', width: 200,
+      title: 'Contact', key: 'contact', width: 180,
       render: (_, record) => (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 group">
-            <MailOutlined className="text-text-tertiary group-hover:text-primary transition-colors text-xs" />
-            <Text className="text-xs text-text-secondary truncate max-w-[160px]">{record.email || record.companyEmail || 'N/A'}</Text>
-          </div>
-          <div className="flex items-center gap-2 group">
-            <PhoneOutlined className="text-text-tertiary group-hover:text-success transition-colors text-xs" />
-            <Text className="text-xs text-text-secondary">{record.phoneNo || record.companyContact || 'N/A'}</Text>
-          </div>
+        <div className="text-xs text-text-secondary">
+          <div className="truncate">{record.email || record.companyEmail || '-'}</div>
+          <div>{record.phoneNo || record.companyContact || '-'}</div>
         </div>
       ),
     },
     {
-      title: 'Placement Stats', key: 'students', width: 140, align: 'center',
-      render: (_, record) => (
-        <div className="flex flex-col items-center p-2 rounded-xl bg-background-tertiary/30 border border-border/50">
-          <Text className="text-lg font-black text-primary leading-none">{record.studentCount || 0}</Text>
-          <Text className="text-[9px] text-text-tertiary font-bold uppercase tracking-tighter mt-1">Students</Text>
-        </div>
-      ),
+      title: 'Students', key: 'students', width: 80, align: 'center',
+      render: (_, record) => <Text className="font-semibold text-primary">{record.studentCount || 0}</Text>,
     },
     {
-      title: 'Status', key: 'status', width: 140, align: 'center',
-      render: (_, record) => {
-        if (record.isSelfIdentifiedCompany) {
-          return <Tag icon={<CheckCircleOutlined />} color="success" className="m-0 rounded-full font-bold text-[10px] px-3 py-0.5 uppercase tracking-wide border-0">Auto-Approved</Tag>;
-        }
-        if (record.isApproved) return <Tag icon={<CheckCircleOutlined />} color="success" className="m-0 rounded-full font-bold text-[10px] px-3 py-0.5 uppercase tracking-wide border-0">Approved</Tag>;
-        if (record.isVerified) return <Tag icon={<SafetyCertificateOutlined />} color="processing" className="m-0 rounded-full font-bold text-[10px] px-3 py-0.5 uppercase tracking-wide border-0">Verified</Tag>;
-        return <Tag icon={<ClockCircleOutlined />} color="warning" className="m-0 rounded-full font-bold text-[10px] px-3 py-0.5 uppercase tracking-wide border-0">Pending</Tag>;
-      },
-    },
-    {
-      title: 'Action', key: 'action', width: 100, fixed: 'right', align: 'center',
+      title: '', key: 'action', width: 70, align: 'center',
       render: (_, record) => (
-        <Button
-          type="primary"
-          ghost
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => handleViewCompanyDetails(record)}
-          className="rounded-lg font-bold text-xs"
-        >
-          Details
-        </Button>
+        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewCompanyDetails(record)}>View</Button>
       ),
     },
   ], [handleViewCompanyDetails]);
 
-  // No institute selected - Enhanced empty state
+  // No institute selected - Clean empty state
   if (!selectedInstitute?.id) {
     return (
-      <div className="h-full flex items-center justify-center p-8 bg-gradient-to-br from-background via-background-secondary to-background">
-        <div className="text-center max-w-md">
-          {/* Animated illustration */}
-          <div className="relative inline-block mb-8">
-            <div className="w-32 h-32 rounded-3xl bg-primary/5 flex items-center justify-center">
-              <BankOutlined className="text-5xl text-primary/40" />
-            </div>
-            {/* Decorative elements */}
-            <div className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-success/20 flex items-center justify-center">
-              <CheckCircleOutlined className="text-success text-xs" />
-            </div>
-            <div className="absolute -bottom-2 -left-2 w-8 h-8 rounded-xl bg-info/20 flex items-center justify-center">
-              <TeamOutlined className="text-info text-sm" />
-            </div>
-          </div>
-
-          <Title level={3} className="!mb-2 !text-2xl font-bold text-text-primary">
-            Select an Institution
-          </Title>
-          <Text className="text-text-secondary block mb-6 text-base leading-relaxed">
-            Choose an institution from the sidebar to explore detailed analytics,
-            student data, company partnerships, and faculty information.
-          </Text>
-
-          {/* Feature hints */}
-          <div className="grid grid-cols-2 gap-3 text-left max-w-sm mx-auto">
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <TeamOutlined className="text-primary text-sm" />
-              </div>
-              <Text className="text-xs text-text-secondary">View student enrollment & progress</Text>
-            </div>
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
-              <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-                <BankOutlined className="text-success text-sm" />
-              </div>
-              <Text className="text-xs text-text-secondary">Explore company partnerships</Text>
-            </div>
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
-              <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-                <SafetyCertificateOutlined className="text-warning text-sm" />
-              </div>
-              <Text className="text-xs text-text-secondary">Track compliance scores</Text>
-            </div>
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface border border-border">
-              <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-                <UserOutlined className="text-info text-sm" />
-              </div>
-              <Text className="text-xs text-text-secondary">Manage faculty & mentors</Text>
-            </div>
-          </div>
-
-          {/* Arrow hint */}
-          <div className="mt-8 flex items-center justify-center gap-2 text-text-tertiary">
-            <span className="text-lg">←</span>
-            <Text className="text-sm">Select from sidebar</Text>
-          </div>
+      <div className="h-full flex items-center justify-center bg-background">
+        <div className="text-center">
+          <BankOutlined className="text-4xl text-text-tertiary mb-4" />
+          <Text className="block text-text-primary font-medium mb-1">Select an Institution</Text>
+          <Text className="text-text-tertiary text-sm">Choose from the sidebar to view details</Text>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 h-full flex flex-col overflow-hidden bg-background">
-      {/* Enhanced Header */}
-      <div className="mb-6 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-lg shadow-primary/10 flex items-center justify-center text-primary">
-            <BankOutlined className="text-2xl" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <Title level={4} className="!mb-0 !text-xl font-bold text-text-primary">
-                {overview.data?.institution?.name || 'Loading...'}
-              </Title>
-              {overview.data?.complianceScore >= 80 && (
-                <Tooltip title="High compliance score">
-                  <CheckCircleOutlined className="text-success" />
-                </Tooltip>
-              )}
-            </div>
-            <div className="flex items-center gap-3 mt-1.5">
-              <Tag className="font-mono text-xs bg-primary/10 text-primary border-0 m-0 rounded-md px-2">
-                {overview.data?.institution?.code}
-              </Tag>
-              <Text className="text-text-secondary flex items-center gap-1.5 text-sm">
-                <EnvironmentOutlined className="text-text-tertiary text-xs" />
-                {overview.data?.institution?.city}
-                {overview.data?.institution?.district && `, ${overview.data?.institution?.district}`}
-              </Text>
-              {overview.data?.complianceScore != null && (
-                <Badge
-                  count={`${overview.data.complianceScore}%`}
-                  style={{
-                    backgroundColor: overview.data.complianceScore >= 80 ? 'rgb(var(--color-success))' :
-                                     overview.data.complianceScore >= 50 ? 'rgb(var(--color-warning))' : 'rgb(var(--color-error))'
-                  }}
-                  className="[&_.ant-badge-count]:text-[10px] [&_.ant-badge-count]:font-bold"
-                />
-              )}
-            </div>
-          </div>
-        </div>
+    <div className="h-full flex flex-col overflow-hidden bg-background">
+      {/* Header - Minimal */}
+      <div className="px-4 py-2 flex items-center justify-between shrink-0 border-b border-border bg-surface">
         <div className="flex items-center gap-2">
-          <Tooltip title="Refresh all data">
-            <Button
-              icon={<ReloadOutlined spin={overview.loading} />}
-              onClick={() => dispatch(fetchInstituteOverview(selectedInstitute.id))}
-              loading={overview.loading}
-              className="rounded-xl h-10 font-bold border-border hover:border-primary hover:text-primary shadow-sm"
-            >
-              Refresh
-            </Button>
-          </Tooltip>
+          <Text className="font-medium text-text-primary text-sm">{overview.data?.institution?.name || 'Loading...'}</Text>
+          <Text className="text-text-tertiary text-xs">({overview.data?.institution?.code})</Text>
+          {overview.data?.complianceScore != null && (
+            <Tag color={overview.data.complianceScore >= 80 ? 'success' : overview.data.complianceScore >= 50 ? 'warning' : 'error'} className="text-[10px] m-0">
+              {overview.data.complianceScore}%
+            </Tag>
+          )}
+          {overview.data?.institution?.city && (
+            <Text className="text-text-tertiary text-xs">
+              <EnvironmentOutlined className="mr-1" />
+              {overview.data?.institution?.city}
+            </Text>
+          )}
         </div>
+        <Button
+          icon={<ReloadOutlined spin={overview.loading} />}
+          onClick={() => dispatch(fetchInstituteOverview(selectedInstitute.id))}
+          loading={overview.loading}
+          size="small"
+          type="text"
+        />
       </div>
 
       {/* Tabs */}
-      <div className="flex-1 overflow-hidden flex flex-col bg-background-secondary rounded-2xl border border-border shadow-soft">
+      <div className="flex-1 overflow-hidden flex flex-col">
         <Tabs 
           activeKey={activeTab} 
           onChange={setActiveTab} 
@@ -1182,69 +905,49 @@ const InstituteDetailView = ({ defaultTab = null }) => {
             {
               key: 'overview',
               label: <span className="flex items-center gap-2"><TeamOutlined /> Overview</span>,
-              children: <div className="h-full overflow-y-auto hide-scrollbar p-6"><OverviewTab data={overview.data} loading={overview.loading} error={overview.error} /></div>,
+              children: <div className="h-full overflow-y-auto hide-scrollbar p-4"><OverviewTab data={overview.data} loading={overview.loading} error={overview.error} /></div>,
             },
             {
               key: 'students',
               label: <span className="flex items-center gap-2"><UserOutlined /> Students ({students.total})</span>,
               children: (
-                <div className="h-full flex flex-col p-6 gap-4 min-h-0">
-                  <Card className="rounded-2xl border-border shadow-soft shrink-0 bg-surface" styles={{ body: { padding: '16px' } }}>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Input.Search
+                <div className="h-full flex flex-col p-4 gap-3 min-h-0">
+                  {/* Search & Filters Row */}
+                  <div className="flex items-center justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <Input
                         placeholder="Search students..."
+                        prefix={<SearchOutlined className="text-text-tertiary" />}
                         value={studentSearchInput}
                         onChange={(e) => setStudentSearchInput(e.target.value)}
-                        className="w-72 rounded-xl h-10 bg-background border-border"
+                        className="w-56 rounded-lg"
                         allowClear
+                        size="small"
                       />
-                      <Button icon={<FilterOutlined />} onClick={() => setShowFilters(!showFilters)} type={showFilters ? 'primary' : 'default'} className="rounded-xl h-10 font-bold shadow-sm">Filters</Button>
-                      <Button icon={<ReloadOutlined />} onClick={resetFilters} className="rounded-xl h-10 shadow-sm">Reset</Button>
+                      <Select value={studentFilter} onChange={setStudentFilter} size="small" className="w-28">
+                        <Select.Option value="all">All Mentor</Select.Option>
+                        <Select.Option value="assigned">Assigned</Select.Option>
+                        <Select.Option value="unassigned">Unassigned</Select.Option>
+                      </Select>
+                      <Select value={branchFilter} onChange={setBranchFilter} size="small" className="w-32">
+                        <Select.Option value="all">All Branches</Select.Option>
+                        {availableBranches.map((b) => <Select.Option key={b} value={b}>{b}</Select.Option>)}
+                      </Select>
+                      <Select value={reportStatusFilter} onChange={setReportStatusFilter} size="small" className="w-28">
+                        <Select.Option value="all">All Reports</Select.Option>
+                        <Select.Option value="submitted">Submitted</Select.Option>
+                        <Select.Option value="pending">Pending</Select.Option>
+                        <Select.Option value="not_submitted">Missing</Select.Option>
+                      </Select>
+                      <Button icon={<ReloadOutlined />} onClick={resetFilters} size="small" type="text" />
                     </div>
-                    {showFilters && (
-                      <div className="mt-4 pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
-                        <div>
-                          <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Mentor Status</div>
-                          <Select value={studentFilter} onChange={setStudentFilter} className="w-full h-10 rounded-lg">
-                            <Select.Option value="all">All</Select.Option>
-                            <Select.Option value="assigned">Assigned</Select.Option>
-                            <Select.Option value="unassigned">Unassigned</Select.Option>
-                          </Select>
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Branch</div>
-                          <Select value={branchFilter} onChange={setBranchFilter} className="w-full h-10 rounded-lg">
-                            <Select.Option value="all">All Branches</Select.Option>
-                            {availableBranches.map((b) => <Select.Option key={b} value={b}>{b}</Select.Option>)}
-                          </Select>
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Report Status</div>
-                          <Select value={reportStatusFilter} onChange={setReportStatusFilter} className="w-full h-10 rounded-lg">
-                            <Select.Option value="all">All</Select.Option>
-                            <Select.Option value="submitted">Submitted</Select.Option>
-                            <Select.Option value="pending">Pending</Select.Option>
-                            <Select.Option value="not_submitted">Not Submitted</Select.Option>
-                          </Select>
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Self-Identified</div>
-                          <Select value={selfIdentifiedFilter} onChange={setSelfIdentifiedFilter} className="w-full h-10 rounded-lg">
-                            <Select.Option value="all">All</Select.Option>
-                            <Select.Option value="yes">Yes</Select.Option>
-                            <Select.Option value="no">No</Select.Option>
-                          </Select>
-                        </div>
-                        <div className="sm:col-span-2 md:col-span-4 flex justify-end">
-                          <Button type="primary" onClick={applyFilters} className="rounded-xl h-10 font-bold px-6 shadow-lg shadow-primary/20">Apply Filters</Button>
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                  
-                  {students.error && <Alert type="error" title={students.error} className="rounded-xl border-error/20 bg-error/5" showIcon closable />}
-                  
-                  <div className="rounded-2xl border border-border shadow-soft flex-1 min-h-0 overflow-hidden bg-surface flex flex-col">
+                    <Text className="text-xs text-text-tertiary">Showing {students.list?.length || 0} of {students.total}</Text>
+                  </div>
+
+                  {students.error && <Alert type="error" message={students.error} className="rounded-lg" showIcon closable />}
+
+                  {/* Table */}
+                  <div className="rounded-xl border border-border flex-1 min-h-0 overflow-hidden bg-surface flex flex-col">
                     <div className="flex-1 min-h-0 overflow-auto">
                       <Table
                         columns={studentColumns}
@@ -1252,17 +955,14 @@ const InstituteDetailView = ({ defaultTab = null }) => {
                         rowKey="id"
                         loading={students.loading}
                         pagination={false}
-                        scroll={{ x: 950 }}
-                        size="middle"
+                        scroll={{ x: 900 }}
+                        size="small"
                         className="custom-table"
-                        sticky
                       />
                     </div>
                     {students.hasMore && (
-                      <div className="text-center p-4 border-t border-border bg-background-tertiary/30 shrink-0">
-                        <Button onClick={handleLoadMore} loading={students.loadingMore} className="rounded-xl font-bold shadow-sm">
-                          Load More Students
-                        </Button>
+                      <div className="text-center py-2 border-t border-border shrink-0">
+                        <Button onClick={handleLoadMore} loading={students.loadingMore} size="small">Load More</Button>
                       </div>
                     )}
                   </div>
@@ -1273,115 +973,53 @@ const InstituteDetailView = ({ defaultTab = null }) => {
               key: 'companies',
               label: <span className="flex items-center gap-2"><BankOutlined /> Companies ({companies.total})</span>,
               children: (
-                <div className="h-full p-6 overflow-y-auto hide-scrollbar space-y-6">
-                  {/* Summary Cards */}
-                  <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={8}>
-                      <Card className="rounded-2xl border-border shadow-soft bg-surface h-full">
-                        <div className="flex items-center gap-4 p-1">
-                          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                            <BankOutlined className="text-primary text-2xl" />
-                          </div>
-                          <div>
-                            <div className="text-3xl font-black text-text-primary">{companies.total || 0}</div>
-                            <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Total Companies</div>
-                          </div>
-                        </div>
-                      </Card>
-                    </Col>
-                    <Col xs={24} sm={8}>
-                      <Card className="rounded-2xl border-border shadow-soft bg-surface h-full">
-                        <div className="flex items-center gap-4 p-1">
-                          <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
-                            <TeamOutlined className="text-success text-2xl" />
-                          </div>
-                          <div>
-                            <div className="text-3xl font-black text-text-primary">{companies.summary?.totalStudents || 0}</div>
-                            <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Students Placed</div>
-                          </div>
-                        </div>
-                      </Card>
-                    </Col>
-                    <Col xs={24} sm={8}>
-                      <Card className="rounded-2xl border-border shadow-soft bg-surface h-full">
-                        <div className="flex items-center gap-4 p-1">
-                          <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
-                            <SafetyCertificateOutlined className="text-purple-500 text-2xl" />
-                          </div>
-                          <div>
-                            <div className="text-3xl font-black text-text-primary">
-                              {companies.summary?.totalSelfIdentified || 0}
-                              <span className="text-sm font-normal text-text-tertiary ml-2 align-middle">
-                                ({companies.summary?.selfIdentifiedRate || 0}%)
-                              </span>
-                            </div>
-                            <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-widest">Self-Identified</div>
-                          </div>
-                        </div>
-                      </Card>
-                    </Col>
-                  </Row>
-
-                  {/* Search and Filters */}
-                  <Card className="rounded-2xl border-border shadow-soft bg-surface" styles={{ body: { padding: '16px' } }}>
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <Input.Search
-                        placeholder="Search companies by name..."
-                        value={companySearchInput}
-                        onChange={(e) => setCompanySearchInput(e.target.value)}
-                        className="max-w-md rounded-xl h-10 bg-background border-border"
-                        allowClear
-                        enterButton={<Button type="primary" className="rounded-r-xl h-10 font-bold shadow-md">Search</Button>}
-                      />
-                      <Tag className="rounded-full px-4 py-1.5 bg-purple-500/10 text-purple-600 border border-purple-500/20 font-bold text-sm">
-                        <CheckCircleOutlined className="mr-1.5" />
-                        {companies.list?.filter(c => c.isSelfIdentifiedCompany).length || 0} Self-Identified Companies
-                      </Tag>
+                <div className="h-full flex flex-col p-4 gap-3 min-h-0">
+                  {/* Search & Stats Row */}
+                  <div className="flex items-center justify-between gap-3 shrink-0">
+                    <Input
+                      placeholder="Search companies..."
+                      prefix={<SearchOutlined className="text-text-tertiary" />}
+                      value={companySearchInput}
+                      onChange={(e) => setCompanySearchInput(e.target.value)}
+                      className="w-64 rounded-lg"
+                      allowClear
+                    />
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-text-tertiary"><span className="font-semibold text-text-primary">{companies.total || 0}</span> companies</span>
+                      <span className="text-text-tertiary"><span className="font-semibold text-success">{companies.summary?.totalStudents || 0}</span> students</span>
+                      <Tag color="purple" className="text-xs m-0">{companies.summary?.totalSelfIdentified || 0} Self-ID</Tag>
                     </div>
-                  </Card>
+                  </div>
 
-                  {/* Error Alert */}
-                  {companies.error && <Alert type="error" title={companies.error} className="rounded-xl border-error/20 bg-error/5" showIcon closable />}
+                  {companies.error && <Alert type="error" message={companies.error} className="rounded-lg" showIcon closable />}
 
-                  {/* Companies Table */}
-                  <div className="rounded-2xl border border-border shadow-soft overflow-hidden bg-surface">
-                    {(companies.loading || companies.list?.length > 0) ? (
-                      <Table
-                        columns={companyColumns}
-                        dataSource={companies.list}
-                        rowKey="id"
-                        loading={companies.loading}
-                        pagination={{
-                          pageSize: 10,
-                          showSizeChanger: true,
-                          showTotal: (total, range) => <span className="text-text-tertiary">Showing {range[0]}-{range[1]} of {total} companies</span>,
-                          className: "px-6 py-4",
-                        }}
-                        size="middle"
-                        scroll={{ x: 1100 }}
-                        className="custom-table"
-                        rowClassName={(record) => record.isSelfIdentifiedCompany ? 'bg-purple-50/10 hover:bg-purple-50/20' : 'hover:bg-background-tertiary/40'}
-                      />
-                    ) : (
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description={
-                          <div className="text-center py-12">
-                            <Text type="secondary" className="block mb-1 text-lg">No companies found</Text>
-                            <Text className="text-xs text-text-tertiary">Companies with placed students will appear here</Text>
-                          </div>
-                        }
-                      />
-                    )}
+                  {/* Table */}
+                  <div className="rounded-xl border border-border flex-1 min-h-0 overflow-hidden bg-surface flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-auto">
+                      {(companies.loading || companies.list?.length > 0) ? (
+                        <Table
+                          columns={companyColumns}
+                          dataSource={companies.list}
+                          rowKey="id"
+                          loading={companies.loading}
+                          pagination={{ pageSize: 15, size: 'small', showSizeChanger: false }}
+                          size="small"
+                          scroll={{ x: 900 }}
+                          className="custom-table"
+                        />
+                      ) : (
+                        <Empty description="No companies found" className="py-12" />
+                      )}
+                    </div>
                   </div>
                 </div>
               ),
             },
             {
               key: 'faculty',
-              label: <span className="flex items-center gap-2"><IdcardOutlined /> Faculty & Principal</span>,
+              label: <span className="flex items-center gap-2"><IdcardOutlined /> Faculty</span>,
               children: (
-                <div className="h-full overflow-y-auto hide-scrollbar p-6">
+                <div className="h-full overflow-y-auto hide-scrollbar p-4">
                   <FacultyTab principal={facultyPrincipal.principal} faculty={facultyPrincipal.faculty} summary={facultyPrincipal.summary} loading={facultyPrincipal.loading} error={facultyPrincipal.error} />
                 </div>
               ),
@@ -1396,102 +1034,38 @@ const InstituteDetailView = ({ defaultTab = null }) => {
       {/* Company Detail Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-              <BankOutlined className="text-primary text-lg" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-lg text-text-primary">{selectedCompany?.companyName || 'Company Details'}</span>
-                {selectedCompany?.isSelfIdentifiedCompany && (
-                  <Tag color="purple" className="text-[10px] font-bold uppercase tracking-wider rounded-md border-0 m-0">Self-ID</Tag>
-                )}
-              </div>
-              <Text className="text-text-tertiary text-xs uppercase font-bold tracking-wider">
-                {selectedCompany?.studentCount || 0} students placed
-              </Text>
-            </div>
+          <div className="flex items-center gap-2">
+            <BankOutlined className="text-primary" />
+            <span className="font-medium">{selectedCompany?.companyName || 'Company Details'}</span>
+            {selectedCompany?.isSelfIdentifiedCompany && <Tag color="purple" className="text-[10px] m-0">Self-ID</Tag>}
+            <Text className="text-text-tertiary text-xs ml-2">({selectedCompany?.studentCount || 0} students)</Text>
           </div>
         }
         open={companyModalVisible}
         onCancel={() => setCompanyModalVisible(false)}
         footer={null}
-        width={900}
+        width={800}
         destroyOnHidden
-        className="rounded-2xl overflow-hidden"
       >
         {selectedCompany && (
-          <div className="space-y-6 pt-4">
-            {/* Company Info Card */}
-            <Card
-              size="small"
-              className={`rounded-2xl border shadow-sm ${selectedCompany.isSelfIdentifiedCompany
-                ? 'border-purple-200 bg-purple-50/30'
-                : 'border-border bg-surface'}`}
-            >
-              <Row gutter={[24, 16]}>
-                <Col xs={24} sm={8}>
-                  <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Industry Type</div>
-                  <Tag className="m-0 rounded-lg font-medium text-text-primary bg-background border-border text-sm px-3 py-1">
-                    {selectedCompany.industryType || 'General'}
-                  </Tag>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Location</div>
-                  <Text className="text-text-primary font-medium flex items-center gap-1">
-                    <EnvironmentOutlined className="text-text-tertiary" />
-                    {selectedCompany.isSelfIdentifiedCompany
-                      ? (selectedCompany.companyAddress || 'Not specified')
-                      : `${selectedCompany.city || 'N/A'}${selectedCompany.state ? `, ${selectedCompany.state}` : ''}`}
-                  </Text>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Status</div>
-                  {selectedCompany.isSelfIdentifiedCompany ? (
-                    <Tag icon={<CheckCircleOutlined />} color="success" className="m-0 rounded-lg font-bold border-0 px-3 py-1">Auto-Approved</Tag>
-                  ) : (
-                    <Space>
-                      {selectedCompany.isApproved && <Tag icon={<CheckCircleOutlined />} color="success" className="m-0 rounded-lg border-0 px-3 py-1">Approved</Tag>}
-                      {selectedCompany.isVerified && <Tag icon={<SafetyCertificateOutlined />} color="processing" className="m-0 rounded-lg border-0 px-3 py-1">Verified</Tag>}
-                      {!selectedCompany.isApproved && !selectedCompany.isVerified && <Tag color="warning" className="m-0 rounded-lg border-0 px-3 py-1">Pending</Tag>}
-                    </Space>
-                  )}
-                </Col>
-                {(selectedCompany.email || selectedCompany.companyEmail || selectedCompany.phoneNo || selectedCompany.companyContact) && (
-                  <>
-                    <Col xs={24} sm={12}>
-                      <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Email</div>
-                      <div className="flex items-center gap-2">
-                        <MailOutlined className="text-text-tertiary" />
-                        <Text className="text-text-primary font-medium">{selectedCompany.email || selectedCompany.companyEmail || 'N/A'}</Text>
-                      </div>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <div className="text-[10px] uppercase font-bold text-text-tertiary mb-1">Phone</div>
-                      <div className="flex items-center gap-2">
-                        <PhoneOutlined className="text-text-tertiary" />
-                        <Text className="text-text-primary font-medium">{selectedCompany.phoneNo || selectedCompany.companyContact || 'N/A'}</Text>
-                      </div>
-                    </Col>
-                  </>
-                )}
-              </Row>
-            </Card>
+          <div className="space-y-4 pt-2">
+            {/* Company Info */}
+            <div className="flex flex-wrap gap-4 text-sm text-text-secondary pb-3 border-b border-border">
+              <span><EnvironmentOutlined className="mr-1" />{selectedCompany.isSelfIdentifiedCompany ? (selectedCompany.companyAddress || '-') : `${selectedCompany.city || '-'}${selectedCompany.state ? `, ${selectedCompany.state}` : ''}`}</span>
+              <span><MailOutlined className="mr-1" />{selectedCompany.email || selectedCompany.companyEmail || '-'}</span>
+              <span><PhoneOutlined className="mr-1" />{selectedCompany.phoneNo || selectedCompany.companyContact || '-'}</span>
+              <span>Industry: {selectedCompany.industryType || 'General'}</span>
+            </div>
 
-            {/* Branch-wise Distribution */}
+            {/* Branch Distribution */}
             {selectedCompany.branchWiseData?.length > 0 && (
               <div>
-                <Title level={5} className="!mb-3 text-xs uppercase tracking-widest text-text-tertiary font-bold">Branch Distribution</Title>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <Text className="text-xs text-text-tertiary font-medium mb-2 block">Branch Distribution</Text>
+                <div className="flex flex-wrap gap-2">
                   {selectedCompany.branchWiseData.map((b, i) => (
-                    <div key={i} className="p-3 rounded-xl bg-background-tertiary/30 border border-border text-center">
-                      <div className="text-xl font-black text-primary">{b.total}</div>
-                      <div className="text-[10px] text-text-secondary truncate font-bold uppercase tracking-wide" title={b.branch}>{b.branch}</div>
-                      {b.selfIdentified > 0 && (
-                        <div className="text-[9px] text-purple-600 font-bold mt-1 bg-purple-100 rounded px-1 inline-block">
-                          {b.selfIdentified} Self-ID
-                        </div>
-                      )}
+                    <div key={i} className="px-3 py-1.5 rounded-lg bg-background-tertiary/50 border border-border text-center">
+                      <span className="font-semibold text-primary mr-1">{b.total}</span>
+                      <span className="text-xs text-text-secondary">{b.branch}</span>
                     </div>
                   ))}
                 </div>
@@ -1500,69 +1074,34 @@ const InstituteDetailView = ({ defaultTab = null }) => {
 
             {/* Students Table */}
             <div>
-              <Title level={5} className="!mb-3 text-xs uppercase tracking-widest text-text-tertiary font-bold">Placed Students ({selectedCompany.students?.length || 0})</Title>
-              <div className="rounded-xl border border-border overflow-hidden bg-surface">
-                <Table
-                  dataSource={selectedCompany.students || []}
-                  columns={[
-                    {
-                      title: 'Student', key: 'student', width: 220,
-                      render: (_, record) => (
-                        <div className="flex items-center gap-3">
-                          <Avatar size="small" icon={<UserOutlined />} className="bg-primary/10 text-primary border border-primary/20" />
-                          <div>
-                            <div className="font-bold text-sm text-text-primary">{record.name}</div>
-                            <div className="text-xs text-text-tertiary font-mono">{record.email}</div>
-                          </div>
-                        </div>
-                      ),
-                    },
-                    { title: 'Roll No.', dataIndex: 'rollNumber', key: 'rollNumber', width: 120, render: (t) => <span className="font-mono text-xs bg-background border border-border px-1.5 py-0.5 rounded text-text-secondary">{t}</span> },
-                    {
-                      title: 'Branch', dataIndex: 'branch', key: 'branch', width: 120,
-                      render: (text) => <Tag className="rounded-md border-0 bg-background-tertiary text-text-secondary m-0 text-[10px] font-bold uppercase">{text || 'N/A'}</Tag>,
-                    },
-                    ...(selectedCompany.isSelfIdentifiedCompany ? [
-                      {
-                        title: 'Job Profile', dataIndex: 'jobProfile', key: 'jobProfile', width: 150,
-                        render: (text) => text ? <Text className="text-sm font-medium text-text-primary">{text}</Text> : <Text type="secondary">-</Text>,
-                      },
-                      {
-                        title: 'Stipend', dataIndex: 'stipend', key: 'stipend', width: 120,
-                        render: (val) => val ? (
-                          <Text className="font-bold text-success">₹{Number(val).toLocaleString()}/mo</Text>
-                        ) : <Text type="secondary">-</Text>,
-                      },
-                    ] : [
-                      {
-                        title: 'Type', dataIndex: 'isSelfIdentified', key: 'isSelfIdentified', width: 100,
-                        render: (val) => val ? (
-                          <Tag color="purple" icon={<CheckCircleOutlined />} className="rounded-md border-0 m-0">Self-ID</Tag>
-                        ) : (
-                          <Tag color="blue" className="rounded-md border-0 m-0">College</Tag>
-                        ),
-                      },
-                    ]),
-                    {
-                      title: 'Joining Letter', dataIndex: 'joiningLetterStatus', key: 'joiningLetterStatus', width: 140,
-                      render: (status) => status ? (
-                        <Tag
-                          icon={status === 'APPROVED' ? <CheckCircleOutlined /> : status === 'PENDING' ? <ClockCircleOutlined /> : <CloseCircleOutlined />}
-                          color={getStatusColor(status)}
-                          className="rounded-md border-0 m-0 font-medium"
-                        >
-                          {status}
-                        </Tag>
-                      ) : <Text type="secondary" className="text-xs italic text-text-tertiary">Not uploaded</Text>,
-                    },
-                  ]}
-                  rowKey="id"
-                  pagination={{ pageSize: 5, showSizeChanger: false }}
-                  size="small"
-                  scroll={{ x: 800 }}
-                  className="custom-table"
-                />
-              </div>
+              <Text className="text-xs text-text-tertiary font-medium mb-2 block">Students ({selectedCompany.students?.length || 0})</Text>
+              <Table
+                dataSource={selectedCompany.students || []}
+                columns={[
+                  {
+                    title: 'Student', key: 'student', width: 200,
+                    render: (_, record) => (
+                      <div>
+                        <div className="font-medium text-sm text-text-primary">{record.name}</div>
+                        <div className="text-xs text-text-tertiary">{record.rollNumber}</div>
+                      </div>
+                    ),
+                  },
+                  { title: 'Branch', dataIndex: 'branch', key: 'branch', width: 100, render: (t) => <Text className="text-xs">{t || '-'}</Text> },
+                  ...(selectedCompany.isSelfIdentifiedCompany ? [
+                    { title: 'Job Profile', dataIndex: 'jobProfile', key: 'jobProfile', width: 140, render: (t) => <Text className="text-xs">{t || '-'}</Text> },
+                    { title: 'Stipend', dataIndex: 'stipend', key: 'stipend', width: 100, render: (v) => v ? <Text className="text-xs text-success font-medium">₹{Number(v).toLocaleString()}</Text> : '-' },
+                  ] : []),
+                  {
+                    title: 'Joining Letter', dataIndex: 'joiningLetterStatus', key: 'joiningLetterStatus', width: 120,
+                    render: (status) => status ? <Tag color={getStatusColor(status)} className="text-[10px] m-0">{status}</Tag> : <Text className="text-xs text-text-tertiary">-</Text>,
+                  },
+                ]}
+                rowKey="id"
+                pagination={{ pageSize: 5, size: 'small', showSizeChanger: false }}
+                size="small"
+                scroll={{ x: 600 }}
+              />
             </div>
           </div>
         )}

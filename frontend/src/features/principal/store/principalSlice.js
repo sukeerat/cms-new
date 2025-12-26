@@ -146,10 +146,8 @@ export const fetchStudents = createAsyncThunk(
         search: params?.search ?? '',
         batchId: params?.batchId ?? '',
         branchId: params?.branchId ?? '',
-        department: params?.department ?? '',
-        year: params?.year ?? '',
-        status: params?.status ?? '',
-        isActive: typeof params?.isActive === 'boolean' ? String(params.isActive) : '',
+        // isActive can be boolean or string; normalize to string for cache key
+        isActive: params?.isActive != null ? String(params.isActive) : '',
         hasMentor: params?.hasMentor ?? '',
       };
       const requestKey = JSON.stringify(normalizedParams);

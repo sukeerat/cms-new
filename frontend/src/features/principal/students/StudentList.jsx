@@ -1,9 +1,19 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Button, Space, Tag, Avatar, Input, Select, Card, Modal, message } from 'antd';
+import { Button, Tag, Avatar, Input, Select, Card, Modal, message, Dropdown } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchStudents, deleteStudent, fetchDepartments, optimisticallyDeleteStudent, rollbackStudentOperation } from '../store/principalSlice';
+import { fetchStudents, deleteStudent, updateStudent, fetchDepartments, fetchBatches, optimisticallyDeleteStudent, rollbackStudentOperation } from '../store/principalSlice';
 import DataTable from '../../../components/tables/DataTable';
-import { EyeOutlined, EditOutlined, UserOutlined, SearchOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import {
+  EyeOutlined,
+  EditOutlined,
+  UserOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  MoreOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons';
 import { getStatusColor } from '../../../utils/format';
 import { generateTxnId, snapshotManager, optimisticToast } from '../../../store/optimisticMiddleware';
 import StudentModal from './StudentModal';
@@ -11,21 +21,36 @@ import StudentModal from './StudentModal';
 const { Search } = Input;
 const { Option } = Select;
 
+// Fallback departments list
+const DEFAULT_DEPARTMENTS = [
+  { id: 'cse', name: 'CSE - Computer Science Engineering' },
+  { id: 'it', name: 'IT - Information Technology' },
+  { id: 'ece', name: 'ECE - Electronics & Communication' },
+  { id: 'ee', name: 'EE - Electrical Engineering' },
+  { id: 'me', name: 'ME - Mechanical Engineering' },
+  { id: 'ce', name: 'CE - Civil Engineering' },
+  { id: 'lt', name: 'LT - Leather Technology' },
+];
+
 const StudentList = () => {
   const dispatch = useDispatch();
   const { list, loading, pagination } = useSelector((state) => state.principal.students);
-  const departments = useSelector((state) => state.principal.departments.list);
+  const departmentsFromStore = useSelector((state) => state.principal.departments.list);
+  const batches = useSelector((state) => state.principal.batches?.list || []);
   const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({
     search: '',
-    department: '',
-    year: '',
-    status: '',
+    branchId: '',
+    batchId: '',
+    isActive: '',
     page: 1,
     limit: 10,
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState(null);
+
+  // Use store departments if available, otherwise use fallback
+  const departments = departmentsFromStore?.length > 0 ? departmentsFromStore : DEFAULT_DEPARTMENTS;
 
   const handleOpenModal = (studentId = null) => {
     setEditingStudentId(studentId);
@@ -53,6 +78,7 @@ const StudentList = () => {
   useEffect(() => {
     dispatch(fetchStudents(filters));
     dispatch(fetchDepartments());
+    dispatch(fetchBatches());
   }, [dispatch, filters]);
 
   const handleView = (record) => {
@@ -63,10 +89,34 @@ const StudentList = () => {
     handleOpenModal(record.id);
   };
 
+  const handleToggleStatus = async (record) => {
+    const newStatus = !record.isActive;
+    const actionText = newStatus ? 'activate' : 'deactivate';
+
+    Modal.confirm({
+      title: `${newStatus ? 'Activate' : 'Deactivate'} Student`,
+      content: `Are you sure you want to ${actionText} ${record.name}?`,
+      okText: newStatus ? 'Activate' : 'Deactivate',
+      okType: newStatus ? 'primary' : 'danger',
+      onOk: async () => {
+        try {
+          await dispatch(updateStudent({
+            id: record.id,
+            data: { isActive: newStatus }
+          })).unwrap();
+          message.success(`Student ${newStatus ? 'activated' : 'deactivated'} successfully`);
+          dispatch(fetchStudents({ ...filters, forceRefresh: true }));
+        } catch (error) {
+          message.error(error || `Failed to ${actionText} student`);
+        }
+      },
+    });
+  };
+
   const handleDelete = (record) => {
     Modal.confirm({
       title: 'Delete Student',
-      content: `Are you sure you want to delete ${record.name}? This will deactivate their account.`,
+      content: `Are you sure you want to delete ${record.name}? This action cannot be undone.`,
       okText: 'Delete',
       okType: 'danger',
       onOk: async () => {
@@ -109,6 +159,38 @@ const StudentList = () => {
     });
   };
 
+  const getActionMenuItems = (record) => [
+    {
+      key: 'view',
+      label: 'View Details',
+      icon: <EyeOutlined />,
+      onClick: () => handleView(record),
+    },
+    {
+      key: 'edit',
+      label: 'Edit',
+      icon: <EditOutlined />,
+      onClick: () => handleEdit(record),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'toggle',
+      label: record.isActive ? 'Deactivate' : 'Activate',
+      icon: record.isActive ? <StopOutlined /> : <CheckCircleOutlined />,
+      onClick: () => handleToggleStatus(record),
+      danger: record.isActive,
+    },
+    {
+      key: 'delete',
+      label: 'Delete',
+      icon: <DeleteOutlined />,
+      onClick: () => handleDelete(record),
+      danger: true,
+    },
+  ];
+
   // Memoized columns definition
   const columns = useMemo(() => [
     {
@@ -118,66 +200,69 @@ const StudentList = () => {
       render: (name, record) => (
         <div className="flex items-center gap-2">
           <Avatar icon={<UserOutlined />} src={record.avatar} />
-          <span>{name}</span>
+          <div>
+            <div className="font-medium">{name}</div>
+            <div className="text-xs text-text-tertiary">{record.rollNumber}</div>
+          </div>
         </div>
       ),
     },
     {
-      title: 'Roll Number',
-      dataIndex: 'rollNumber',
-      key: 'rollNumber',
-    },
-    {
       title: 'Department',
-      dataIndex: 'department',
-      key: 'department',
+      dataIndex: 'branchName',
+      key: 'branchName',
+      render: (branchName, record) => branchName || record.branch?.name || '-',
     },
     {
-      title: 'Year',
-      dataIndex: 'year',
-      key: 'year',
-      sorter: (a, b) => a.year - b.year,
+      title: 'Batch',
+      dataIndex: 'batchName',
+      key: 'batchName',
+      render: (batchName, record) => batchName || record.batch?.name || '-',
     },
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
+      ellipsis: true,
     },
     {
       title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={getStatusColor(status)}>
-          {status?.toUpperCase()}
+      dataIndex: 'isActive',
+      key: 'isActive',
+      width: 100,
+      render: (isActive) => (
+        <Tag color={isActive ? 'success' : 'default'}>
+          {isActive ? 'Active' : 'Inactive'}
         </Tag>
       ),
     },
     {
-      title: 'Actions',
+      title: '',
       key: 'actions',
+      width: 50,
       render: (_, record) => (
-        <Space>
-          <Button type="link" icon={<EyeOutlined />} onClick={() => handleView(record)}>
-            View
-          </Button>
-          <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            Edit
-          </Button>
-          <Button type="link" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record)}>
-            Delete
-          </Button>
-        </Space>
+        <Dropdown
+          menu={{ items: getActionMenuItems(record) }}
+          trigger={['click']}
+          placement="bottomRight"
+        >
+          <Button
+            type="text"
+            icon={<MoreOutlined style={{ fontSize: '18px' }} />}
+            className="flex items-center justify-center"
+          />
+        </Dropdown>
       ),
     },
-  ], []);
+  ], [filters, list]);
 
   const handleSearch = useCallback((value) => {
     setSearchInput(value);
   }, []);
 
   const handleFilterChange = useCallback((key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+    // Convert undefined to empty string (Select allowClear passes undefined)
+    setFilters(prev => ({ ...prev, [key]: value ?? '', page: 1 }));
   }, []);
 
   const handlePageChange = useCallback((page, pageSize) => {
@@ -213,32 +298,30 @@ const StudentList = () => {
             placeholder="Department"
             allowClear
             className="w-full md:w-[200px]"
-            onChange={(value) => handleFilterChange('department', value)}
+            onChange={(value) => handleFilterChange('branchId', value)}
           >
             {departments?.map(dept => (
               <Option key={dept.id} value={dept.id}>{dept.name}</Option>
             ))}
           </Select>
           <Select
-            placeholder="Year"
+            placeholder="Batch/Year"
             allowClear
             className="w-full md:w-[150px]"
-            onChange={(value) => handleFilterChange('year', value)}
+            onChange={(value) => handleFilterChange('batchId', value)}
           >
-            <Option value="1">1st Year</Option>
-            <Option value="2">2nd Year</Option>
-            <Option value="3">3rd Year</Option>
-            <Option value="4">4th Year</Option>
+            {batches?.map(batch => (
+              <Option key={batch.id} value={batch.id}>{batch.name}</Option>
+            ))}
           </Select>
           <Select
             placeholder="Status"
             allowClear
             className="w-full md:w-[150px]"
-            onChange={(value) => handleFilterChange('status', value)}
+            onChange={(value) => handleFilterChange('isActive', value)}
           >
-            <Option value="active">Active</Option>
-            <Option value="inactive">Inactive</Option>
-            <Option value="graduated">Graduated</Option>
+            <Option value="true">Active</Option>
+            <Option value="false">Inactive</Option>
           </Select>
         </div>
       </Card>

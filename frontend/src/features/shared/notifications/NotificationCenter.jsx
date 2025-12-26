@@ -56,7 +56,7 @@ const NotificationCenter = () => {
                 <Avatar icon={<BellOutlined />} />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-text-primary">{item.title}</div>
-                  <p className="text-text-secondary mt-1">{item.message}</p>
+                  <p className="text-text-secondary mt-1">{item.body || item.message}</p>
                   <span className="text-xs text-gray-500">
                     {formatRelativeTime(item.createdAt)}
                   </span>

@@ -458,27 +458,34 @@ export class PrincipalService {
       const mentor = student.mentorAssignments[0]?.mentor;
       const reports = application?.monthlyReports || [];
 
-      // Calculate expected reports based on internship duration
-      let totalExpectedReports = 6; // Default
+      // Calculate expected reports based on internship dates (months elapsed so far)
+      let totalExpectedReports = 1; // Default to at least 1
       if (application) {
-        // For self-identified internships, use internshipDuration field
-        const duration = (application as any).isSelfIdentified
-          ? ((application as any).internshipDuration || '')
-          : (application.internship?.duration || '');
-        const monthsMatch = duration.match(/(\d+)\s*month/i);
-        if (monthsMatch) {
-          totalExpectedReports = parseInt(monthsMatch[1], 10);
-        }
-
-        // Also calculate based on start/end dates if available
         const startDate = (application as any).startDate || application.joiningDate;
         const endDate = (application as any).endDate || application.completionDate;
-        if (startDate && endDate) {
+        const now = new Date();
+
+        if (startDate) {
           const start = new Date(startDate);
-          const end = new Date(endDate);
-          const monthsDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30));
-          if (monthsDiff > 0) {
-            totalExpectedReports = monthsDiff;
+          // Only calculate if internship has started
+          if (start <= now) {
+            // Calculate months from start to now (or endDate if earlier/completed)
+            const effectiveEnd = endDate && new Date(endDate) < now ? new Date(endDate) : now;
+            const yearsDiff = effectiveEnd.getFullYear() - start.getFullYear();
+            const monthsDiff = effectiveEnd.getMonth() - start.getMonth();
+            totalExpectedReports = Math.max(1, yearsDiff * 12 + monthsDiff + 1);
+          }
+        } else {
+          // Fallback: if no startDate, try duration string (legacy behavior)
+          const duration = (application as any).isSelfIdentified
+            ? ((application as any).internshipDuration || '')
+            : (application.internship?.duration || '');
+          const monthsMatch = duration.match(/(\d+)\s*month/i);
+          if (monthsMatch) {
+            totalExpectedReports = parseInt(monthsMatch[1], 10);
+          } else {
+            // Ultimate fallback for legacy data without dates or duration
+            totalExpectedReports = 6;
           }
         }
       }
@@ -806,7 +813,7 @@ export class PrincipalService {
     search?: string;
     batchId?: string;
     branchId?: string;
-    isActive?: boolean;
+    isActive?: boolean | string; // Query params come as strings
     hasMentor?: string; // 'true', 'false', or undefined for all
     hasInternship?: string; // 'true' to filter only students with self-identified internships
   }) {
@@ -844,8 +851,9 @@ export class PrincipalService {
       where.branchId = branchId;
     }
 
-    if (isActive !== undefined) {
-      where.isActive = isActive;
+    // Convert isActive string to boolean (query params come as strings)
+    if (isActive !== undefined && isActive !== '') {
+      where.isActive = isActive === 'true' || isActive === true;
     }
 
     // Filter by mentor assignment status
@@ -1753,6 +1761,8 @@ export class PrincipalService {
           select: {
             id: true,
             joiningDate: true,
+            startDate: true,
+            endDate: true,
             internship: {
               select: {
                 duration: true,
@@ -1839,9 +1849,19 @@ export class PrincipalService {
           if (targetYear === joiningYear && month < joiningMonth) continue;
         }
 
-        // Calculate expected duration
-        let expectedMonths = 6;
-        if (application.internship?.duration) {
+        // Calculate expected duration from dates or duration string
+        let expectedMonths = 6; // Fallback for legacy data
+        const appStartDate = application.startDate || application.joiningDate;
+        const appEndDate = application.endDate;
+
+        if (appStartDate && appEndDate) {
+          // Calculate duration from actual dates
+          const start = new Date(appStartDate);
+          const end = new Date(appEndDate);
+          const yearsDiff = end.getFullYear() - start.getFullYear();
+          const monthsDiff = end.getMonth() - start.getMonth();
+          expectedMonths = Math.max(1, yearsDiff * 12 + monthsDiff + 1);
+        } else if (application.internship?.duration) {
           const match = application.internship.duration.match(/(\d+)\s*month/i);
           if (match) expectedMonths = parseInt(match[1], 10);
         }
@@ -2655,9 +2675,10 @@ export class PrincipalService {
         },
       }),
       // Get all active assignments to compute mentor with assignments
+      // Only count assignments for active students to match totalStudents count
       this.prisma.mentorAssignment.findMany({
         where: {
-          student: { institutionId },
+          student: { institutionId, isActive: true },
           isActive: true,
         },
         select: {
@@ -2696,7 +2717,8 @@ export class PrincipalService {
 
     // Compute students with/without mentors
     const studentsWithMentors = new Set(allAssignments.map(a => a.studentId)).size;
-    const studentsWithoutMentors = totalStudents - studentsWithMentors;
+    // Ensure non-negative (safeguard against edge cases)
+    const studentsWithoutMentors = Math.max(0, totalStudents - studentsWithMentors);
 
     // Get mentor distribution for load balancing display
     // Count unique students per mentor (avoid counting duplicate assignment records)
@@ -3439,6 +3461,13 @@ export class PrincipalService {
 
   /**
    * Get compliance metrics for principal dashboard with 6-month trend
+   *
+   * NEW FORMULA (aligned with state dashboard):
+   * Compliance Score = (MentorRate + JoiningLetterRate) / 2
+   * - MentorRate = studentsWithActiveMentors / activeStudents * 100
+   * - JoiningLetterRate = joiningLettersUploaded / activeStudents * 100
+   *
+   * Visit and Report compliance are shown as separate informational metrics (not in overall score)
    */
   async getComplianceMetrics(principalId: string) {
     const principal = await this.prisma.user.findUnique({
@@ -3454,7 +3483,49 @@ export class PrincipalService {
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
 
-    // Calculate 6-month trend data
+    // Get current active students count for compliance calculation
+    const activeStudents = await this.prisma.student.count({
+      where: {
+        institutionId,
+        isActive: true,
+      },
+    });
+
+    // Get current compliance metrics (MentorRate + JoiningLetterRate)
+    const [studentsWithActiveMentors, joiningLettersUploaded] = await Promise.all([
+      // Count students with active mentor assignments
+      this.prisma.mentorAssignment.count({
+        where: {
+          student: { institutionId, isActive: true },
+          isActive: true,
+        },
+      }),
+      // Count joining letters uploaded (non-empty joiningLetterUrl)
+      this.prisma.internshipApplication.count({
+        where: {
+          student: { institutionId, isActive: true },
+          isSelfIdentified: true,
+          joiningLetterUrl: { not: null, notIn: [''] },
+        },
+      }),
+    ]);
+
+    // Calculate compliance rates using activeStudents as denominator
+    const mentorRate = activeStudents > 0
+      ? Math.min((studentsWithActiveMentors / activeStudents) * 100, 100)
+      : null;
+
+    const joiningLetterRate = activeStudents > 0
+      ? Math.min((joiningLettersUploaded / activeStudents) * 100, 100)
+      : null;
+
+    // Overall compliance score = (MentorRate + JoiningLetterRate) / 2
+    // Returns null if activeStudents = 0
+    const overallComplianceScore = activeStudents > 0
+      ? Math.round(((mentorRate || 0) + (joiningLetterRate || 0)) / 2)
+      : null;
+
+    // Calculate 6-month trend data for compliance metrics
     const trendData: any[] = [];
     for (let i = 5; i >= 0; i--) {
       const date = new Date(currentYear, currentMonth - 1 - i, 1);
@@ -3463,7 +3534,39 @@ export class PrincipalService {
       const startOfMonth = new Date(year, month - 1, 1);
       const endOfMonth = new Date(year, month, 0);
 
-      const [studentsWithInternships, facultyVisits, reportsSubmitted] = await Promise.all([
+      // Get historical active students count (approximate using current snapshot)
+      // For more accurate historical data, a snapshot table would be needed
+      const [
+        historicalActiveStudents,
+        historicalMentorAssignments,
+        historicalJoiningLetters,
+        studentsWithInternships,
+        facultyVisits,
+        reportsSubmitted,
+      ] = await Promise.all([
+        // Active students (current snapshot)
+        this.prisma.student.count({
+          where: {
+            institutionId,
+            isActive: true,
+          },
+        }),
+        // Mentor assignments (current snapshot)
+        this.prisma.mentorAssignment.count({
+          where: {
+            student: { institutionId, isActive: true },
+            isActive: true,
+          },
+        }),
+        // Joining letters uploaded
+        this.prisma.internshipApplication.count({
+          where: {
+            student: { institutionId, isActive: true },
+            isSelfIdentified: true,
+            joiningLetterUrl: { not: null, notIn: [''] },
+          },
+        }),
+        // Students with ongoing internships (for informational visit/report metrics)
         this.prisma.internshipApplication.count({
           where: {
             student: { institutionId },
@@ -3472,6 +3575,7 @@ export class PrincipalService {
             startDate: { lte: endOfMonth },
           },
         }),
+        // Faculty visits for informational metrics
         this.prisma.facultyVisitLog.count({
           where: {
             application: {
@@ -3483,6 +3587,7 @@ export class PrincipalService {
             visitDate: { gte: startOfMonth, lte: endOfMonth },
           },
         }),
+        // Reports submitted for informational metrics
         this.prisma.monthlyReport.count({
           where: {
             student: { institutionId },
@@ -3493,21 +3598,41 @@ export class PrincipalService {
         }),
       ]);
 
+      // Calculate compliance rates for trend (MentorRate + JoiningLetterRate)
+      const trendMentorRate = historicalActiveStudents > 0
+        ? Math.min((historicalMentorAssignments / historicalActiveStudents) * 100, 100)
+        : null;
+
+      const trendJoiningLetterRate = historicalActiveStudents > 0
+        ? Math.min((historicalJoiningLetters / historicalActiveStudents) * 100, 100)
+        : null;
+
+      // Overall compliance score for trend
+      const trendOverallScore = historicalActiveStudents > 0
+        ? Math.round(((trendMentorRate || 0) + (trendJoiningLetterRate || 0)) / 2)
+        : null;
+
+      // Informational metrics (not part of compliance score)
       const visitCompliance = studentsWithInternships > 0
         ? Math.round(Math.min((facultyVisits / studentsWithInternships) * 100, 100))
-        : 0;
+        : null;
 
       const reportCompliance = studentsWithInternships > 0
-        ? Math.round((reportsSubmitted / studentsWithInternships) * 100)
-        : 0;
-
-      const overallScore = Math.round((visitCompliance + reportCompliance) / 2);
+        ? Math.round(Math.min((reportsSubmitted / studentsWithInternships) * 100, 100))
+        : null;
 
       trendData.push({
         month,
         year,
         monthName: MONTH_NAMES[month - 1],
-        overallScore,
+        // New compliance metrics
+        overallScore: trendOverallScore,
+        mentorRate: trendMentorRate !== null ? Math.round(trendMentorRate) : null,
+        joiningLetterRate: trendJoiningLetterRate !== null ? Math.round(trendJoiningLetterRate) : null,
+        activeStudents: historicalActiveStudents,
+        studentsWithActiveMentors: historicalMentorAssignments,
+        joiningLettersUploaded: historicalJoiningLetters,
+        // Informational metrics (not in compliance score)
         visitCompliance,
         reportCompliance,
         facultyVisits,
@@ -3523,7 +3648,14 @@ export class PrincipalService {
       currentMonth: {
         month: currentMonth,
         year: currentYear,
-        overallScore: currentMonthData.overallScore,
+        // Primary compliance metrics
+        overallScore: overallComplianceScore,
+        mentorRate: mentorRate !== null ? Math.round(mentorRate) : null,
+        joiningLetterRate: joiningLetterRate !== null ? Math.round(joiningLetterRate) : null,
+        activeStudents,
+        studentsWithActiveMentors,
+        joiningLettersUploaded,
+        // Informational metrics (separate from compliance score)
         visitComplianceRate: currentMonthData.visitCompliance,
         reportComplianceRate: currentMonthData.reportCompliance,
         facultyVisits: currentMonthData.facultyVisits,
@@ -3532,9 +3664,20 @@ export class PrincipalService {
       },
       trend: trendData,
       summary: {
-        averageCompliance: Math.round(trendData.reduce((sum, m) => sum + m.overallScore, 0) / trendData.length),
-        bestMonth: trendData.reduce((best, m) => m.overallScore > best.overallScore ? m : best, trendData[0]),
-        worstMonth: trendData.reduce((worst, m) => m.overallScore < worst.overallScore ? m : worst, trendData[0]),
+        averageCompliance: trendData.filter(m => m.overallScore !== null).length > 0
+          ? Math.round(
+              trendData.filter(m => m.overallScore !== null).reduce((sum, m) => sum + m.overallScore, 0) /
+              trendData.filter(m => m.overallScore !== null).length
+            )
+          : null,
+        bestMonth: trendData.filter(m => m.overallScore !== null).reduce(
+          (best, m) => (m.overallScore || 0) > (best?.overallScore || 0) ? m : best,
+          trendData.find(m => m.overallScore !== null) || null
+        ),
+        worstMonth: trendData.filter(m => m.overallScore !== null).reduce(
+          (worst, m) => (m.overallScore || 0) < (worst?.overallScore || Infinity) ? m : worst,
+          trendData.find(m => m.overallScore !== null) || null
+        ),
       },
     };
   }

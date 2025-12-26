@@ -14,6 +14,7 @@ import {
   selectInstitutionsLoading,
   setSelectedInstitute,
   selectSelectedInstitute,
+  selectInstitutionsTotalStudents,
 } from '../../store/stateSlice';
 
 const { Text } = Typography;
@@ -23,6 +24,7 @@ const InstituteSidePanel = ({ onSelectInstitute }) => {
   const institutions = useSelector(selectInstitutions);
   const loading = useSelector(selectInstitutionsLoading);
   const selectedInstitute = useSelector(selectSelectedInstitute);
+  const apiTotalStudents = useSelector(selectInstitutionsTotalStudents);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -60,10 +62,10 @@ const InstituteSidePanel = ({ onSelectInstitute }) => {
     [dispatch, onSelectInstitute]
   );
 
-  // Calculate quick stats
+  // Use API total (matches dashboard) or fall back to summing institution counts
   const totalStudents = useMemo(
-    () => institutions.reduce((sum, inst) => sum + (inst._count?.Student || 0), 0),
-    [institutions]
+    () => apiTotalStudents ?? institutions.reduce((sum, inst) => sum + (inst._count?.Student || 0), 0),
+    [apiTotalStudents, institutions]
   );
 
   // Skeleton loading items

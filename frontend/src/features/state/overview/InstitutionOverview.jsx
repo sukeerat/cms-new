@@ -39,10 +39,8 @@ const InstitutionOverview = () => {
   const urlInstitutionId = searchParams.get('id');
   const urlTab = searchParams.get('tab');
 
-  // Fetch institutions on mount
-  useEffect(() => {
-    dispatch(fetchInstitutions({ limit: 100 }));
-  }, [dispatch]);
+  // Note: fetchInstitutions is handled by InstituteSidePanel with proper caching
+  // to avoid duplicate API calls
 
   // Auto-select institution from URL param
   useEffect(() => {
@@ -70,61 +68,31 @@ const InstitutionOverview = () => {
 
   return (
     <div className="institution-overview flex flex-col h-[calc(100vh-120px)] bg-background rounded-2xl overflow-hidden shadow-lg border border-border">
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
-        <div className="flex items-center gap-4">
-          {/* Page Icon & Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <BankOutlined className="text-primary text-lg" />
-            </div>
-            <div>
-              <Title level={4} className="!mb-0 !text-lg font-bold text-text-primary">
-                Institutions
-              </Title>
-              <Text className="text-xs text-text-tertiary">
-                {loading ? 'Loading...' : `${institutions.length} registered institutions`}
-              </Text>
-            </div>
-          </div>
-
-          {/* Breadcrumb when selected */}
+      {/* Top Header Bar - Compact */}
+      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-border">
+        <div className="flex items-center gap-3">
+          <BankOutlined className="text-primary text-base" />
+          <Text className="font-semibold text-text-primary text-sm">Institutions</Text>
+          <Text className="text-xs text-text-tertiary">
+            ({loading ? '...' : institutions.length})
+          </Text>
           {hasSelection && selectedName && (
-            <div className="flex items-center gap-2 pl-4 border-l border-border ml-2">
-              <Text className="text-text-tertiary">/</Text>
-              <Badge status="processing" />
-              <Text className="text-text-primary font-medium truncate max-w-[200px]">
-                {selectedName}
-              </Text>
-            </div>
+            <>
+              <Text className="text-text-tertiary text-xs">/</Text>
+              <Text className="text-text-primary text-sm font-medium truncate max-w-[200px]">{selectedName}</Text>
+            </>
           )}
         </div>
-
         <div className="flex items-center gap-2">
-          {/* Back button when selected */}
           {hasSelection && (
-            <Tooltip title="Back to list view">
-              <Button
-                type="text"
-                icon={<ArrowLeftOutlined />}
-                onClick={handleClearSelection}
-                className="text-text-secondary hover:text-primary hover:bg-primary/5 rounded-lg"
-              >
-                Back
-              </Button>
-            </Tooltip>
+            <Button type="text" size="small" icon={<ArrowLeftOutlined />} onClick={handleClearSelection}>Back</Button>
           )}
-
-          {/* Toggle sidebar */}
-          <Tooltip title={sidePanelOpen ? 'Hide sidebar (Ctrl+B)' : 'Show sidebar (Ctrl+B)'}>
-            <Button
-              type={sidePanelOpen ? 'default' : 'primary'}
-              ghost={sidePanelOpen}
-              icon={sidePanelOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
-              onClick={() => setSidePanelOpen(!sidePanelOpen)}
-              className="rounded-lg"
-            />
-          </Tooltip>
+          <Button
+            type="text"
+            size="small"
+            icon={sidePanelOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+            onClick={() => setSidePanelOpen(!sidePanelOpen)}
+          />
         </div>
       </div>
 

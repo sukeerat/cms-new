@@ -3,6 +3,7 @@ import { ApplicationStatus, AuditAction, AuditCategory, AuditSeverity } from '@p
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { AuditService } from '../../../infrastructure/audit/audit.service';
+import { SystemConfigService } from '../../../api/system-admin/services/system-config.service';
 
 export interface SubmitSelfIdentifiedDto {
   companyName: string;
@@ -28,6 +29,7 @@ export class SelfIdentifiedService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly auditService: AuditService,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   async submitSelfIdentified(studentId: string, data: SubmitSelfIdentifiedDto) {
@@ -40,6 +42,24 @@ export class SelfIdentifiedService {
 
       if (!student) {
         throw new NotFoundException('Student not found');
+      }
+
+      // Validate internship start date against minimum allowed date
+      const minimumStartDateStr = await this.systemConfigService.get<string>('internship.minimumStartDate');
+      if (minimumStartDateStr) {
+        const minimumStartDate = new Date(minimumStartDateStr);
+        const internshipStartDate = new Date(data.startDate);
+
+        if (internshipStartDate < minimumStartDate) {
+          const formattedMinDate = minimumStartDate.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          });
+          throw new BadRequestException(
+            `Internship start date cannot be before ${formattedMinDate}. Please select a valid start date.`
+          );
+        }
       }
 
       // Auto-approve self-identified internships

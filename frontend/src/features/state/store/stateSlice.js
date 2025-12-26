@@ -1115,7 +1115,7 @@ const stateSlice = createSlice({
           state.institutions.list = action.payload.data || action.payload;
           // Support multiple response shapes:
           // - { data, pagination: { ... } }
-          // - { data, total, page, limit, totalPages, nextCursor }
+          // - { data, total, page, limit, totalPages, nextCursor, totalStudents }
           // - legacy arrays
           state.institutions.pagination =
             action.payload.pagination ||
@@ -1128,6 +1128,8 @@ const stateSlice = createSlice({
                   nextCursor: action.payload.nextCursor,
                 }
               : null);
+          // Store total students count from API (matches dashboard total)
+          state.institutions.totalStudents = action.payload.totalStudents ?? null;
           state.lastFetched.institutions = Date.now();
           state.lastFetched.institutionsKey = action.payload._cacheKey ?? null;
         }
@@ -1824,6 +1826,7 @@ export const selectSelectedInstitution = (state) => state.state?.institutions?.s
 export const selectInstitutionsPagination = (state) => state.state?.institutions?.pagination ?? null;
 export const selectInstitutionsLoading = (state) => state.state?.institutions?.loading ?? false;
 export const selectInstitutionsError = (state) => state.state?.institutions?.error ?? null;
+export const selectInstitutionsTotalStudents = (state) => state.state?.institutions?.totalStudents ?? null;
 
 // Institutions with Stats selectors (for dashboard)
 export const selectInstitutionsWithStats = (state) => state.state?.institutionsWithStats?.list ?? [];

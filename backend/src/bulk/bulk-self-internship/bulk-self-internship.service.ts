@@ -407,9 +407,11 @@ export class BulkSelfInternshipService {
         facultyMentorContact: internship.facultyMentorContact || null,
         facultyMentorDesignation: internship.facultyMentorDesignation || null,
 
-        // Joining letter
+        // Joining letter - auto-approve joining when letter is provided
         joiningLetterUrl: internship.joiningLetterUrl || null,
         joiningLetterUploadedAt: internship.joiningLetterUrl ? now : null,
+        hasJoined: !!internship.joiningLetterUrl, // Auto-set hasJoined when joining letter is provided
+        reviewedBy: internship.joiningLetterUrl ? 'SYSTEM' : null, // Track auto-approval
 
         applicationDate: now,
         appliedDate: now,

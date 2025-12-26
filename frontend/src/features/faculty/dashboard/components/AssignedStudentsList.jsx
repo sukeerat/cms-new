@@ -10,7 +10,6 @@ import {
   MinusCircleOutlined,
   EnvironmentOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -30,6 +29,15 @@ const AssignedStudentsList = ({
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [visitForm] = Form.useForm();
 
+  // Helper to extract company name from student record
+  const getCompanyName = (student) => {
+    return student.companyName ||
+           student.company?.companyName ||
+           student.internship?.industry?.companyName ||
+           student.student?.internshipApplications?.[0]?.companyName ||
+           'Not Assigned';
+  };
+
   // Filter students based on search
   const filteredStudents = useMemo(() => {
     if (!searchText) return students;
@@ -38,7 +46,7 @@ const AssignedStudentsList = ({
     return students.filter(student => {
       const name = (student.name || student.student?.name || '').toLowerCase();
       const rollNumber = (student.rollNumber || student.student?.rollNumber || '').toLowerCase();
-      const company = (student.companyName || student.company?.companyName || '').toLowerCase();
+      const company = getCompanyName(student).toLowerCase();
 
       return name.includes(search) || rollNumber.includes(search) || company.includes(search);
     });
@@ -81,9 +89,22 @@ const AssignedStudentsList = ({
     }
   };
 
+  // Helper to get internship application from student record
+  const getInternshipApp = (student) => {
+    return student.student?.internshipApplications?.[0] ||
+           student.internshipApplications?.[0] ||
+           student.activeInternship ||
+           null;
+  };
+
   // Get visit status icon
   const getVisitStatusIcon = (student) => {
-    const visits = student.visits || student.visitLogs || [];
+    const internshipApp = getInternshipApp(student);
+    const visits = student.visits ||
+                  student.visitLogs ||
+                  internshipApp?.facultyVisitLogs ||
+                  student.student?.facultyVisitLogs ||
+                  [];
     const visitCount = visits.length;
 
     if (visitCount === 0) {
@@ -108,6 +129,7 @@ const AssignedStudentsList = ({
 
       // FIXED: Check if visit is after internship start date
       const internshipStartDate = visit.application?.internship?.startDate ||
+                                   internshipApp?.startDate ||
                                    student.activeInternship?.startDate ||
                                    student.application?.internship?.startDate;
 
@@ -134,7 +156,12 @@ const AssignedStudentsList = ({
 
   // Get report status icon
   const getReportStatusIcon = (student) => {
-    const reports = student.monthlyReports || student.reports || [];
+    const internshipApp = getInternshipApp(student);
+    const reports = student.monthlyReports ||
+                   student.reports ||
+                   internshipApp?.monthlyReports ||
+                   student.student?.monthlyReports ||
+                   [];
     const latestReport = reports[0];
 
     if (!latestReport) {
@@ -171,11 +198,23 @@ const AssignedStudentsList = ({
   // Get joining letter status icon
   const getJoiningLetterStatusIcon = (student) => {
     const letter = student.joiningLetter || student.joiningLetters?.[0];
+    // Check if there's a joining letter URL in the internship application
+    const internshipApp = getInternshipApp(student);
+    const hasJoiningLetterUrl = internshipApp?.joiningLetterUrl;
 
-    if (!letter) {
+    if (!letter && !hasJoiningLetterUrl) {
       return (
         <Tooltip title="No joining letter submitted">
           <MinusCircleOutlined style={{ color: '#d9d9d9', fontSize: 16 }} />
+        </Tooltip>
+      );
+    }
+
+    // If we have a joining letter URL but no letter object, show as pending
+    if (!letter && hasJoiningLetterUrl) {
+      return (
+        <Tooltip title="Joining letter uploaded">
+          <ClockCircleOutlined style={{ color: '#faad14', fontSize: 16 }} />
         </Tooltip>
       );
     }
@@ -229,19 +268,14 @@ const AssignedStudentsList = ({
       title: 'Company',
       key: 'company',
       sorter: (a, b) => {
-        const companyA = (a.companyName || a.company?.companyName || a.internship?.industry?.companyName || '').toLowerCase();
-        const companyB = (b.companyName || b.company?.companyName || b.internship?.industry?.companyName || '').toLowerCase();
+        const companyA = getCompanyName(a).toLowerCase();
+        const companyB = getCompanyName(b).toLowerCase();
         return companyA.localeCompare(companyB);
       },
       render: (_, student) => {
-        const company = student.companyName ||
-                       student.company?.companyName ||
-                       student.internship?.industry?.companyName ||
-                       'Not Assigned';
-
         return (
           <Text style={{ fontSize: 13 }}>
-            {company}
+            {getCompanyName(student)}
           </Text>
         );
       },
@@ -285,10 +319,10 @@ const AssignedStudentsList = ({
             icon={<EyeOutlined />}
             onClick={(e) => {
               e.stopPropagation();
+              // Use actual student ID for finding the record
+              const studentId = student.id || student.studentId || student.student?.id;
               if (onViewStudent) {
-                onViewStudent(student.id);
-              } else {
-                navigate(`/students/${student.id}`);
+                onViewStudent(studentId);
               }
             }}
           >
@@ -343,10 +377,9 @@ const AssignedStudentsList = ({
           onRow={(record) => ({
             style: { cursor: 'pointer' },
             onClick: () => {
+              const studentId = record.id || record.studentId || record.student?.id;
               if (onViewStudent) {
-                onViewStudent(record.id);
-              } else {
-                navigate(`/students/${record.id}`);
+                onViewStudent(studentId);
               }
             },
           })}

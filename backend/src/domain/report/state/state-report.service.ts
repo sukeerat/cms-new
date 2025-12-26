@@ -120,17 +120,11 @@ export class StateReportService {
                 activeInternships,
                 completedInternships,
                 approvedReports: monthlyReports,
-                performanceScore: this.calculatePerformanceScore({
-                  students: totalStudents,
-                  activeInternships,
-                  completedInternships,
-                  approvedReports: monthlyReports,
-                }),
               };
             }),
           );
 
-          return performance.sort((a, b) => b.performanceScore - a.performanceScore);
+          return performance.sort((a, b) => b.activeInternships - a.activeInternships);
         },
         this.CACHE_TTL,
       );
@@ -348,7 +342,9 @@ export class StateReportService {
             rejected: number;
           }>();
 
+          // Filter out orphaned records where student was deleted
           for (const app of applications) {
+            if (!app.student) continue; // Skip orphaned records
             const instId = app.student.institutionId;
             const inst = app.student.Institution;
 
@@ -397,11 +393,10 @@ export class StateReportService {
           );
 
           // Get recent activity (last 10 verifications/rejections)
-          const recentActivity = await this.prisma.internshipApplication.findMany({
+          const recentActivityRaw = await this.prisma.internshipApplication.findMany({
             where: {
               isSelfIdentified: true,
-              joiningLetterUrl: { not: null },
-              reviewedAt: { not: null },
+              joiningLetterUrl: { not: '' },
             },
             select: {
               id: true,
@@ -421,8 +416,13 @@ export class StateReportService {
               companyName: true,
             },
             orderBy: { reviewedAt: 'desc' },
-            take: 10,
+            take: 20, // Fetch more to account for filtering
           });
+
+          // Filter out orphaned records and those without reviewedAt
+          const recentActivity = recentActivityRaw
+            .filter(a => a.student && a.reviewedAt)
+            .slice(0, 10);
 
           const { total, noLetter, pendingReview, verified, rejected } = summaryTotals;
           const uploaded = pendingReview + verified + rejected;
@@ -442,9 +442,9 @@ export class StateReportService {
             recentActivity: recentActivity.map(a => ({
               id: a.id,
               action: a.hasJoined ? 'VERIFIED' : 'REJECTED',
-              studentName: a.student.name,
-              rollNumber: a.student.rollNumber,
-              institutionName: a.student.Institution?.name,
+              studentName: a.student!.name,
+              rollNumber: a.student!.rollNumber,
+              institutionName: a.student!.Institution?.name,
               companyName: a.companyName,
               reviewedAt: a.reviewedAt,
               reviewedBy: a.reviewedBy,
@@ -458,22 +458,5 @@ export class StateReportService {
       this.logger.error(`Failed to get joining letter stats: ${error.message}`, error.stack);
       throw error;
     }
-  }
-
-  private calculatePerformanceScore(data: {
-    students: number;
-    activeInternships: number;
-    completedInternships: number;
-    approvedReports: number;
-  }): number {
-    const { students, activeInternships, completedInternships, approvedReports } = data;
-
-    if (students === 0) return 0;
-
-    const internshipRate = ((activeInternships + completedInternships) / students) * 40;
-    const completionRate = completedInternships > 0 ? (completedInternships / (activeInternships + completedInternships)) * 30 : 0;
-    const reportRate = activeInternships > 0 ? (approvedReports / activeInternships) * 30 : 0;
-
-    return Math.min(100, internshipRate + completionRate + reportRate);
   }
 }

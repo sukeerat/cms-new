@@ -36,13 +36,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // Get error details
     const errorDetails = this.getErrorDetails(exception);
 
+    // Get user from request (may be populated by JWT guard if auth succeeded)
+    const user = (request as any).user;
+    const userId = user?.userId || user?.id || 'anonymous';
+
     // Prepare error context for logging
     const errorContext = {
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
       ip: this.getClientIp(request),
-      user: (request as any).user?.id || 'anonymous',
+      user: userId,
       statusCode: status,
       message,
       stack: exception.stack,

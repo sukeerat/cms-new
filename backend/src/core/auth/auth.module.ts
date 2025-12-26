@@ -27,7 +27,7 @@ import { AuditModule } from '../../infrastructure/audit/audit.module';
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
           // Cast to satisfy JwtSignOptions typing (StringValue | number)
-          expiresIn: configService.get<string>('JWT_EXPIRATION', '15m') as any,
+          expiresIn: configService.get<string>('JWT_EXPIRATION', '30m') as any,
         },
       }),
     }),

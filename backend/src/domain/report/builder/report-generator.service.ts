@@ -1,11 +1,59 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { InternshipStatus, MonthlyReportStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { ReportType } from './interfaces/report.interface';
 
+/**
+ * Reports that require institution isolation
+ * These reports MUST have institutionId to prevent cross-tenant data leakage
+ */
+const INSTITUTION_REQUIRED_REPORTS = [
+  'student',
+  'internship',
+  'faculty',
+  'mentor',
+  'monthly',
+  'placement',
+  'compliance',
+  'pending',
+];
+
+/**
+ * Reports that can be run without institution filter (admin-only)
+ */
+const ADMIN_ONLY_REPORTS = ['institution_performance', 'system'];
+
 @Injectable()
 export class ReportGeneratorService {
+  private readonly logger = new Logger(ReportGeneratorService.name);
+
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Validate institution isolation for reports
+   * Throws ForbiddenException if institutionId is required but not provided
+   */
+  private validateInstitutionIsolation(
+    reportType: string,
+    filters: any,
+    isAdmin: boolean = false,
+  ): void {
+    const typeStr = reportType.toLowerCase();
+
+    // Check if this report type requires institution isolation
+    const requiresInstitution = INSTITUTION_REQUIRED_REPORTS.some(
+      (r) => typeStr.includes(r),
+    );
+
+    if (requiresInstitution && !filters?.institutionId && !isAdmin) {
+      this.logger.warn(
+        `Report generation blocked: ${reportType} requires institutionId`,
+      );
+      throw new ForbiddenException(
+        'Institution ID is required for this report type',
+      );
+    }
+  }
 
   /**
    * Generate Student Progress Report
@@ -382,10 +430,24 @@ export class ReportGeneratorService {
 
   /**
    * Generate report based on type
+   * @param type - Report type
+   * @param filters - Filter parameters including institutionId
+   * @param isAdmin - Whether the requesting user is an admin (can bypass institution isolation)
    */
-  async generateReport(type: ReportType | string, filters: any): Promise<any[]> {
+  async generateReport(
+    type: ReportType | string,
+    filters: any,
+    isAdmin: boolean = false,
+  ): Promise<any[]> {
     // Map new report types to generators
     const typeStr = String(type).toLowerCase();
+
+    // SECURITY: Validate institution isolation before generating any report
+    this.validateInstitutionIsolation(typeStr, filters, isAdmin);
+
+    this.logger.log(
+      `Generating report: ${type}, institutionId: ${filters?.institutionId || 'N/A'}`,
+    );
 
     // Student reports
     if (typeStr.includes('student') || typeStr === ReportType.STUDENT_PROGRESS) {
@@ -412,7 +474,7 @@ export class ReportGeneratorService {
       return this.generatePlacementReport(filters);
     }
 
-    // Institution reports
+    // Institution reports - requires institutionId by design
     if (typeStr.includes('institut') || typeStr === ReportType.INSTITUTION_PERFORMANCE) {
       return this.generateInstitutionPerformanceReport(filters);
     }
@@ -425,8 +487,8 @@ export class ReportGeneratorService {
       return this.generateMonthlyReport(filters);
     }
 
-    // Default to student report
-    console.warn(`[ReportGenerator] Unknown report type: ${type}, defaulting to student report`);
-    return this.generateStudentProgressReport(filters);
+    // Unknown report type - reject instead of defaulting
+    this.logger.error(`Unknown report type requested: ${type}`);
+    throw new ForbiddenException(`Unknown report type: ${type}`);
   }
 }

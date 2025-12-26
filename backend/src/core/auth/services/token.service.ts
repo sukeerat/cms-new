@@ -13,7 +13,7 @@ export class TokenService {
    * Generate access token
    */
   generateAccessToken(payload: any, expiresIn?: string): string {
-    const exp = (expiresIn || this.configService.get<string>('JWT_EXPIRATION', '15m')) as any;
+    const exp = (expiresIn || this.configService.get<string>('JWT_EXPIRATION', '30m')) as any;
     return this.jwtService.sign(payload as any, {
       secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: exp,

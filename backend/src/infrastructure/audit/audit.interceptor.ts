@@ -54,14 +54,19 @@ export class AuditInterceptor implements NestInterceptor {
 
     const request = context.switchToHttp().getRequest();
     const { action, entityType } = metadata;
-    const userId = request.user?.id || 'anonymous';
-    const ipAddress = request.ip;
     const userAgent = request.headers['user-agent'];
+
+    // Get client IP (handle proxies)
+    const ipAddress = this.getClientIp(request);
 
     return next.handle().pipe(
       tap({
         next: async (data) => {
           try {
+            // Get user AFTER guards have run (request.user is now populated)
+            const user = request.user;
+            const userId = user?.userId || user?.id || 'anonymous';
+
             // Extract entity ID from response or request
             let entityId = 'unknown';
 
@@ -86,7 +91,7 @@ export class AuditInterceptor implements NestInterceptor {
               },
               ipAddress,
               userAgent,
-              institutionId: request.user?.institutionId,
+              institutionId: user?.institutionId,
             });
           } catch (error) {
             this.logger.error('Failed to create audit log in interceptor', error.stack);
@@ -94,6 +99,10 @@ export class AuditInterceptor implements NestInterceptor {
         },
         error: async (error) => {
           try {
+            // Get user AFTER guards have run
+            const user = request.user;
+            const userId = user?.userId || user?.id || 'anonymous';
+
             await this.auditService.log({
               action: `${action}_FAILED`,
               entityType,
@@ -107,7 +116,7 @@ export class AuditInterceptor implements NestInterceptor {
               },
               ipAddress,
               userAgent,
-              institutionId: request.user?.institutionId,
+              institutionId: user?.institutionId,
             });
           } catch (auditError) {
             this.logger.error('Failed to create error audit log', auditError.stack);
@@ -115,6 +124,26 @@ export class AuditInterceptor implements NestInterceptor {
         },
       }),
     );
+  }
+
+  /**
+   * Get client IP address (handle proxies and load balancers)
+   */
+  private getClientIp(request: any): string {
+    // Check X-Forwarded-For header (added by proxies)
+    const forwarded = request.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string') {
+      return forwarded.split(',')[0].trim();
+    }
+
+    // Check X-Real-IP header
+    const realIp = request.headers['x-real-ip'];
+    if (realIp) {
+      return realIp as string;
+    }
+
+    // Fall back to direct connection IP
+    return request.ip || request.socket?.remoteAddress || 'unknown';
   }
 
   /**

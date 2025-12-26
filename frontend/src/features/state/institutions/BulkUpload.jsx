@@ -287,7 +287,7 @@ const BulkUpload = () => {
 
             {file && (
               <Alert
-                message="File Selected"
+                title="File Selected"
                 description={`${file.name} (${(file.size / 1024).toFixed(2)} KB)`}
                 type="success"
                 showIcon
@@ -347,7 +347,7 @@ const BulkUpload = () => {
 
             {validationResult.errors && validationResult.errors.length > 0 && (
               <Alert
-                message="Validation Errors Found"
+                title="Validation Errors Found"
                 description={`${validationResult.errors.length} error(s) found. Please fix these issues in your file and re-upload, or download the error report.`}
                 type="error"
                 showIcon

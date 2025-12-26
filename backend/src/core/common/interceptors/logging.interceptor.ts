@@ -24,9 +24,8 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    const { method, url, ip, headers } = request;
+    const { method, url, headers } = request;
     const userAgent = headers['user-agent'] || 'unknown';
-    const user = (request as any).user;
 
     // Get client IP (handle proxies)
     const clientIp = this.getClientIp(request);
@@ -34,9 +33,9 @@ export class LoggingInterceptor implements NestInterceptor {
     // Start timer
     const startTime = Date.now();
 
-    // Log request
+    // Log incoming request (user not yet available - JWT guard hasn't run)
     this.logger.log(
-      `Incoming Request: ${method} ${url} - IP: ${clientIp} - User: ${user?.id || 'anonymous'}`,
+      `Incoming Request: ${method} ${url} - IP: ${clientIp}`,
     );
 
     return next.handle().pipe(
@@ -45,9 +44,13 @@ export class LoggingInterceptor implements NestInterceptor {
         const duration = Date.now() - startTime;
         const statusCode = response.statusCode;
 
+        // Get user AFTER guards have run (request.user is now populated)
+        const user = (request as any).user;
+        const userId = user?.userId || user?.id || 'anonymous';
+
         // Log successful response
         this.logger.log(
-          `${method} ${url} ${statusCode} ${duration}ms - IP: ${clientIp} - User: ${user?.id || 'anonymous'} - Agent: ${this.truncate(userAgent, 50)}`,
+          `${method} ${url} ${statusCode} ${duration}ms - IP: ${clientIp} - User: ${userId} - Agent: ${this.truncate(userAgent, 50)}`,
         );
 
         // Log slow requests (> 1 second)
@@ -62,9 +65,13 @@ export class LoggingInterceptor implements NestInterceptor {
         const duration = Date.now() - startTime;
         const statusCode = error.status || 500;
 
+        // Get user AFTER guards have run
+        const user = (request as any).user;
+        const userId = user?.userId || user?.id || 'anonymous';
+
         // Log error
         this.logger.error(
-          `${method} ${url} ${statusCode} ${duration}ms - IP: ${clientIp} - User: ${user?.id || 'anonymous'} - Error: ${error.message}`,
+          `${method} ${url} ${statusCode} ${duration}ms - IP: ${clientIp} - User: ${userId} - Error: ${error.message}`,
           error.stack,
         );
 

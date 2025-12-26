@@ -12,6 +12,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { ReportBuilderService } from './report-builder.service';
 import { GenerateReportDto } from './dto/generate-report.dto';
@@ -175,8 +176,10 @@ export class ReportBuilderController {
 
   /**
    * Queue report generation (async)
+   * Rate limited: 10 reports per minute per user to prevent queue flooding
    */
   @Post('generate')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
   async generateReport(@Req() req: any, @Body() dto: GenerateReportDto) {
     const userId = req.user.userId;
     const institutionId = req.user.institutionId;
@@ -216,8 +219,10 @@ export class ReportBuilderController {
 
   /**
    * Generate report synchronously
+   * Rate limited: 5 sync reports per minute (more restrictive as sync is resource-intensive)
    */
   @Post('generate-sync')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
   async generateReportSync(@Req() req: any, @Body() dto: GenerateReportDto) {
     const userId = req.user.userId;
     const institutionId = req.user.institutionId;

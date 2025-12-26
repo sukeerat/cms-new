@@ -34,6 +34,12 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
+  // Trust proxy - required to get real client IP behind reverse proxy (nginx, cloudflare, etc.)
+  // This allows Express to read X-Forwarded-For and X-Real-IP headers correctly
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', true);
+  logger.log('Trust proxy enabled for correct client IP detection');
+
   // Enable CORS with specific allowed origins
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' ? allowedOrigins : true,

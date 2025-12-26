@@ -133,7 +133,12 @@ export class UnifiedWebSocketGateway implements OnGatewayInit, OnGatewayConnecti
         rooms: Array.from(client.rooms),
       });
     } catch (error) {
-      this.logger.error(`Connection error: ${error.message}`, error.stack);
+      // Log token expiration as warn (expected behavior) vs other errors
+      if (error.message?.includes('expired')) {
+        this.logger.warn(`Connection rejected: Token expired - ${client.id}`);
+      } else {
+        this.logger.error(`Connection error: ${error.message}`, error.stack);
+      }
       client.emit(WebSocketEvent.ERROR, { message: 'Authentication failed' });
       client.disconnect();
     }

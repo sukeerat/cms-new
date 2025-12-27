@@ -9,7 +9,7 @@ import compression from 'compression';
 import { AllExceptionsFilter } from './core/common/filters/all-exceptions.filter';
 
 // Prefer BACKEND_PORT so generic PORT (often set by other tools) doesn't hijack backend.
-const port = process.env.BACKEND_PORT || process.env.PORT || 5000;
+const port = process.env.BACKEND_PORT || process.env.PORT || 8000;
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');

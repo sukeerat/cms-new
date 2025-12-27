@@ -33,18 +33,30 @@ import { AuditModule } from '../../infrastructure/audit/audit.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [
-    PrismaService,
-    LruCacheService,
-    AuthService,
-    TokenService,
-    TokenBlacklistService,
-    JwtStrategy,
-    GoogleStrategy,
-    JwtAuthGuard,
-    OptionalJwtAuthGuard,
-    RolesGuard,
-  ],
+  providers: (() => {
+    // Use a generic provider array type to allow conditionally pushing classes
+    const baseProviders: Array<any> = [
+      PrismaService,
+      LruCacheService,
+      AuthService,
+      TokenService,
+      TokenBlacklistService,
+      JwtStrategy,
+      JwtAuthGuard,
+      OptionalJwtAuthGuard,
+      RolesGuard,
+    ];
+
+    // Register GoogleStrategy only if OAuth credentials are configured
+    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+      baseProviders.push(GoogleStrategy);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn('Google OAuth not configured: skipping GoogleStrategy registration');
+    }
+
+    return baseProviders;
+  })(),
   exports: [
     AuthService,
     TokenService,

@@ -26,7 +26,7 @@ const LayoutHeader = ({
 }) => {
   return (
     <Header
-      className="sticky top-0 z-40 flex items-center justify-between h-16 px-4 md:px-6 border-b border-gray-100 dark:border-slate-800 !bg-white/80 dark:!bg-slate-950/80 backdrop-blur-md shadow-sm transition-all duration-300"
+      className="sticky top-0 z-40 flex items-center justify-between h-16 px-4 md:px-6 bg-surface border-b border-border shadow-sm transition-all duration-300"
       style={{
         lineHeight: 'normal',
         paddingInline: '24px',

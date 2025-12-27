@@ -374,7 +374,7 @@ const StudentDashboard = () => {
 
   return (
     <Spin spinning={isLoading} tip="Loading dashboard...">
-      <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <div className="p-4 md:p-8 bg-background-secondary min-h-screen">
         {/* Subtle Revalidation Indicator */}
         {isRevalidating && !isLoading && (
           <div

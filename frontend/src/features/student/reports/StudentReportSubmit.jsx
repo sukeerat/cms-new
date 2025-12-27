@@ -50,7 +50,7 @@ const StudentReportSubmit = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+    <div className="p-4 md:p-8 bg-background-secondary min-h-screen">
       <Card 
         title={<span className="text-text-primary font-semibold">Submit Monthly Report</span>} 
         className="rounded-xl border-border shadow-sm max-w-4xl mx-auto"

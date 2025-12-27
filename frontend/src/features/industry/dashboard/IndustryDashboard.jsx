@@ -164,7 +164,7 @@ const IndustryDashboard = () => {
 
   return (
     <Layouts>
-      <div className="p-4 md:p-8 bg-gray-50 dark:bg-slate-950 min-h-screen">
+      <div className="p-4 md:p-8 bg-background-secondary min-h-screen">
         <div className="max-w-[1600px] mx-auto space-y-8 pb-20">
           {/* Stale data indicator */}
           {isStale && (

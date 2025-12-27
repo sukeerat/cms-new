@@ -158,14 +158,15 @@ body {
 
 /* Force Ant Design Layout to use our theme colors */
 .ant-layout {
-  background-color: rgb(var(--color-background-secondary)) !important;
+  background-color: rgb(var(--color-background)) !important;
 }
 
 .ant-layout-header {
-  background: transparent !important;
-  height: auto !important;
-  padding: 0 !important;
+  background-color: rgb(var(--color-card-bg)) !important;
+  height: 64px !important;
+  padding: 0 24px !important;
   line-height: normal !important;
+  border-bottom: 1px solid rgb(var(--color-border)) !important;
 }
 
 /* ============================================

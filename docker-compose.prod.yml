@@ -104,8 +104,8 @@ services:
   mongodb:
     image: mongo:8.0
     container_name: cms-mongodb
-    expose:
-      - "27017"
+    ports:
+      - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -131,8 +131,8 @@ services:
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.24.0
     container_name: cms-dragonfly
-    expose:
-      - "6379"
+    ports:
+      - "6379:6379"
     volumes:
       - dragonfly-data:/data
     networks:
@@ -140,10 +140,11 @@ services:
     restart: unless-stopped
     ulimits:
       memlock: -1
+    # Reduced maxmemory so the container can start on smaller VPS instances.
     command: >
       --logtostderr
       --cache_mode=true
-      --maxmemory=256mb
+      --maxmemory=128mb
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
       interval: 15s
@@ -157,9 +158,9 @@ services:
   minio:
     image: minio/minio:latest
     container_name: cms-minio
-    expose:
-      - "9000" # API port
-      - "9001" # Console port
+    ports:
+      - "9000:9000" # API port
+      - "9001:9001" # Console port
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}

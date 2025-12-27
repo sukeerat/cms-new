@@ -7,12 +7,16 @@ import helmet from 'helmet';
 import { json, urlencoded } from 'express';
 import compression from 'compression';
 import { AllExceptionsFilter } from './core/common/filters/all-exceptions.filter';
+import { validateProductionEnvironment } from './config/env.validation';
 
 // Prefer BACKEND_PORT so generic PORT (often set by other tools) doesn't hijack backend.
 const port = process.env.BACKEND_PORT || process.env.PORT || 8000;
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Validate environment configuration (throws in production if invalid)
+  validateProductionEnvironment();
 
   // Define allowed origins
   const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -103,7 +107,8 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
-        enableImplicitConversion: true,
+        // Disabled for security - use explicit @Type() decorators in DTOs instead
+        enableImplicitConversion: false,
       },
     }),
   );

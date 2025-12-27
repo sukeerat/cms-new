@@ -27,7 +27,7 @@ module.exports = {
       // Environment variables
       env: {
         NODE_ENV: 'production',
-        PORT: process.env.PORT || 5000,
+        PORT: process.env.PORT || 8000,
       },
 
       // Logging configuration
@@ -64,7 +64,6 @@ module.exports = {
       node_args: [
         '--max-old-space-size=500',
         '--optimize-for-size',
-        '--gc-interval=100',
       ],
     },
   ],

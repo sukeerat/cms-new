@@ -1426,37 +1426,6 @@ export class StateInstitutionService {
       industryWhere.companyName = { contains: search, mode: 'insensitive' };
     }
 
-    // Debug: First check total self-identified apps in database (for debugging)
-    const debugTotalSelfId = await this.prisma.internshipApplication.count({
-      where: {
-        OR: [
-          { isSelfIdentified: true },
-          { internshipStatus: 'SELF_IDENTIFIED' },
-        ],
-      },
-    });
-    console.log('[getInstitutionCompanies] DEBUG: Total self-identified apps in DB:', debugTotalSelfId);
-
-    // Debug: Check self-identified apps for this specific institution
-    const debugInstitutionApps = await this.prisma.internshipApplication.findMany({
-      where: {
-        OR: [
-          { isSelfIdentified: true },
-          { internshipStatus: 'SELF_IDENTIFIED' },
-        ],
-        student: { institutionId: id },
-      },
-      select: {
-        id: true,
-        isSelfIdentified: true,
-        internshipStatus: true,
-        companyName: true,
-        student: { select: { institutionId: true, name: true } },
-      },
-      take: 5,
-    });
-    console.log('[getInstitutionCompanies] DEBUG: Institution self-id apps:', JSON.stringify(debugInstitutionApps, null, 2));
-
     // Query 2: Get self-identified applications (check both isSelfIdentified and internshipStatus)
     const selfIdWhere: Prisma.InternshipApplicationWhereInput = {
       OR: [
@@ -1468,10 +1437,6 @@ export class StateInstitutionService {
     if (search) {
       selfIdWhere.companyName = { contains: search, mode: 'insensitive' };
     }
-
-    // Debug: Log the query params
-    console.log('[getInstitutionCompanies] Institution ID:', id);
-    console.log('[getInstitutionCompanies] Search:', search);
 
     // Execute both queries in parallel
     const [industries, selfIdentifiedApps] = await Promise.all([
@@ -1535,13 +1500,6 @@ export class StateInstitutionService {
         },
       }),
     ]);
-
-    // Debug: Log query results
-    console.log('[getInstitutionCompanies] Industries found:', industries.length);
-    console.log('[getInstitutionCompanies] Self-identified apps found:', selfIdentifiedApps.length);
-    if (selfIdentifiedApps.length > 0) {
-      console.log('[getInstitutionCompanies] Sample self-id app:', JSON.stringify(selfIdentifiedApps[0], null, 2));
-    }
 
     // Transform Industry data
     const companiesWithData = industries.map((industry) => {

@@ -3,7 +3,7 @@ import { PrismaClient, SupportCategory, Role } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Helper function to determine targetRoles based on FAQ title and category
-function determineTargetRoles(title: string, category: SupportCategory): string[] {
+export function determineTargetRoles(title: string, category: SupportCategory): string[] {
   const lowerTitle = title.toLowerCase();
 
   // STUDENT-specific FAQs - things only students need to know
@@ -167,7 +167,7 @@ function determineTargetRoles(title: string, category: SupportCategory): string[
 }
 
 // Comprehensive FAQ Data - ALL from FAQS.md + Additional System-Specific FAQs
-const faqData = [
+export const faqData = [
   // ==========================================
   // GENERAL QUESTIONS (6 FAQs)
   // ==========================================
@@ -3935,9 +3935,17 @@ async function main() {
 
   console.log(`📝 Using author: ${author.name} (${author.email})\n`);
 
-  // Delete existing FAQs
-  const deletedCount = await prisma.fAQArticle.deleteMany({});
-  console.log(`🗑️  Deleted ${deletedCount.count} existing FAQ articles.\n`);
+  // Delete existing FAQs (skip if MongoDB doesn't support transactions)
+  try {
+    const deletedCount = await prisma.fAQArticle.deleteMany({});
+    console.log(`🗑️  Deleted ${deletedCount.count} existing FAQ articles.\n`);
+  } catch (deleteError: any) {
+    if (deleteError.code === 'P2031') {
+      console.log(`⚠️  Skipping delete (MongoDB standalone mode). Will upsert FAQs instead.\n`);
+    } else {
+      throw deleteError;
+    }
+  }
 
   // Create FAQs
   let createdCount = 0;
@@ -3960,22 +3968,43 @@ async function main() {
       // Determine which roles should see this FAQ
       const targetRoles = determineTargetRoles(faq.title, faq.category);
 
-      await prisma.fAQArticle.create({
-        data: {
-          title: faq.title,
-          content: faq.content,
-          summary: faq.summary,
-          category: faq.category,
-          tags: faq.tags,
-          targetRoles: targetRoles, // Role-based visibility
-          slug: slug,
-          isPublished: true,
-          author: { connect: { id: author.id } },
-          authorName: author.name || 'System',
-          viewCount: Math.floor(Math.random() * 150) + 10,
-          helpfulCount: Math.floor(Math.random() * 30) + 1,
-        },
+      // Manual find + create/update pattern to avoid MongoDB transaction requirement
+      const existing = await prisma.fAQArticle.findFirst({
+        where: { slug: slug },
       });
+
+      if (existing) {
+        await prisma.fAQArticle.update({
+          where: { id: existing.id },
+          data: {
+            title: faq.title,
+            content: faq.content,
+            summary: faq.summary,
+            category: faq.category,
+            tags: faq.tags,
+            targetRoles: targetRoles,
+            isPublished: true,
+            authorName: author.name || 'System',
+          },
+        });
+      } else {
+        await prisma.fAQArticle.create({
+          data: {
+            title: faq.title,
+            content: faq.content,
+            summary: faq.summary,
+            category: faq.category,
+            tags: faq.tags,
+            targetRoles: targetRoles,
+            slug: slug,
+            isPublished: true,
+            authorId: author.id,
+            authorName: author.name || 'System',
+            viewCount: Math.floor(Math.random() * 150) + 10,
+            helpfulCount: Math.floor(Math.random() * 30) + 1,
+          },
+        });
+      }
       createdCount++;
       const roleInfo = targetRoles.length > 0 ? ` [${targetRoles.join(', ')}]` : ' [ALL]';
       console.log(`✅ Created: ${faq.title.substring(0, 50)}...${roleInfo}`);
@@ -4057,11 +4086,14 @@ async function main() {
   console.log('-'.repeat(50));
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Only run main if this file is executed directly (not imported)
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

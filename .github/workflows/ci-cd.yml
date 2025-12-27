@@ -147,6 +147,8 @@ jobs:
           platforms: linux/amd64
           build-args: |
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'https://api.sukeerat.com' }}
+            VITE_APP_NAME=${{ vars.VITE_APP_NAME || 'PlaceIntern Portal' }}
+            VITE_APP_ENV=production
 
   # 5. Deploy to Production
   deploy-production:

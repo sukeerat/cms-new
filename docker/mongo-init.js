@@ -18,16 +18,20 @@ const dbName = process.env.MONGO_INITDB_DATABASE || 'cms';
 db = db.getSiblingDB(dbName);
 
 // Create application user with read/write permissions
+// Password is read from environment variable for security
+const appUser = process.env.MONGO_APP_USER || 'cmsuser';
+const appPassword = process.env.MONGO_APP_PASSWORD || process.env.MONGO_INITDB_ROOT_PASSWORD || 'changeme';
+
 try {
   db.createUser({
-    user: 'cmsuser',
-    pwd: 'cmspassword123',
+    user: appUser,
+    pwd: appPassword,
     roles: [
       { role: 'readWrite', db: dbName },
       { role: 'dbAdmin', db: dbName },
     ],
   });
-  print('User "cmsuser" created successfully');
+  print('User "' + appUser + '" created successfully');
 } catch (error) {
   if (error.codeName === 'DuplicateKey') {
     print('User "cmsuser" already exists, skipping creation');
@@ -76,5 +80,5 @@ try {
 print('=================================');
 print('MongoDB initialization completed!');
 print('Database: ' + dbName);
-print('User: cmsuser (readWrite, dbAdmin)');
+print('User: ' + appUser + ' (readWrite, dbAdmin)');
 print('=================================');

@@ -12,8 +12,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5000/api}
-        VITE_APP_NAME: ${VITE_APP_NAME:-CMS Portal}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+        VITE_APP_NAME: ${VITE_APP_NAME:-PlaceIntern Portal}
         VITE_APP_ENV: ${VITE_APP_ENV:-production}
     image: cms-frontend:latest
     container_name: cms-frontend
@@ -48,12 +48,12 @@ services:
     image: cms-backend:latest
     container_name: cms-backend
     ports:
-      - "${BACKEND_PORT:-5000}:5000"
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
       # Core Settings
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=5000
-      - BACKEND_PORT=5000
+      - PORT=8000
+      - BACKEND_PORT=8000
       # Database
       - DATABASE_URL=${DATABASE_URL:-mongodb://admin:admin123@mongodb:27017/cms?authSource=admin}
       # Redis/Cache (DragonflyDB)
@@ -121,7 +121,7 @@ services:
         reservations:
           memory: 512M
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 5

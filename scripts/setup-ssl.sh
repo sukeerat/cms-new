@@ -1,25 +1,44 @@
 #!/bin/bash
 
 # ===========================================
-# SSL Certificate Setup Script
+# SSL Certificate Setup Script (Host Nginx)
 # ===========================================
-# Usage: ./scripts/setup-ssl.sh your-domain.com your-email@example.com
+# Usage: sudo ./scripts/setup-ssl.sh your-domain.com your-email@example.com
+#
+# Prerequisites:
+#   - Nginx installed on host
+#   - Domain DNS pointing to this server
+#   - Port 80 accessible from internet
+#
+# This script uses certbot with the nginx plugin for
+# automatic SSL certificate management.
 
 set -e
 
+# Non-interactive mode for apt
+export DEBIAN_FRONTEND=noninteractive
+export APT_OPTS="-y -qq -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+
 DOMAIN="${1:-}"
 EMAIL="${2:-}"
-INSTALL_DIR="${3:-/opt/cms}"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 log_success() { echo -e "${GREEN}✓ $1${NC}"; }
 log_info() { echo -e "${YELLOW}→ $1${NC}"; }
 log_error() { echo -e "${RED}✗ $1${NC}"; }
+log_step() { echo -e "${CYAN}▶ $1${NC}"; }
+
+# Check root
+if [ "$EUID" -ne 0 ]; then
+    log_error "Please run as root (sudo)"
+    exit 1
+fi
 
 # Validate inputs
 if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
@@ -28,28 +47,41 @@ if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
     exit 1
 fi
 
-cd "$INSTALL_DIR"
-
 echo ""
-echo "Setting up SSL for: $DOMAIN"
-echo "Email: $EMAIL"
+echo -e "${CYAN}══════════════════════════════════════════${NC}"
+echo -e "${CYAN}  SSL Certificate Setup${NC}"
+echo -e "${CYAN}══════════════════════════════════════════${NC}"
+echo ""
+echo "  Domain: $DOMAIN"
+echo "  Email:  $EMAIL"
 echo ""
 
-# Step 1: Make sure containers are running
-log_info "Ensuring containers are running..."
-docker compose -f docker-compose.prod.yml up -d nginx certbot
+# Step 1: Install certbot if not present
+if ! command -v certbot &> /dev/null; then
+    log_step "Installing Certbot..."
+    apt-get update $APT_OPTS
+    apt-get install $APT_OPTS certbot python3-certbot-nginx
+    log_success "Certbot installed"
+else
+    log_info "Certbot already installed"
+fi
 
-sleep 5
+# Step 2: Check if nginx is running
+if ! systemctl is-active --quiet nginx; then
+    log_error "Nginx is not running. Please start nginx first:"
+    echo "  sudo systemctl start nginx"
+    exit 1
+fi
 
-# Step 2: Request certificate
-log_info "Requesting SSL certificate..."
+# Step 3: Request certificate (non-interactive)
+log_step "Requesting SSL certificate..."
 
-docker compose -f docker-compose.prod.yml run --rm certbot certonly \
-    --webroot \
-    --webroot-path=/var/www/certbot \
+certbot --nginx \
+    --non-interactive \
     --email "$EMAIL" \
     --agree-tos \
     --no-eff-email \
+    --redirect \
     -d "$DOMAIN" \
     -d "www.$DOMAIN"
 
@@ -57,96 +89,34 @@ if [ $? -ne 0 ]; then
     log_error "Failed to obtain SSL certificate"
     echo ""
     echo "Troubleshooting tips:"
-    echo "1. Make sure DNS points to this server"
-    echo "2. Make sure port 80 is accessible"
-    echo "3. Try again in a few minutes"
+    echo "  1. Make sure DNS A records point to this server for both:"
+    echo "     - $DOMAIN"
+    echo "     - www.$DOMAIN"
+    echo "  2. Make sure port 80 is accessible (check firewall: ufw status)"
+    echo "  3. Check nginx is serving the domain: curl -I http://$DOMAIN"
+    echo "  4. Try again in a few minutes (rate limiting)"
     exit 1
 fi
 
 log_success "SSL certificate obtained!"
 
-# Step 3: Update nginx configuration
-log_info "Updating Nginx configuration..."
+# Step 4: Setup auto-renewal cron
+log_step "Setting up auto-renewal..."
 
-cat > "$INSTALL_DIR/nginx/conf.d/default.conf" << EOF
-# ===========================================
-# CMS Production Configuration with SSL
-# Domain: ${DOMAIN}
-# Generated: $(date)
-# ===========================================
-
-# HTTP - Redirect to HTTPS
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN} www.${DOMAIN};
-
-    # Let's Encrypt challenge
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    # Redirect all HTTP to HTTPS
-    location / {
-        return 301 https://\$server_name\$request_uri;
-    }
-}
-
-# HTTPS - Main server
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${DOMAIN} www.${DOMAIN};
-
-    # SSL Certificates (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/${DOMAIN}/chain.pem;
-
-    # SSL Configuration
-    ssl_session_timeout 1d;
-    ssl_session_cache shared:SSL:50m;
-    ssl_session_tickets off;
-
-    # Modern SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-
-    # HSTS
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-    # Include location blocks
-    include /etc/nginx/snippets/locations.conf;
-}
-
-# Redirect www to non-www (optional - uncomment if needed)
-# server {
-#     listen 443 ssl http2;
-#     listen [::]:443 ssl http2;
-#     server_name www.${DOMAIN};
-#
-#     ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-#     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-#
-#     return 301 https://${DOMAIN}\$request_uri;
-# }
-EOF
-
-# Step 4: Test and reload nginx
-log_info "Testing Nginx configuration..."
-docker compose -f docker-compose.prod.yml exec nginx nginx -t
-
-log_info "Reloading Nginx..."
-docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
-
-# Step 5: Setup auto-renewal cron
-log_info "Setting up auto-renewal..."
-
-# Add cron job for certificate renewal
-(crontab -l 2>/dev/null | grep -v "certbot renew"; echo "0 3 * * * cd $INSTALL_DIR && docker compose -f docker-compose.prod.yml run --rm certbot renew --quiet && docker compose -f docker-compose.prod.yml exec nginx nginx -s reload") | crontab -
+# Remove any existing certbot renew entries and add new one
+(crontab -l 2>/dev/null | grep -v "certbot renew"; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
 
 log_success "Auto-renewal configured (runs daily at 3 AM)"
+
+# Step 5: Test renewal
+log_step "Testing renewal process..."
+certbot renew --dry-run
+
+if [ $? -eq 0 ]; then
+    log_success "Renewal test passed"
+else
+    log_info "Renewal test had issues - certificate will still work"
+fi
 
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════════${NC}"
@@ -155,6 +125,10 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo "  Your site is now available at:"
 echo "    https://${DOMAIN}"
+echo "    https://www.${DOMAIN}"
+echo ""
+echo "  Certificate details:"
+echo "    sudo certbot certificates"
 echo ""
 echo "  Certificate will auto-renew before expiry."
 echo ""

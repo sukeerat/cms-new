@@ -15,6 +15,12 @@
 set -e
 
 # ===========================================
+# Non-interactive mode for apt
+# ===========================================
+export DEBIAN_FRONTEND=noninteractive
+export APT_OPTS="-y -qq -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+
+# ===========================================
 # Configuration
 # ===========================================
 DOMAIN="${1:-localhost}"
@@ -59,9 +65,9 @@ check_root() {
 update_system() {
     log_header "Updating System"
 
-    apt-get update -y
-    apt-get upgrade -y
-    apt-get install -y \
+    apt-get update $APT_OPTS
+    apt-get upgrade $APT_OPTS
+    apt-get install $APT_OPTS \
         curl \
         wget \
         git \
@@ -90,11 +96,11 @@ install_docker() {
         log_step "Installing Docker..."
 
         # Remove old versions
-        apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+        apt-get remove $APT_OPTS docker docker-engine docker.io containerd runc 2>/dev/null || true
 
         # Add Docker's official GPG key
         install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
         chmod a+r /etc/apt/keyrings/docker.gpg
 
         # Add repository
@@ -104,8 +110,8 @@ install_docker() {
             tee /etc/apt/sources.list.d/docker.list > /dev/null
 
         # Install Docker
-        apt-get update -y
-        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        apt-get update $APT_OPTS
+        apt-get install $APT_OPTS docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
         # Start and enable Docker
         systemctl start docker
@@ -238,14 +244,16 @@ ALLOWED_ORIGINS=https://${DOMAIN},https://www.${DOMAIN}
 
 # API URL (relative for same-domain setup)
 VITE_API_BASE_URL=/api
-VITE_APP_NAME=CMS Portal
+VITE_APP_NAME="PlaceIntern Portal"
 VITE_APP_ENV=production
 
 # Database
-DATABASE_URL=mongodb://cmsuser:cmspassword123@mongodb:27017/cms?authSource=cms
 MONGO_ROOT_USER=admin
 MONGO_ROOT_PASSWORD=${MONGO_PASSWORD}
-MONGO_DATABASE=cms
+MONGO_DATABASE=cms_db
+MONGO_APP_USER=cmsuser
+MONGO_APP_PASSWORD=${MONGO_PASSWORD}
+DATABASE_URL=mongodb://admin:\${MONGO_ROOT_PASSWORD}@mongodb:27017/cms_db?authSource=admin
 
 # Cache
 REDIS_URL=redis://dragonfly:6379
@@ -303,13 +311,66 @@ EOF
 }
 
 # ===========================================
-# Configure Nginx for Domain
+# Install and Configure Host Nginx
 # ===========================================
 configure_nginx_domain() {
     log_header "Configuring Nginx for ${DOMAIN}"
 
-    # Update nginx config with domain
-    sed -i "s/YOUR_DOMAIN/${DOMAIN}/g" "$INSTALL_DIR/nginx/conf.d/default.conf"
+    # Install nginx if not present
+    if ! command -v nginx &> /dev/null; then
+        log_step "Installing Nginx..."
+        apt-get update $APT_OPTS
+        apt-get install $APT_OPTS nginx
+    fi
+
+    # Create nginx configuration for the CMS
+    cat > /etc/nginx/sites-available/cms << EOF
+# CMS Nginx Configuration
+# Domain: ${DOMAIN}
+# Generated: $(date)
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN} www.${DOMAIN};
+
+    # Frontend
+    location / {
+        proxy_pass http://127.0.0.1:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Backend API
+    location /api {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Health check
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+}
+EOF
+
+    # Enable site
+    ln -sf /etc/nginx/sites-available/cms /etc/nginx/sites-enabled/
+
+    # Remove default site if exists
+    rm -f /etc/nginx/sites-enabled/default
+
+    # Test and reload
+    nginx -t && systemctl reload nginx
 
     log_success "Nginx configured for ${DOMAIN}"
 }
@@ -322,8 +383,9 @@ start_application() {
 
     cd "$INSTALL_DIR"
 
-    log_step "Building and starting containers..."
-    docker compose -f docker-compose.prod.yml up -d --build
+    log_step "Pulling and starting containers..."
+    docker compose -f docker-compose.prod.yml pull
+    docker compose -f docker-compose.prod.yml up -d
 
     log_step "Waiting for services to start..."
     sleep 30
@@ -337,7 +399,7 @@ start_application() {
 }
 
 # ===========================================
-# Setup SSL Certificate
+# Setup SSL Certificate (Host Nginx)
 # ===========================================
 setup_ssl() {
     log_header "Setting Up SSL Certificate"
@@ -347,63 +409,32 @@ setup_ssl() {
         return
     fi
 
-    cd "$INSTALL_DIR"
+    # Check if certbot is installed
+    if ! command -v certbot &> /dev/null; then
+        log_step "Installing Certbot..."
+        apt-get update $APT_OPTS
+        apt-get install $APT_OPTS certbot python3-certbot-nginx
+    fi
 
     log_step "Obtaining SSL certificate for ${DOMAIN}..."
 
-    # Get certificate
-    docker compose -f docker-compose.prod.yml run --rm certbot certonly \
-        --webroot \
-        --webroot-path=/var/www/certbot \
+    # Get certificate using host nginx (non-interactive)
+    certbot --nginx \
+        --non-interactive \
         --email "$EMAIL" \
         --agree-tos \
         --no-eff-email \
+        --redirect \
         -d "$DOMAIN" \
         -d "www.$DOMAIN" || {
             log_info "SSL certificate request failed. You can retry later with:"
-            log_info "  cd $INSTALL_DIR && ./scripts/setup-ssl.sh $DOMAIN $EMAIL"
+            log_info "  sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN"
             return
         }
 
-    # Enable HTTPS in nginx config
-    log_step "Enabling HTTPS configuration..."
-
-    cat > "$INSTALL_DIR/nginx/conf.d/default.conf" << EOF
-# HTTP - Redirect to HTTPS
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN} www.${DOMAIN};
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://\$server_name\$request_uri;
-    }
-}
-
-# HTTPS
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${DOMAIN} www.${DOMAIN};
-
-    # SSL Certificates
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/${DOMAIN}/chain.pem;
-
-    # HSTS
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-    include /etc/nginx/snippets/locations.conf;
-}
-EOF
-
-    # Reload nginx
-    docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+    # Setup auto-renewal cron
+    log_step "Setting up auto-renewal..."
+    (crontab -l 2>/dev/null | grep -v "certbot renew"; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
 
     log_success "SSL certificate installed!"
     log_info "Your site is now available at: https://${DOMAIN}"

@@ -358,50 +358,60 @@ export class MetricsService {
 
   private async getDiskMetrics() {
     try {
-      // Try to get disk usage for the current working directory
+      // Use Node.js native fs.statfs (available in Node 18.15+) - no shell commands needed
       const diskPath = process.platform === 'win32' ? process.cwd().split(path.sep)[0] + path.sep : '/';
 
-      if (process.platform === 'win32') {
-        // Windows: Use wmic command
-        const { execSync } = require('child_process');
-        try {
-          const drive = process.cwd().charAt(0).toUpperCase();
-          const output = execSync(`wmic logicaldisk where "DeviceID='${drive}:'" get FreeSpace,Size /format:csv`, { encoding: 'utf-8' });
-          const lines = output.trim().split('\n').filter(line => line.trim());
-          if (lines.length >= 2) {
-            const values = lines[1].split(',');
-            const freeSpace = parseInt(values[1]) || 0;
-            const totalSize = parseInt(values[2]) || 0;
-            const usedSpace = totalSize - freeSpace;
-            return {
-              total: totalSize,
-              used: usedSpace,
-              free: freeSpace,
-              usagePercent: totalSize > 0 ? Math.round((usedSpace / totalSize) * 10000) / 100 : 0,
-            };
-          }
-        } catch (e) {
-          this.logger.debug('Failed to get Windows disk metrics:', e.message);
-        }
-      } else {
-        // Linux/Mac: Use df command
-        const { execSync } = require('child_process');
-        try {
-          const output = execSync(`df -B1 ${diskPath} | tail -1`, { encoding: 'utf-8' });
-          const parts = output.trim().split(/\s+/);
-          if (parts.length >= 4) {
-            const total = parseInt(parts[1]) || 0;
-            const used = parseInt(parts[2]) || 0;
-            const free = parseInt(parts[3]) || 0;
-            return {
-              total,
-              used,
-              free,
-              usagePercent: total > 0 ? Math.round((used / total) * 10000) / 100 : 0,
-            };
-          }
-        } catch (e) {
-          this.logger.debug('Failed to get Linux disk metrics:', e.message);
+      // Use promisified statfs for safe disk metrics (no command injection risk)
+      const { statfs } = require('fs/promises');
+
+      try {
+        const stats = await statfs(diskPath);
+        const total = stats.blocks * stats.bsize;
+        const free = stats.bfree * stats.bsize;
+        const used = total - free;
+
+        return {
+          total,
+          used,
+          free,
+          usagePercent: total > 0 ? Math.round((used / total) * 10000) / 100 : 0,
+        };
+      } catch (statfsError) {
+        // Fallback for older Node.js versions - use safe spawn with fixed arguments
+        this.logger.debug('statfs not available, using fallback method');
+
+        if (process.platform !== 'win32') {
+          const { spawn } = require('child_process');
+
+          return new Promise((resolve) => {
+            // Use spawn with array arguments (safe from injection)
+            const df = spawn('df', ['-B1', '/'], { timeout: 5000 });
+            let output = '';
+
+            df.stdout.on('data', (data) => { output += data.toString(); });
+            df.on('close', (code) => {
+              if (code === 0) {
+                const lines = output.trim().split('\n');
+                if (lines.length >= 2) {
+                  const parts = lines[1].split(/\s+/);
+                  if (parts.length >= 4) {
+                    const total = parseInt(parts[1]) || 0;
+                    const used = parseInt(parts[2]) || 0;
+                    const free = parseInt(parts[3]) || 0;
+                    resolve({
+                      total,
+                      used,
+                      free,
+                      usagePercent: total > 0 ? Math.round((used / total) * 10000) / 100 : 0,
+                    });
+                    return;
+                  }
+                }
+              }
+              resolve({ total: 0, used: 0, free: 0, usagePercent: 0 });
+            });
+            df.on('error', () => resolve({ total: 0, used: 0, free: 0, usagePercent: 0 }));
+          });
         }
       }
     } catch (error) {

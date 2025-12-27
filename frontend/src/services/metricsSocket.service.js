@@ -21,13 +21,12 @@ class MetricsSocketService {
 
   /**
    * Get WebSocket URL based on current environment
-   * Uses unified /ws namespace
+   * Connects to the default namespace (no /ws suffix - backend uses default namespace)
    */
   getSocketUrl() {
-    const apiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-    // Remove /api suffix to get base URL if present
-    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-    return `${baseUrl}/ws`;
+    const apiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+    // Remove /api suffix to get base URL for WebSocket
+    return apiUrl.replace(/\/api\/?$/, '');
   }
 
   /**

@@ -28,9 +28,23 @@ const RATE_LIMIT_MAX_EVENTS = 100; // Max events per window
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Cleanup every 5 minutes
 const RATE_LIMIT_ENTRY_TTL_MS = 2 * 60 * 1000; // Entries expire after 2 minutes of inactivity
 
+// Get allowed origins from environment or use defaults
+const getAllowedOrigins = () => {
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+  }
+  // Default origins for development
+  return [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+  ];
+};
+
 @WebSocketGateway({
   cors: {
-    origin: true,
+    origin: process.env.NODE_ENV === 'production' ? getAllowedOrigins() : true,
     credentials: true,
   },
   transports: ['websocket', 'polling'],

@@ -62,12 +62,12 @@ RUN chown -R appuser:appgroup /app
 # Switch to non-root user
 USER appuser
 
-# Expose port (default 5000, can be overridden)
-EXPOSE 5000
+# Expose port (default 8000 for production)
+EXPOSE 8000
 
 # Health check using wget (available in alpine)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-5000}/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8000}/health || exit 1
 
 # Start with PM2 runtime (handles clustering)
 CMD ["pm2-runtime", "start", "ecosystem.config.js"]

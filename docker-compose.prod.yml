@@ -109,7 +109,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-cms}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-cms_db}
     volumes:
       - mongodb-data:/data/db
       - mongodb-config:/data/configdb

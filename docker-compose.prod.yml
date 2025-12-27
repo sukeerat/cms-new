@@ -140,11 +140,11 @@ services:
     restart: unless-stopped
     ulimits:
       memlock: -1
-    # Reduced maxmemory so the container can start on smaller VPS instances.
+    # Increased maxmemory to meet Dragonfly's minimum requirement of 512MiB.
     command: >
       --logtostderr
       --cache_mode=true
-      --maxmemory=128mb
+      --maxmemory=512mb
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
       interval: 15s

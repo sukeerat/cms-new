@@ -1,6 +1,6 @@
 import React, { useState, useCallback, memo } from 'react';
-import { Row, Col, Spin, Alert, Modal, Form, Input, Select, DatePicker, message, FloatButton } from 'antd';
-import { SyncOutlined, CameraOutlined } from '@ant-design/icons';
+import { Row, Col, Spin, Alert, Modal, Form, Input, Select, DatePicker, message, FloatButton, Layout } from 'antd';
+import { SyncOutlined, CameraOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -32,6 +32,7 @@ const FacultyDashboard = () => {
   const {
     isLoading,
     isRevalidating, // NEW: SWR revalidation state
+    lastFetched, // Timestamp of most recent data fetch
     dashboard,
     students,
     visitLogs,
@@ -151,6 +152,7 @@ const FacultyDashboard = () => {
             placeholder="Reason for rejection (optional)"
             id="rejectionReason"
             rows={3}
+            className="rounded-lg mt-2"
           />
         </div>
       ),
@@ -198,14 +200,18 @@ const FacultyDashboard = () => {
   // Show error state
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-8 flex justify-center items-center min-h-[50vh]">
         <Alert
           type="error"
-          title="Error loading dashboard"
+          message={<span className="font-bold text-lg">Dashboard Error</span>}
           description={error}
           showIcon
+          className="rounded-2xl shadow-sm border-red-100 bg-red-50 max-w-lg w-full"
           action={
-            <button onClick={refresh} className="text-blue-600 hover:underline">
+            <button 
+              onClick={refresh} 
+              className="text-red-600 font-semibold hover:text-red-800 hover:underline px-4 py-2"
+            >
               Try Again
             </button>
           }
@@ -216,39 +222,35 @@ const FacultyDashboard = () => {
 
   return (
     <>
-      <Spin spinning={isLoading} tip="Loading dashboard...">
-        <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
+      <Spin spinning={isLoading} tip="Loading dashboard..." size="large">
+        <div className="p-4 md:p-8 bg-gray-50 dark:bg-slate-950 min-h-screen">
           {/* Subtle Revalidation Indicator */}
           {isRevalidating && !isLoading && (
-            <div
-              className="fixed top-0 left-0 right-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-center gap-2 text-blue-700 text-sm"
-              style={{
-                animation: 'slideDown 0.3s ease-out',
-              }}
-            >
+            <div className="fixed top-0 left-0 right-0 z-50 bg-blue-50/90 backdrop-blur-sm border-b border-blue-100 px-4 py-2 flex items-center justify-center gap-2 text-blue-700 text-sm font-medium animate-slide-down shadow-sm">
               <SyncOutlined spin />
               <span>Updating dashboard data...</span>
             </div>
           )}
 
-          {/* Header Section */}
-          <DashboardHeader
-            facultyName={mentor?.name}
-            stats={stats}
-            onRefresh={refresh}
-            loading={isLoading}
-            isRevalidating={isRevalidating}
-          />
+          <div className="max-w-[1600px] mx-auto space-y-8 pb-20">
+            {/* Header Section */}
+            <DashboardHeader
+              facultyName={mentor?.name}
+              stats={stats}
+              onRefresh={refresh}
+              loading={isLoading}
+              isRevalidating={isRevalidating}
+              lastFetched={lastFetched}
+            />
 
-          {/* Statistics Grid */}
-          <div className="mb-6">
-            <StatisticsGrid stats={stats} />
-          </div>
+            {/* Statistics Grid */}
+            <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
+              <StatisticsGrid stats={stats} />
+            </div>
 
-          {/* Main Content Grid */}
-          <Row gutter={[16, 16]}>
-            {/* Assigned Students List - Full Width */}
-            <Col xs={24}>
+            {/* Main Content Grid */}
+            <div className="space-y-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              {/* Assigned Students List - Full Width */}
               <AssignedStudentsList
                 students={students}
                 loading={isLoading}
@@ -258,58 +260,62 @@ const FacultyDashboard = () => {
                 }}
                 onViewAll={() => navigate('/assigned-students')}
               />
-            </Col>
-          </Row>
 
-          {/* Secondary Content Grid */}
-          <Row gutter={[16, 16]} className="mt-4">
-            {/* Visit Logs */}
-            <Col xs={24} lg={12}>
-              <VisitLogsCard
-                visitLogs={visitLogs}
-                loading={isLoading}
-                onCreateNew={() => handleNewVisit()}
-                onViewAll={() => navigate('/visit-logs')}
-              />
-            </Col>
+              {/* Secondary Content Grid */}
+              <Row gutter={[24, 24]}>
+                {/* Visit Logs */}
+                <Col xs={24} xl={12}>
+                  <VisitLogsCard
+                    visitLogs={visitLogs}
+                    loading={isLoading}
+                    onCreateNew={() => handleNewVisit()}
+                    onViewAll={() => navigate('/visit-logs')}
+                  />
+                </Col>
 
-            {/* Pending Approvals */}
-            <Col xs={24} lg={12}>
-              <PendingApprovalsCard
-                applications={pendingApprovals}
-                loading={isLoading}
-                onApprove={handleApprove}
-                onReject={handleReject}
-                onViewAll={() => navigate('/approvals')}
-              />
-            </Col>
-          </Row>
+                {/* Pending Approvals */}
+                <Col xs={24} xl={12}>
+                  <PendingApprovalsCard
+                    applications={pendingApprovals}
+                    loading={isLoading}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    onViewAll={() => navigate('/approvals')}
+                  />
+                </Col>
+              </Row>
 
-          {/* Monthly Reports & Joining Letters */}
-          <Row gutter={[16, 16]} className="mt-4">
-            <Col xs={24} lg={12}>
-              <MonthlyReportsCard
-                reports={dashboard?.monthlyReports || []}
-                loading={isLoading}
-                onRefresh={refresh}
-                onViewAll={() => navigate('/monthly-reports')}
-              />
-            </Col>
-            <Col xs={24} lg={12}>
-              <JoiningLettersCard
-                letters={dashboard?.joiningLetters || []}
-                loading={isLoading}
-                onRefresh={refresh}
-                onViewAll={() => navigate('/joining-letters')}
-              />
-            </Col>
-          </Row>
+              {/* Monthly Reports & Joining Letters */}
+              <Row gutter={[24, 24]}>
+                <Col xs={24} xl={12}>
+                  <MonthlyReportsCard
+                    reports={dashboard?.monthlyReports || []}
+                    loading={isLoading}
+                    onRefresh={refresh}
+                    onViewAll={() => navigate('/monthly-reports')}
+                  />
+                </Col>
+                <Col xs={24} xl={12}>
+                  <JoiningLettersCard
+                    letters={dashboard?.joiningLetters || []}
+                    loading={isLoading}
+                    onRefresh={refresh}
+                    onViewAll={() => navigate('/joining-letters')}
+                  />
+                </Col>
+              </Row>
+            </div>
+          </div>
         </div>
       </Spin>
 
       {/* Visit Log Modal */}
       <Modal
-        title={editingVisit ? 'Edit Visit Log' : 'Schedule New Visit'}
+        title={
+          <div className="text-xl font-bold text-gray-900 pb-2 border-b border-gray-100">
+            {editingVisit ? 'Edit Visit Log' : 'Schedule New Visit'}
+          </div>
+        }
         open={visitModalVisible}
         onOk={handleVisitSubmit}
         onCancel={() => {
@@ -318,16 +324,22 @@ const FacultyDashboard = () => {
         }}
         okText={editingVisit ? 'Update' : 'Create'}
         width={600}
-        className="rounded-xl overflow-hidden"
+        className="rounded-2xl overflow-hidden"
+        styles={{ content: { borderRadius: '24px', padding: '24px' } }}
+        centered
       >
-        <Form form={visitForm} layout="vertical" className="mt-4">
+        <Form form={visitForm} layout="vertical" className="mt-6">
           {!selectedStudent && (
             <Form.Item
               name="applicationId"
-              label="Select Student"
+              label={<span className="font-medium text-gray-700">Select Student</span>}
               rules={[{ required: true, message: 'Please select a student' }]}
             >
-              <Select placeholder="Select a student" className="rounded-lg">
+              <Select 
+                placeholder="Select a student" 
+                className="h-11 rounded-lg"
+                dropdownStyle={{ borderRadius: '12px', padding: '8px' }}
+              >
                 {students.map((student) => {
                   // Handle nested data structure from API
                   const studentName = student.name || student.student?.name || 'Unknown';
@@ -347,30 +359,38 @@ const FacultyDashboard = () => {
 
           <Form.Item
             name="visitDate"
-            label="Visit Date"
+            label={<span className="font-medium text-gray-700">Visit Date & Time</span>}
             rules={[{ required: true, message: 'Please select a date' }]}
           >
-            <DatePicker className="w-full rounded-lg" showTime />
+            <DatePicker className="w-full h-11 rounded-lg" showTime format="MMMM D, YYYY h:mm A" />
           </Form.Item>
 
           <Form.Item
             name="visitType"
-            label="Visit Type"
+            label={<span className="font-medium text-gray-700">Visit Type</span>}
             rules={[{ required: true, message: 'Please select visit type' }]}
           >
-            <Select placeholder="Select visit type" className="rounded-lg">
+            <Select 
+              placeholder="Select visit type" 
+              className="h-11 rounded-lg"
+              dropdownStyle={{ borderRadius: '12px', padding: '8px' }}
+            >
               <Option value="PHYSICAL">Physical Visit</Option>
               <Option value="VIRTUAL">Virtual Visit</Option>
               <Option value="PHONE">Phone Call</Option>
             </Select>
           </Form.Item>
 
-          <Form.Item name="visitLocation" label="Visit Location">
-            <Input placeholder="Enter visit location" className="rounded-lg" />
+          <Form.Item name="visitLocation" label={<span className="font-medium text-gray-700">Visit Location</span>}>
+            <Input placeholder="Enter visit location" className="h-11 rounded-lg" />
           </Form.Item>
 
-          <Form.Item name="notes" label="Notes">
-            <TextArea rows={3} placeholder="Add any notes about this visit" className="rounded-lg" />
+          <Form.Item name="notes" label={<span className="font-medium text-gray-700">Notes / Observations</span>}>
+            <TextArea 
+              rows={4} 
+              placeholder="Add any notes about this visit..." 
+              className="rounded-lg bg-gray-50 border-gray-200 hover:bg-white focus:bg-white transition-colors" 
+            />
           </Form.Item>
         </Form>
       </Modal>
@@ -391,12 +411,13 @@ const FacultyDashboard = () => {
         tooltip="Quick Log Visit"
         onClick={() => setQuickVisitModalVisible(true)}
         style={{
-          right: 24,
-          bottom: 24,
-          width: 60,
-          height: 60,
+          right: 32,
+          bottom: 32,
+          width: 64,
+          height: 64,
         }}
-        badge={{ count: 'Quick Log', color: '#52c41a' }}
+        className="shadow-lg shadow-blue-500/30"
+        badge={{ count: 'Quick', color: '#10b981', offset: [-5, 5] }}
       />
 
       {/* Student Details Modal */}

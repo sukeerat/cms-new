@@ -53,66 +53,124 @@ const { Title, Text, Paragraph } = Typography;
 
 // Stat Card Component - Refactored for Clean UI
 const StatCard = ({ title, value, icon: Icon, colorClass, bgClass }) => (
-  <Card size="small" className="rounded-xl border-border shadow-sm hover:shadow-md transition-all h-full">
-    <div className="flex items-center gap-3 p-1">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bgClass} ${colorClass}`}>
-        <Icon className="text-lg" />
+  <Card bordered={false} className="rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all h-full bg-white dark:bg-slate-900 dark:border-slate-800">
+    <div className="flex items-center gap-4 p-2">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bgClass} ${colorClass}`}>
+        <Icon className="text-xl" />
       </div>
       <div>
-        <div className="text-2xl font-bold text-text-primary leading-none mb-1">
+        <div className="text-3xl font-bold text-gray-900 dark:text-white leading-none mb-1">
           {value || 0}
         </div>
-        <div className="text-[10px] uppercase font-bold text-text-tertiary tracking-wider">{title}</div>
+        <div className="text-xs uppercase font-bold text-gray-400 dark:text-slate-500 tracking-wider">{title}</div>
       </div>
     </div>
   </Card>
 );
 
-// ... (keep FloatingQuickActions as is for now)
+// Floating Quick Actions Component
+const FloatingQuickActions = ({ profile, dashboardData }) => {
+  const navigate = useNavigate();
+  return (
+    <FloatButton.Group
+      trigger="hover"
+      type="primary"
+      style={{ right: 24, bottom: 24 }}
+      icon={<PlusOutlined />}
+    >
+      <FloatButton
+        icon={<FileAddOutlined />}
+        tooltip="Post Internship"
+        onClick={() => navigate("/postings")}
+      />
+      <FloatButton
+        icon={<ContactsOutlined />}
+        tooltip="View Applications"
+        onClick={() => navigate("/applications")}
+      />
+      <FloatButton
+        icon={<SettingOutlined />}
+        tooltip="Profile Settings"
+        onClick={() => navigate("/profile")}
+      />
+    </FloatButton.Group>
+  );
+};
 
 const IndustryDashboard = () => {
   // ... (keep state and hooks)
+  // Assuming useSmartIndustry hook provides all necessary data and logic
+  const {
+    profile,
+    dashboardData,
+    loading: isLoading,
+    isStale,
+    forceRefresh,
+    error
+  } = useSmartIndustry();
+  
+  const navigate = useNavigate();
+  const { token } = theme.useToken();
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "SELECTED": return "success";
+      case "REJECTED": return "error";
+      case "SHORTLISTED": return "warning";
+      default: return "default"; // processing/applied
+    }
+  };
 
   const statsConfigs = [
     {
       title: "Total Internships",
       value: dashboardData?.stats?.totalInternships || 0,
       icon: ShopOutlined,
-      colorClass: "text-primary",
-      bgClass: "bg-primary/10",
+      colorClass: "text-blue-600 dark:text-blue-400",
+      bgClass: "bg-blue-50 dark:bg-blue-900/20",
     },
     {
       title: "Active Positions",
       value: dashboardData?.stats?.activeInternships || 0,
       icon: CheckCircleOutlined,
-      colorClass: "text-success",
-      bgClass: "bg-success/10",
+      colorClass: "text-green-600 dark:text-green-400",
+      bgClass: "bg-green-50 dark:bg-green-900/20",
     },
     {
       title: "Applications",
       value: dashboardData?.stats?.totalApplications || 0,
       icon: ContactsOutlined,
-      colorClass: "text-info",
-      bgClass: "bg-info/10",
+      colorClass: "text-cyan-600 dark:text-cyan-400",
+      bgClass: "bg-cyan-50 dark:bg-cyan-900/20",
     },
     {
       title: "Selected Students",
       value: dashboardData?.stats?.selectedStudents || 0,
       icon: TrophyOutlined,
-      colorClass: "text-warning",
-      bgClass: "bg-warning/10",
+      colorClass: "text-amber-500 dark:text-amber-400",
+      bgClass: "bg-amber-50 dark:bg-amber-900/20",
     },
   ];
 
+  if (isLoading && !dashboardData) {
+    return (
+      <Layouts>
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
+          <Spin size="large" tip="Loading dashboard..." />
+        </div>
+      </Layouts>
+    );
+  }
+
   return (
     <Layouts>
-      <div className="p-4 md:p-6 bg-background-secondary min-h-screen">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="p-4 md:p-8 bg-gray-50 dark:bg-slate-950 min-h-screen">
+        <div className="max-w-[1600px] mx-auto space-y-8 pb-20">
           {/* Stale data indicator */}
           {isStale && (
             <Alert
-              title="Data update required"
-              description="Your dashboard data might be outdated. Click refresh to sync."
+              message={<span className="font-bold">Data Update Required</span>}
+              description="Your dashboard data might be outdated. Click refresh to sync with the latest server data."
               type="warning"
               showIcon
               action={
@@ -120,12 +178,12 @@ const IndustryDashboard = () => {
                   size="small"
                   type="primary"
                   onClick={forceRefresh}
-                  className="rounded-lg"
+                  className="rounded-lg bg-amber-500 hover:bg-amber-600 border-0"
                 >
-                  Refresh
+                  Refresh Now
                 </Button>
               }
-              className="rounded-xl border-warning/20 bg-warning-50/50"
+              className="rounded-xl border-amber-100 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800"
             />
           )}
 
@@ -140,22 +198,22 @@ const IndustryDashboard = () => {
                   icon={<PlusOutlined />}
                   onClick={() => navigate("/postings")}
                   key="post"
-                  className="h-10 rounded-xl font-bold bg-primary border-0 shadow-lg shadow-primary/20"
+                  className="h-11 px-6 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 border-0 shadow-lg shadow-blue-200 dark:shadow-none"
                 >
                   Post Internship
                 </Button>
               ) : (
-                <Tag color="warning" className="rounded-full px-4 py-1 font-bold border-0 uppercase text-[10px] tracking-widest" key="status">
+                <Tag color="warning" className="rounded-full px-4 py-1.5 font-bold border-0 uppercase text-[10px] tracking-widest" key="status">
                   PENDING APPROVAL
                 </Tag>
               ),
             ]}
           >
             {/* Status indicator */}
-            <div className="mt-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-background-tertiary border border-border">
-                <div className={`w-2 h-2 rounded-full ${profile?.isApproved ? 'bg-success animate-pulse' : 'bg-warning animate-pulse'}`} />
-                <Text className={`font-bold uppercase tracking-widest text-[10px] ${profile?.isApproved ? 'text-success' : 'text-warning'}`}>
+            <div className="mt-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-sm">
+                <div className={`w-2 h-2 rounded-full ${profile?.isApproved ? 'bg-green-500 animate-pulse' : 'bg-amber-500 animate-pulse'}`} />
+                <Text className={`font-bold uppercase tracking-widest text-[10px] ${profile?.isApproved ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                   {profile?.isApproved ? 'Profile Approved' : 'Under Review'}
                 </Text>
               </div>
@@ -163,38 +221,43 @@ const IndustryDashboard = () => {
           </PageHeader>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
             {statsConfigs.map((stat, index) => (
               <StatCard key={index} {...stat} />
             ))}
           </div>
 
           {/* Modern Content Grid */}
-          <Row gutter={[24, 24]}>
+          <Row gutter={[24, 24]} className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
             {/* Recent Applications */}
             <Col xs={24} lg={16}>
               <Card
-                className="rounded-2xl border-border shadow-sm overflow-hidden bg-surface"
-                styles={{ header: { borderBottom: '1px solid var(--color-border)', padding: '16px 24px' }, body: { padding: 0 } }}
+                bordered={false}
+                className="rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-900"
+                styles={{ header: { borderBottom: '1px solid #f3f4f6', padding: '20px 24px' }, body: { padding: 0 } }}
                 title={
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <ContactsOutlined className="text-primary" />
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                      <ContactsOutlined className="text-blue-600 dark:text-blue-400 text-lg" />
                     </div>
-                    <span className="font-bold text-text-primary text-base">Recent Applications</span>
-                    <Badge
-                      count={dashboardData.recentApplications.length}
-                      className="ml-auto"
-                      style={{ backgroundColor: 'rgb(var(--color-primary))' }}
-                    />
+                    <div>
+                      <span className="font-bold text-gray-900 dark:text-white text-lg block leading-tight">Recent Applications</span>
+                      <span className="text-xs text-gray-400 dark:text-slate-500 font-medium">Latest student applications</span>
+                    </div>
+                    {dashboardData.recentApplications.length > 0 && (
+                      <Badge
+                        count={dashboardData.recentApplications.length}
+                        className="ml-auto"
+                        style={{ backgroundColor: '#3b82f6' }}
+                      />
+                    )}
                   </div>
                 }
                 extra={
                   <Link to="/applications">
                     <Button
                       type="text"
-                      icon={<EyeOutlined />}
-                      className="text-primary hover:bg-primary/10 rounded-xl font-bold text-xs px-4"
+                      className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl font-bold text-xs px-4 h-9"
                     >
                       VIEW ALL
                     </Button>
@@ -207,38 +270,39 @@ const IndustryDashboard = () => {
                       <div
                         key={item.id || index}
                         className={`
-                          rounded-xl p-4 transition-all duration-200 flex items-start gap-4 hover:bg-background-tertiary
-                          ${index !== dashboardData.recentApplications.length - 1 ? 'border-b border-border/50' : ''}
+                          rounded-xl p-4 transition-all duration-200 flex items-start gap-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 group cursor-pointer
+                          ${index !== dashboardData.recentApplications.length - 1 ? 'border-b border-gray-50 dark:border-slate-800' : ''}
                         `}
+                        onClick={() => navigate(`/applications/${item.id}`)}
                       >
                         <Avatar
-                          className="bg-primary/10 text-primary border-primary/20 rounded-xl shrink-0"
+                          className="bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400 rounded-xl shrink-0"
                           size={48}
                           icon={<UserOutlined />}
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-start">
                             <div className="min-w-0">
-                              <Text className="font-bold text-base text-text-primary block leading-none mb-1 truncate">
+                              <Text className="font-bold text-base text-gray-900 dark:text-white block leading-tight mb-1 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                 {item.studentName}
                               </Text>
-                              <Text className="font-medium text-sm text-primary truncate block">
-                                {item.internshipTitle}
+                              <Text className="font-medium text-sm text-gray-500 dark:text-slate-400 truncate block">
+                                Applied for <span className="text-gray-700 dark:text-slate-300 font-semibold">{item.internshipTitle}</span>
                               </Text>
                             </div>
                             <Tag
                               color={getStatusColor(item.status)}
-                              className="m-0 px-3 py-0.5 rounded-full border-0 font-bold uppercase tracking-widest text-[10px] shrink-0"
+                              className="m-0 px-3 py-1 rounded-full border-0 font-bold uppercase tracking-widest text-[10px] shrink-0"
                             >
                               {item.status.replace("_", " ")}
                             </Tag>
                           </div>
-                          <div className="flex items-center gap-4 mt-3 text-xs text-text-tertiary font-medium">
+                          <div className="flex items-center gap-4 mt-3 text-xs text-gray-400 dark:text-slate-500 font-medium">
                             <span className="flex items-center gap-1.5">
                               <BankOutlined className="text-[10px]" />
                               {item.branch}
                             </span>
-                            <span className="w-1 h-1 rounded-full bg-text-tertiary opacity-30 shrink-0" />
+                            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-slate-600 shrink-0" />
                             <span className="flex items-center gap-1.5">
                               <CalendarOutlined className="text-[10px]" />
                               Applied {new Date(item.appliedDate).toLocaleDateString()}
@@ -249,13 +313,13 @@ const IndustryDashboard = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-20 text-center flex flex-col items-center">
+                  <div className="py-24 text-center flex flex-col items-center">
                     <Empty
                       description={false}
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
                     />
-                    <Title level={5} className="text-text-secondary mt-4">No applications yet</Title>
-                    <Text className="text-text-tertiary">Applications will appear here once students apply</Text>
+                    <Title level={5} className="text-gray-500 dark:text-slate-400 mt-4 !font-normal">No applications yet</Title>
+                    <Text className="text-gray-400 dark:text-slate-500 text-sm">Applications will appear here once students apply</Text>
                   </div>
                 )}
               </Card>
@@ -264,14 +328,18 @@ const IndustryDashboard = () => {
             {/* Active Internships */}
             <Col xs={24} lg={8}>
               <Card
-                className="rounded-2xl border-border shadow-sm overflow-hidden bg-surface"
-                styles={{ header: { borderBottom: '1px solid var(--color-border)', padding: '16px 24px' }, body: { padding: 0 } }}
+                bordered={false}
+                className="rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-900"
+                styles={{ header: { borderBottom: '1px solid #f3f4f6', padding: '20px 24px' }, body: { padding: 0 } }}
                 title={
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
-                      <ShopOutlined className="text-success" />
+                    <div className="w-10 h-10 rounded-xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
+                      <ShopOutlined className="text-green-600 dark:text-green-400 text-lg" />
                     </div>
-                    <span className="font-bold text-text-primary text-base">Active Internships</span>
+                    <div>
+                      <span className="font-bold text-gray-900 dark:text-white text-lg block leading-tight">Active Posts</span>
+                      <span className="text-xs text-gray-400 dark:text-slate-500 font-medium">Live internships</span>
+                    </div>
                   </div>
                 }
                 extra={
@@ -279,7 +347,7 @@ const IndustryDashboard = () => {
                     <Button
                       type="text"
                       icon={<SettingOutlined />}
-                      className="text-success hover:bg-success/10 rounded-xl font-bold text-xs px-4"
+                      className="text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl font-bold text-xs px-4 h-9"
                     >                  
                       MANAGE
                     </Button>
@@ -292,30 +360,30 @@ const IndustryDashboard = () => {
                       <div
                         key={item.id || index}
                         className={`
-                          rounded-xl p-4 transition-all duration-200 flex flex-col gap-4 hover:bg-background-tertiary
-                          ${index !== dashboardData.activeInternships.length - 1 ? 'border-b border-border/50' : ''}
+                          rounded-xl p-4 transition-all duration-200 flex flex-col gap-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 group
+                          ${index !== dashboardData.activeInternships.length - 1 ? 'border-b border-gray-50 dark:border-slate-800' : ''}
                         `}
                       >
                         <div className="w-full">
                           <div className="flex items-start gap-3 mb-4">
-                            <div className="bg-success/10 text-success p-2 rounded-xl shrink-0">
-                              <BankOutlined className="text-lg" />
+                            <div className="bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400 p-2.5 rounded-xl shrink-0 group-hover:scale-105 transition-transform">
+                              <BankOutlined className="text-xl" />
                             </div>
-                            <div className="min-w-0">
-                              <Text className="font-bold text-sm text-text-primary block truncate mb-1">
+                            <div className="min-w-0 flex-1">
+                              <Text className="font-bold text-base text-gray-900 dark:text-white block truncate mb-1">
                                 {item.title}
                               </Text>
-                              <div className="flex items-center gap-2 text-[10px] text-text-tertiary font-bold uppercase tracking-wider">
+                              <div className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-slate-500 font-bold uppercase tracking-wider">
                                 <CalendarOutlined />
                                 Ends: {new Date(item.deadline).toLocaleDateString()}
                               </div>
                             </div>
                           </div>
                           
-                          <div className="bg-background-secondary p-3 rounded-xl border border-border/50">
-                            <div className="flex justify-between text-[10px] uppercase font-black text-text-tertiary mb-2 tracking-widest">
+                          <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700">
+                            <div className="flex justify-between text-[10px] uppercase font-black text-gray-400 dark:text-slate-500 mb-2 tracking-widest">
                               <span>Applicants</span>
-                              <span className="text-primary">
+                              <span className="text-blue-600 dark:text-blue-400">
                                 {item.applications} / {item.positions}
                               </span>
                             </div>
@@ -333,17 +401,17 @@ const IndustryDashboard = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-12 text-center flex flex-col items-center">
+                  <div className="p-16 text-center flex flex-col items-center">
                     <Empty
                       description={false}
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
                     />
-                    <Text className="text-text-tertiary mt-4 mb-4">Post your first internship to get started</Text>
+                    <Text className="text-gray-400 dark:text-slate-500 mt-4 mb-6 block font-medium">Post your first internship to get started</Text>
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={() => navigate("/postings")}
-                      className="rounded-xl font-bold bg-primary border-0"
+                      className="rounded-xl font-bold bg-blue-600 hover:bg-blue-500 border-0 h-10 px-6 shadow-lg shadow-blue-200"
                     >
                       Post First Internship
                     </Button>
@@ -354,9 +422,6 @@ const IndustryDashboard = () => {
           </Row>
         </div>
       </div>
-
-      {/* Floating Quick Actions */}
-      <FloatingQuickActions profile={profile} dashboardData={dashboardData} />
     </Layouts>
   );
 };

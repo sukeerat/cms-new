@@ -24,36 +24,16 @@ const LayoutHeader = ({
   onProfileClick,
   onLogoutClick,
 }) => {
-  // Standard button style matching the "Report Issue" button, using semantic theme classes
-  const iconBtnClass = `
-    w-10 h-10 flex items-center justify-center rounded-xl
-    bg-surface border border-border
-    text-text-secondary
-    shadow-sm
-    hover:bg-surface-hover
-    hover:scale-105 active:scale-95
-    transition-all duration-200
-  `;
-
   return (
     <Header
-      className={`
-        sticky top-0 z-40 flex items-center justify-between
-        h-16 px-4 md:px-6
-        border-b transition-all duration-300
-        bg-surface/80
-        border-border
-        backdrop-blur-md
-        shadow-sm
-      `}
+      className="sticky top-0 z-40 flex items-center justify-between h-16 px-4 md:px-6 border-b border-gray-100 dark:border-slate-800 !bg-white/80 dark:!bg-slate-950/80 backdrop-blur-md shadow-sm transition-all duration-300"
       style={{
         lineHeight: 'normal',
-        background: 'transparent',
+        paddingInline: '24px',
       }}
     >
       {/* Left Section */}
       <div className="flex items-center gap-3">
-        {/* Menu Toggle Button */}
         <Tooltip title={isDesktop ? (collapsed ? "Expand sidebar" : "Collapse sidebar") : "Open menu"}>
           <Button
             type="text"
@@ -65,7 +45,7 @@ const LayoutHeader = ({
               )
             }
             onClick={() => (isDesktop ? onToggleCollapse() : onMobileOpen())}
-            className={iconBtnClass}
+            className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
           />
         </Tooltip>
       </div>
@@ -85,7 +65,7 @@ const LayoutHeader = ({
               )
             }
             onClick={toggleTheme}
-            className={iconBtnClass}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-100 dark:hover:border-slate-600 transition-all duration-200"
           />
         </Tooltip>
 
@@ -95,7 +75,7 @@ const LayoutHeader = ({
         </div>
 
         {/* Divider */}
-        <div className="h-8 w-px bg-border mx-1" />
+        <div className="h-6 w-px bg-gray-200 dark:bg-slate-700 mx-2" />
 
         {/* User Profile Button */}
         <Tooltip title="View profile">
@@ -103,7 +83,7 @@ const LayoutHeader = ({
             type="text"
             icon={<UserOutlined className="text-lg" />}
             onClick={onProfileClick}
-            className={iconBtnClass}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-100 dark:hover:border-slate-600 transition-all duration-200"
           />
         </Tooltip>
 
@@ -113,13 +93,7 @@ const LayoutHeader = ({
           danger
           onClick={onLogoutClick}
           icon={<LogoutOutlined />}
-          className={`
-            h-10 px-4 rounded-xl font-medium text-sm
-            flex items-center gap-2
-            shadow-sm hover:shadow-md
-            transition-all duration-200
-            hover:scale-105 active:scale-95
-          `}
+          className="h-10 px-4 rounded-xl font-medium text-sm flex items-center gap-2 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 bg-red-500 hover:bg-red-600 border-red-500 hover:border-red-600"
         >
           <span className="hidden sm:inline">Logout</span>
         </Button>

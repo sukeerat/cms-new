@@ -173,11 +173,11 @@ const MyApplications = () => {
         <span className="flex items-center gap-2">
           <BankOutlined />
           Platform Internships
-          <Tag color="blue">{derivedData.platformCount}</Tag>
+          <Tag color="blue" className="rounded-md font-bold">{derivedData.platformCount}</Tag>
         </span>
       ),
       children: derivedData.hasPlatformApplications ? (
-        <Card className="rounded-2xl border border-gray-200">
+        <Card bordered={false} className="rounded-2xl border border-gray-100 shadow-sm">
           <ApplicationsTable
             applications={applications}
             loading={loading}
@@ -185,7 +185,7 @@ const MyApplications = () => {
           />
         </Card>
       ) : (
-        <Card className="rounded-2xl border border-gray-200">
+        <Card bordered={false} className="rounded-2xl border border-gray-100 shadow-sm bg-white">
           <Empty
             image={<BankOutlined className="text-6xl text-gray-300" />}
             imageStyle={{ height: 80 }}
@@ -201,6 +201,7 @@ const MyApplications = () => {
               icon={<ExportOutlined />}
               onClick={() => navigate('/internships')}
               size="large"
+              className="rounded-xl h-11 px-6 font-bold bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-200"
             >
               Browse Internships
             </Button>
@@ -214,11 +215,11 @@ const MyApplications = () => {
         <span className="flex items-center gap-2">
           <RocketOutlined />
           Self-Identified
-          <Tag color="purple">{derivedData.selfIdentifiedCount}</Tag>
+          <Tag color="purple" className="rounded-md font-bold">{derivedData.selfIdentifiedCount}</Tag>
         </span>
       ),
       children: derivedData.hasSelfIdentifiedApplications ? (
-        <Card className="rounded-2xl border border-gray-200">
+        <Card bordered={false} className="rounded-2xl border border-gray-100 shadow-sm">
           <ApplicationsTable
             applications={selfIdentifiedApplications}
             loading={loading}
@@ -227,7 +228,7 @@ const MyApplications = () => {
           />
         </Card>
       ) : (
-        <Card className="rounded-2xl border border-gray-200">
+        <Card bordered={false} className="rounded-2xl border border-gray-100 shadow-sm bg-white">
           <Empty
             image={<RocketOutlined className="text-6xl text-gray-300" />}
             imageStyle={{ height: 80 }}
@@ -243,7 +244,7 @@ const MyApplications = () => {
               icon={<PlusOutlined />}
               onClick={() => navigate('/self-identified-internship')}
               size="large"
-              className="bg-purple-600 hover:bg-purple-700"
+              className="rounded-xl h-11 px-6 font-bold bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-200"
             >
               Add Self-Identified Internship
             </Button>
@@ -256,25 +257,28 @@ const MyApplications = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       {/* Header Section */}
-      <div className="mb-6">
+      <div className="mb-8 animate-fade-in">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <Title level={2} className="mb-1 flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <BankOutlined className="text-blue-600 text-lg" />
-              </div>
-              My Applications
-            </Title>
-            <Text className="text-gray-500">
-              Track and manage your internship applications
-            </Text>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center shadow-sm text-blue-600">
+              <BankOutlined className="text-2xl" />
+            </div>
+            <div>
+              <Title level={2} className="!mb-1 !text-gray-900 !text-2xl lg:!text-3xl tracking-tight">
+                My Applications
+              </Title>
+              <Text className="text-gray-500 text-sm">
+                Track and manage your internship applications
+              </Text>
+            </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button
               icon={<ReloadOutlined spin={loading} />}
               onClick={refetch}
               loading={loading}
+              className="rounded-xl h-11 px-4 border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-200 bg-white"
             >
               Refresh
             </Button>
@@ -282,6 +286,7 @@ const MyApplications = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => navigate('/self-identified-internship')}
+              className="rounded-xl h-11 px-6 font-bold shadow-lg shadow-blue-200 bg-blue-600 hover:bg-blue-500 border-0"
             >
               Add Internship
             </Button>
@@ -291,41 +296,42 @@ const MyApplications = () => {
         {/* Quick Stats */}
         <Row gutter={[16, 16]}>
           <Col xs={12} sm={6}>
-            <Card className="rounded-xl border border-gray-200 text-center">
+            <Card bordered={false} className="rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-all duration-300">
               <Statistic
-                title={<span className="text-gray-500 text-xs">Total Applications</span>}
+                title={<span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Total Applications</span>}
                 value={derivedData.totalCount}
-                prefix={<BankOutlined className="text-blue-500" />}
+                prefix={<BankOutlined className="text-blue-500 mr-2" />}
+                valueStyle={{ fontWeight: 700, color: '#111827' }}
               />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card className="rounded-xl border border-gray-200 text-center">
+            <Card bordered={false} className="rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-all duration-300">
               <Statistic
-                title={<span className="text-gray-500 text-xs">Active Internships</span>}
+                title={<span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Active Internships</span>}
                 value={derivedData.activeCount}
-                valueStyle={{ color: '#10b981' }}
-                prefix={<CheckCircleOutlined className="text-green-500" />}
+                valueStyle={{ color: '#10b981', fontWeight: 700 }}
+                prefix={<CheckCircleOutlined className="text-emerald-500 mr-2" />}
               />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card className="rounded-xl border border-gray-200 text-center">
+            <Card bordered={false} className="rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-all duration-300">
               <Statistic
-                title={<span className="text-gray-500 text-xs">Pending</span>}
+                title={<span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Pending</span>}
                 value={derivedData.pendingCount}
-                valueStyle={{ color: '#f59e0b' }}
-                prefix={<ClockCircleOutlined className="text-orange-500" />}
+                valueStyle={{ color: '#f59e0b', fontWeight: 700 }}
+                prefix={<ClockCircleOutlined className="text-amber-500 mr-2" />}
               />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card className="rounded-xl border border-gray-200 text-center">
+            <Card bordered={false} className="rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-all duration-300">
               <Statistic
-                title={<span className="text-gray-500 text-xs">Self-Identified</span>}
+                title={<span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Self-Identified</span>}
                 value={derivedData.selfIdentifiedCount}
-                valueStyle={{ color: '#8b5cf6' }}
-                prefix={<RocketOutlined className="text-purple-500" />}
+                valueStyle={{ color: '#8b5cf6', fontWeight: 700 }}
+                prefix={<RocketOutlined className="text-violet-500 mr-2" />}
               />
             </Card>
           </Col>
@@ -337,7 +343,7 @@ const MyApplications = () => {
         activeKey={activeTab}
         onChange={setActiveTab}
         items={tabItems}
-        className="applications-tabs"
+        className="applications-tabs custom-tabs"
         size="large"
       />
     </div>

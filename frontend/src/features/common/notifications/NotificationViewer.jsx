@@ -13,7 +13,6 @@ import {
   Spin,
   Typography,
   Divider,
-  Checkbox,
   Dropdown,
 } from 'antd';
 import {
@@ -39,7 +38,7 @@ import {
   groupNotificationsByDate,
 } from './notificationUtils.jsx';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 /**
  * Get connection status info based on connection state
@@ -173,31 +172,44 @@ const NotificationViewer = () => {
     {
       key: 'all',
       label: (
-        <span>
+        <span className="flex items-center gap-2">
           All
-          <Badge count={notifications.length} className="ml-2" size="small" showZero={false} />
+          <Badge 
+            count={notifications.length} 
+            overflowCount={999}
+            className="ml-1" 
+            size="small" 
+            showZero={false} 
+            styles={{ indicator: { background: '#94a3b8' } }}
+          />
         </span>
       ),
     },
     {
       key: 'unread',
       label: (
-        <span>
+        <span className="flex items-center gap-2">
           Unread
-          <Badge count={unreadCount} className="ml-2" size="small" showZero={false} />
+          <Badge 
+            count={unreadCount} 
+            className="ml-1" 
+            size="small" 
+            showZero={false} 
+          />
         </span>
       ),
     },
     {
       key: 'read',
       label: (
-        <span>
+        <span className="flex items-center gap-2">
           Read
           <Badge
             count={notifications.length - unreadCount}
-            className="ml-2"
+            className="ml-1"
             size="small"
             showZero={false}
+            styles={{ indicator: { background: '#10b981' } }}
           />
         </span>
       ),
@@ -237,11 +249,15 @@ const NotificationViewer = () => {
     if (items.length === 0) return null;
 
     return (
-      <div key={title} className="mb-6">
-        <Text type="secondary" className="text-xs uppercase tracking-wider mb-2 block px-1">
-          {title}
-        </Text>
-        <div className="bg-surface rounded-lg border border-border overflow-hidden">
+      <div key={title} className="mb-8">
+        <div className="flex items-center gap-3 mb-4 px-1">
+          <div className="h-px flex-1 bg-gray-100 dark:bg-slate-800" />
+          <Text className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-slate-500 whitespace-nowrap">
+            {title}
+          </Text>
+          <div className="h-px flex-1 bg-gray-100 dark:bg-slate-800" />
+        </div>
+        <Card bordered={false} className="rounded-2xl border border-gray-100 dark:border-slate-800 overflow-hidden shadow-sm bg-white dark:bg-slate-900" styles={{ body: { padding: 0 } }}>
           {items.map((notification) => (
             <NotificationItem
               key={notification.id}
@@ -254,199 +270,223 @@ const NotificationViewer = () => {
               onSelect={handleSelect}
             />
           ))}
-        </div>
+        </Card>
       </div>
     );
   };
 
   return (
-    <div className="notification-viewer">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <Title level={2} className="!m-0 flex items-center gap-2">
-            <BellOutlined />
-            Notifications
-          </Title>
-          {unreadCount > 0 && (
-            <Badge count={unreadCount} className="ml-1" />
-          )}
-          <Tooltip
-            title={
-              <div>
-                <div>{connectionStatus.text}</div>
-                {lastSyncTime && (
-                  <div className="text-xs opacity-75">
-                    Last sync: {lastSyncTime.toLocaleTimeString()}
-                  </div>
-                )}
-                {connectionState === 'error' && (
-                  <div className="text-xs mt-1">Click to reconnect</div>
-                )}
+    <div className="p-4 md:p-6 bg-gray-50 dark:bg-slate-950 min-h-screen">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8 animate-fade-in">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-blue-600 shadow-sm">
+              <BellOutlined className="text-2xl" />
+            </div>
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <Title level={2} className="!m-0 !text-gray-900 dark:!text-white !text-2xl lg:!text-3xl tracking-tight">
+                  Notification Inbox
+                </Title>
+                <Tooltip
+                  title={
+                    <div>
+                      <div className="font-bold">{connectionStatus.text}</div>
+                      {lastSyncTime && (
+                        <div className="text-[10px] opacity-75 mt-0.5">
+                          Synced at {lastSyncTime.toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                  }
+                >
+                  <div 
+                    className={`w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 shadow-sm cursor-pointer ${connectionState === 'error' ? 'animate-pulse' : ''}`}
+                    style={{ background: connectionStatus.color }}
+                    onClick={connectionState === 'error' ? forceReconnect : undefined}
+                  />
+                </Tooltip>
               </div>
-            }
-          >
-            <span
-              className={`cursor-pointer ${connectionState === 'error' ? 'hover:opacity-75' : ''}`}
-              onClick={connectionState === 'error' ? forceReconnect : undefined}
-              style={{ color: connectionStatus.color }}
-            >
-              {connectionStatus.icon}
-            </span>
-          </Tooltip>
-        </div>
+              <Paragraph className="!text-gray-500 dark:!text-slate-400 !text-sm !mb-0 font-medium">
+                Stay updated with your latest academic and internship activities
+              </Paragraph>
+            </div>
+          </div>
 
-        <Space wrap>
-          {selectionMode && selectedIds.length > 0 && (
-            <>
-              <Button
-                icon={<CheckOutlined />}
-                onClick={handleBulkMarkAsRead}
-              >
-                Mark Selected as Read ({selectedIds.length})
-              </Button>
-              <Popconfirm
-                title={`Delete ${selectedIds.length} notifications?`}
-                onConfirm={handleBulkDelete}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button danger icon={<DeleteOutlined />}>
-                  Delete Selected
-                </Button>
-              </Popconfirm>
-            </>
-          )}
-
-          {!selectionMode && unreadCount > 0 && (
-            <Button icon={<CheckOutlined />} onClick={markAllAsRead}>
-              Mark All as Read
-            </Button>
-          )}
-
-          <Tooltip title="Refresh">
-            <Button icon={<ReloadOutlined />} onClick={refresh} loading={loading} />
-          </Tooltip>
-
-          <Dropdown menu={moreActionsMenu} placement="bottomRight">
-            <Button icon={<MoreOutlined />} />
-          </Dropdown>
-        </Space>
-      </div>
-
-      {/* Filters */}
-      <Card className="mb-6" size="small">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Input
-            placeholder="Search notifications..."
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            allowClear
-            className="sm:max-w-xs"
-          />
-
-          <Select
-            placeholder="Filter by category"
-            value={selectedCategory}
-            onChange={setSelectedCategory}
-            options={categoryOptions}
-            className="sm:w-48"
-            suffixIcon={<FilterOutlined />}
-          />
-
-          {selectionMode && (
-            <Button
-              type={selectedIds.length === filteredNotifications.length ? 'primary' : 'default'}
-              onClick={handleSelectAll}
-            >
-              {selectedIds.length === filteredNotifications.length ? 'Deselect All' : 'Select All'}
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Tabs */}
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-        className="mb-4"
-      />
-
-      {/* Content */}
-      {loading && notifications.length === 0 ? (
-        <div className="flex items-center justify-center py-20">
-          <Spin size="large" />
-        </div>
-      ) : filteredNotifications.length === 0 ? (
-        <Card>
-          <Empty
-            image={<InboxOutlined className="text-6xl text-text-tertiary" />}
-            description={
-              <div className="text-center">
-                <Text type="secondary" className="block mb-2">
-                  {searchText || selectedCategory !== NOTIFICATION_CATEGORIES.ALL
-                    ? 'No notifications match your filters'
-                    : activeTab === 'unread'
-                    ? 'No unread notifications'
-                    : activeTab === 'read'
-                    ? 'No read notifications'
-                    : 'No notifications yet'}
+          <Space wrap className="w-full lg:w-auto">
+            {selectionMode && selectedIds.length > 0 ? (
+              <div className="flex items-center gap-2 p-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm animate-fade-in">
+                <Text className="text-xs font-bold text-blue-600 dark:text-blue-400 px-3">
+                  {selectedIds.length} SELECTED
                 </Text>
-                {(searchText || selectedCategory !== NOTIFICATION_CATEGORIES.ALL) && (
-                  <Button
-                    type="link"
-                    onClick={() => {
-                      setSearchText('');
-                      setSelectedCategory(NOTIFICATION_CATEGORIES.ALL);
-                    }}
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<CheckOutlined />}
+                  onClick={handleBulkMarkAsRead}
+                  className="rounded-lg h-8 bg-blue-600 hover:bg-blue-500 font-semibold"
+                >
+                  Read
+                </Button>
+                <Popconfirm
+                  title={`Delete ${selectedIds.length} notifications?`}
+                  onConfirm={handleBulkDelete}
+                  okText="Yes"
+                  cancelText="No"
+                  placement="bottomRight"
+                >
+                  <Button danger size="small" type="primary" icon={<DeleteOutlined />} className="rounded-lg h-8 font-semibold shadow-red-100" />
+                </Popconfirm>
+              </div>
+            ) : (
+              <>
+                {!selectionMode && unreadCount > 0 && (
+                  <Button 
+                    icon={<CheckOutlined />} 
+                    onClick={markAllAsRead}
+                    className="rounded-xl h-11 border-gray-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20"
                   >
-                    Clear filters
+                    Mark All as Read
                   </Button>
                 )}
-              </div>
-            }
-          />
-        </Card>
-      ) : (
-        <div>
-          {/* Render grouped notifications */}
-          {renderNotificationGroup('Today', groupedNotifications.today)}
-          {renderNotificationGroup('Yesterday', groupedNotifications.yesterday)}
-          {renderNotificationGroup('This Week', groupedNotifications.thisWeek)}
-          {renderNotificationGroup('Older', groupedNotifications.older)}
-
-          {/* If no groups but have notifications (shouldn't happen but fallback) */}
-          {Object.values(groupedNotifications).every((g) => g.length === 0) &&
-            filteredNotifications.length > 0 && (
-              <div className="bg-surface rounded-lg border border-border overflow-hidden">
-                {filteredNotifications.map((notification) => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onMarkAsRead={markAsRead}
-                    onDelete={deleteNotification}
-                    showType={selectedCategory === NOTIFICATION_CATEGORIES.ALL}
-                    selectable={selectionMode}
-                    selected={selectedIds.includes(notification.id)}
-                    onSelect={handleSelect}
+                
+                <Tooltip title="Refresh Inbox">
+                  <Button 
+                    icon={<ReloadOutlined spin={loading} />} 
+                    onClick={refresh} 
+                    loading={loading}
+                    size="large"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-500 shadow-sm hover:text-blue-600 hover:border-blue-200 transition-all duration-200" 
                   />
-                ))}
-              </div>
-            )}
-        </div>
-      )}
+                </Tooltip>
 
-      {/* Footer stats */}
-      {notifications.length > 0 && (
-        <div className="mt-6 text-center">
-          <Text type="secondary" className="text-sm">
-            Showing {filteredNotifications.length} of {notifications.length} notifications
-            {unreadCount > 0 && ` (${unreadCount} unread)`}
-          </Text>
+                <Dropdown menu={moreActionsMenu} placement="bottomRight" arrow={{ pointAtCenter: true }}>
+                  <Button 
+                    icon={<MoreOutlined />} 
+                    size="large"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-500 shadow-sm"
+                  />
+                </Dropdown>
+              </>
+            )}
+          </Space>
         </div>
-      )}
+
+        {/* Search & Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
+          <div className="md:col-span-8">
+            <Input
+              placeholder="Search notifications, subjects or content..."
+              prefix={<SearchOutlined className="text-gray-400 mr-2" />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+              className="rounded-2xl h-12 bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all px-4"
+            />
+          </div>
+          <div className="md:col-span-4">
+            <Select
+              placeholder="Filter by category"
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              options={categoryOptions}
+              className="w-full h-12 custom-select rounded-2xl"
+              suffixIcon={<FilterOutlined className="text-gray-400" />}
+              dropdownStyle={{ borderRadius: '16px', padding: '8px' }}
+            />
+          </div>
+        </div>
+
+        {/* Tabs and Content */}
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
+          className="custom-tabs mb-6"
+          size="large"
+        />
+
+        {/* Main Content Area */}
+        <div className="min-h-[400px]">
+          {loading && notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 gap-4 bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm">
+              <Spin size="large" />
+              <Text className="text-gray-400 font-medium">Checking your inbox...</Text>
+            </div>
+          ) : filteredNotifications.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-800 p-16 shadow-sm animate-fade-in">
+              <Empty
+                image={<InboxOutlined className="text-7xl text-gray-200 dark:text-slate-800" />}
+                description={
+                  <div className="mt-4">
+                    <Title level={4} className="!m-0 !text-gray-900 dark:!text-white">
+                      Inbox is empty
+                    </Title>
+                    <Paragraph className="text-gray-400 dark:text-slate-500 mt-2 max-w-sm mx-auto">
+                      {searchText || selectedCategory !== NOTIFICATION_CATEGORIES.ALL
+                        ? "We couldn't find any notifications matching your current filters."
+                        : activeTab === 'unread'
+                        ? "You're all caught up! No unread notifications to show."
+                        : "You don't have any notifications at the moment. We'll let you know when something new arrives."}
+                    </Paragraph>
+                    {(searchText || selectedCategory !== NOTIFICATION_CATEGORIES.ALL) && (
+                      <Button
+                        type="primary"
+                        ghost
+                        onClick={() => {
+                          setSearchText('');
+                          setSelectedCategory(NOTIFICATION_CATEGORIES.ALL);
+                        }}
+                        className="mt-6 rounded-xl font-bold h-10 border-blue-200 text-blue-600"
+                      >
+                        Reset All Filters
+                      </Button>
+                    )}
+                  </div>
+                }
+              />
+            </div>
+          ) : (
+            <div className="animate-fade-in">
+              {/* Grouped Notifications */}
+              {groupedNotifications.today.length > 0 && renderNotificationGroup('Today', groupedNotifications.today)}
+              {groupedNotifications.yesterday.length > 0 && renderNotificationGroup('Yesterday', groupedNotifications.yesterday)}
+              {groupedNotifications.thisWeek.length > 0 && renderNotificationGroup('This Week', groupedNotifications.thisWeek)}
+              {groupedNotifications.older.length > 0 && renderNotificationGroup('Earlier', groupedNotifications.older)}
+
+              {/* Fallback for ungrouped */}
+              {Object.values(groupedNotifications).every((g) => g.length === 0) &&
+                filteredNotifications.length > 0 && (
+                  <Card bordered={false} className="rounded-2xl border border-gray-100 dark:border-slate-800 overflow-hidden shadow-sm bg-white dark:bg-slate-900" styles={{ body: { padding: 0 } }}>
+                    {filteredNotifications.map((notification) => (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onMarkAsRead={markAsRead}
+                        onDelete={deleteNotification}
+                        showType={selectedCategory === NOTIFICATION_CATEGORIES.ALL}
+                        selectable={selectionMode}
+                        selected={selectedIds.includes(notification.id)}
+                        onSelect={handleSelect}
+                      />
+                    ))}
+                  </Card>
+                )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer info */}
+        {notifications.length > 0 && (
+          <div className="mt-10 mb-16 text-center border-t border-gray-100 dark:border-slate-800 pt-8">
+            <Text className="text-gray-400 dark:text-slate-500 font-medium">
+              Showing <span className="text-gray-900 dark:text-white font-bold">{filteredNotifications.length}</span> of <span className="text-gray-900 dark:text-white font-bold">{notifications.length}</span> total notifications
+              {unreadCount > 0 && <span> (<span className="text-blue-600 dark:text-blue-400 font-bold">{unreadCount} unread</span>)</span>}
+            </Text>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -9,30 +9,35 @@ const StatCard = ({
   value,
   bgClass,
   colorClass,
+  borderColorClass,
   suffix,
 }) => {
   return (
     <Card
-      size="small"
-      className="rounded-2xl border border-border hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-default"
-      styles={{ body: { padding: '16px' } }}
+      bordered={false}
+      className={`group h-full rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-all duration-300 cursor-default ${borderColorClass || ''}`}
+      styles={{ body: { padding: '20px' } }}
     >
-      <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bgClass}`}>
-          {React.cloneElement(icon, { className: `text-xl ${colorClass}` })}
+      <div className="flex items-center gap-5">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105 ${bgClass}`}>
+          {React.cloneElement(icon, { className: `text-2xl ${colorClass}` })}
         </div>
-        <div className="flex-1">
-          <div className="flex items-baseline gap-1">
-            <Text className="text-2xl font-bold text-gray-900">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5 mb-0.5">
+            <Text className="text-3xl font-bold text-gray-900 leading-none tracking-tight">
               {value ?? 0}
             </Text>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Text className="text-xs font-bold text-gray-400 uppercase tracking-wider truncate block">
+              {title}
+            </Text>
             {suffix && (
-              <Text className="text-sm text-gray-500">{suffix}</Text>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-gray-50 text-gray-400 border border-gray-100`}>
+                {suffix}
+              </span>
             )}
           </div>
-          <Text className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-            {title}
-          </Text>
         </div>
       </div>
     </Card>

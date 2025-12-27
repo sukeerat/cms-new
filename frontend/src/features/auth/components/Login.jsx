@@ -12,6 +12,7 @@ import {
   LockOutlined,
   LoginOutlined,
   IdcardOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import API from "../../../services/api";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -136,100 +137,97 @@ function Login() {
   }, [location.search, navigate]);
 
   return (
-    <div
-      className="flex items-center justify-center min-h-screen bg-background bg-gradient-to-br from-primary-50/30 to-background dark:from-primary-900/10"
-    >
-      <div className="w-full max-w-lg px-4 mt-5">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-white dark:from-slate-900 dark:via-slate-800 dark:to-slate-950 p-4 relative overflow-hidden">
+      
+      {/* Decorative Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-blue-200/20 dark:bg-blue-900/10 rounded-full blur-[100px]" />
+        <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] bg-indigo-200/20 dark:bg-indigo-900/10 rounded-full blur-[100px]" />
+        <div className="absolute -bottom-[10%] left-[20%] w-[30%] h-[30%] bg-purple-200/20 dark:bg-purple-900/10 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="w-full max-w-md z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <Title level={2} className="text-text-primary mb-2">
-            Portal Login
+        <div className="text-center mb-8 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 shadow-xl shadow-blue-100/50 dark:shadow-none mb-6">
+            <UserOutlined className="text-3xl text-blue-600 dark:text-blue-400" />
+          </div>
+          <Title level={2} className="!mb-2 !text-gray-900 dark:!text-white !font-bold tracking-tight">
+            Welcome Back
           </Title>
-          <Text className="text-text-secondary">
-            Access your academic dashboard and internship opportunities
+          <Text className="text-gray-500 dark:text-slate-400 text-base">
+            Access your academic dashboard and manage your journey
           </Text>
         </div>
 
         {/* Form Card */}
-        <Card className="rounded-xl shadow-soft-lg border border-border bg-surface">
+        <Card 
+          bordered={false}
+          className="rounded-3xl shadow-2xl shadow-gray-200/50 dark:shadow-black/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 overflow-hidden animate-slide-up"
+          styles={{ body: { padding: '32px' } }}
+        >
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
             centered
             size="large"
+            className="custom-tabs mb-6"
             items={[
               {
                 key: "email",
                 label: (
-                  <span>
-                    <MailOutlined /> Email Login
+                  <span className="flex items-center gap-2 px-2">
+                    <MailOutlined /> Staff/Faculty
                   </span>
                 ),
                 children: (
-                  <Form onFinish={onFinishEmail} layout="vertical" size="large">
+                  <Form onFinish={onFinishEmail} layout="vertical" size="large" className="mt-4">
                     <Form.Item
                       name="email"
-                      label={
-                        <span className="text-text-primary">
-                          Email Address
-                        </span>
-                      }
-                      rules={[
-                        { required: true, message: "Please enter your email" },
-                      ]}
+                      label={<span className="font-medium text-gray-700 dark:text-slate-300">Email Address</span>}
+                      rules={[{ required: true, message: "Please enter your email" }]}
                     >
                       <Input
-                        placeholder="Enter your student email address"
-                        prefix={
-                          <MailOutlined className="text-text-tertiary" />
-                        }
+                        placeholder="Enter your email address"
+                        prefix={<MailOutlined className="text-gray-400" />}
+                        className="rounded-xl h-12 bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-white focus:bg-white dark:focus:bg-slate-800 transition-all"
                       />
                     </Form.Item>
 
                     <Form.Item
                       name="password"
-                      label={
-                        <span className="text-text-primary">Password</span>
-                      }
+                      label={<span className="font-medium text-gray-700 dark:text-slate-300">Password</span>}
                       rules={[
                         { required: true, message: "Please enter your password" },
-                        {
-                          min: 5,
-                          message: "Password must be at least 6 characters",
-                        },
+                        { min: 5, message: "Password must be at least 6 characters" },
                       ]}
                     >
                       <Input.Password
                         placeholder="Enter your password"
-                        prefix={
-                          <LockOutlined className="text-text-tertiary" />
-                        }
+                        prefix={<LockOutlined className="text-gray-400" />}
+                        className="rounded-xl h-12 bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-white focus:bg-white dark:focus:bg-slate-800 transition-all"
                       />
                     </Form.Item>
 
-                    <div className="text-right mb-4">
+                    <div className="flex justify-end mb-6">
                       <Link
                         to="/forgot-password"
-                        style={{
-                          color: token.colorPrimary,
-                          textDecoration: "none",
-                          fontSize: "14px",
-                        }}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium text-sm transition-colors"
                       >
                         Forgot Password?
                       </Link>
                     </div>
 
-                    <Form.Item className="mb-4">
+                    <Form.Item className="mb-2">
                       <Button
                         type="primary"
                         htmlType="submit"
                         block
                         loading={loading}
                         icon={!loading && <LoginOutlined />}
-                        className="h-12 font-medium"
+                        className="h-12 rounded-xl font-bold text-base shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all transform hover:-translate-y-0.5"
                       >
-                        {loading ? "Signing In..." : "Sign In with Email"}
+                        {loading ? "Signing In..." : "Sign In"}
                       </Button>
                     </Form.Item>
                   </Form>
@@ -238,80 +236,58 @@ function Login() {
               {
                 key: "rollNumber",
                 label: (
-                  <span>
-                    <IdcardOutlined /> Registration Number
+                  <span className="flex items-center gap-2 px-2">
+                    <IdcardOutlined /> Student
                   </span>
                 ),
                 children: (
-                  <Form onFinish={onFinishRollNumber} layout="vertical" size="large">
+                  <Form onFinish={onFinishRollNumber} layout="vertical" size="large" className="mt-4">
                     <Form.Item
                       name="rollNumber"
-                      label={
-                        <span className="text-text-primary">
-                          Registration Number
-                        </span>
-                      }
-                      rules={[
-                        {
-                          required: true,
-                          message: "Please enter your registration number",
-                        },
-                      ]}
+                      label={<span className="font-medium text-gray-700 dark:text-slate-300">Registration Number</span>}
+                      rules={[{ required: true, message: "Please enter your registration number" }]}
                     >
                       <Input
                         placeholder="Enter your Registration Number"
-                        prefix={
-                          <IdcardOutlined
-                            className="text-text-tertiary"
-                          />
-                        }
+                        prefix={<IdcardOutlined className="text-gray-400" />}
+                        className="rounded-xl h-12 bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-white focus:bg-white dark:focus:bg-slate-800 transition-all"
                       />
                     </Form.Item>
 
                     <Form.Item
                       name="password"
-                      label={
-                        <span className="text-text-primary">Password</span>
-                      }
+                      label={<span className="font-medium text-gray-700 dark:text-slate-300">Password</span>}
                       rules={[
                         { required: true, message: "Please enter your password" },
-                        {
-                          min: 5,
-                          message: "Password must be at least 5 characters",
-                        },
+                        { min: 5, message: "Password must be at least 5 characters" },
                       ]}
                     >
                       <Input.Password
                         placeholder="Enter your password"
-                        prefix={
-                          <LockOutlined className="text-text-tertiary" />
-                        }
+                        prefix={<LockOutlined className="text-gray-400" />}
+                        className="rounded-xl h-12 bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-white focus:bg-white dark:focus:bg-slate-800 transition-all"
                       />
                     </Form.Item>
 
-                    <div className="text-right mb-4">
+                    <div className="flex justify-end mb-6">
                       <Link
                         to="/forgot-password"
-                        style={{
-                          color: token.colorPrimary,
-                          textDecoration: "none",
-                          fontSize: "14px",
-                        }}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium text-sm transition-colors"
                       >
                         Forgot Password?
                       </Link>
                     </div>
 
-                    <Form.Item className="mb-4">
+                    <Form.Item className="mb-2">
                       <Button
                         type="primary"
                         htmlType="submit"
                         block
                         loading={loading}
                         icon={!loading && <LoginOutlined />}
-                        className="h-12 font-medium"
+                        className="h-12 rounded-xl font-bold text-base shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all transform hover:-translate-y-0.5"
                       >
-                        {loading ? "Signing In..." : "Sign In with Registration Number"}
+                        {loading ? "Signing In..." : "Student Login"}
                       </Button>
                     </Form.Item>
                   </Form>
@@ -320,6 +296,12 @@ function Login() {
             ]}
           />
         </Card>
+        
+        {/* Footer */}
+        <div className="text-center mt-8 text-sm text-gray-500 dark:text-slate-500">
+          Having trouble accessing your account? <br />
+          <Link to="/support" className="text-gray-700 dark:text-slate-400 font-semibold hover:underline">Contact Support</Link>
+        </div>
       </div>
     </div>
   );

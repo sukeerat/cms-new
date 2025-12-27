@@ -75,18 +75,18 @@ const NotificationDropdown = ({ maxItems = 5 }) => {
   // Dropdown content
   const dropdownContent = (
     <div
-      className={`notification-dropdown ${darkMode ? 'dark' : ''} w-[380px] max-h-[480px] bg-background rounded-xl shadow-soft-lg overflow-hidden`}
+      className={`notification-dropdown ${darkMode ? 'dark' : ''} w-[380px] max-h-[520px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden animate-fade-in`}
     >
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border/50">
+      <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Title level={5} className="!m-0">
+            <Title level={5} className="!m-0 !text-gray-900 dark:!text-white">
               Notifications
             </Title>
             {isConnected && (
               <Tooltip title="Real-time connected">
-                <WifiOutlined className="text-green-500 text-xs" />
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               </Tooltip>
             )}
           </div>
@@ -96,15 +96,17 @@ const NotificationDropdown = ({ maxItems = 5 }) => {
                 <Button
                   type="text"
                   size="small"
+                  className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                   icon={<CheckOutlined />}
                   onClick={markAllAsRead}
                 />
               </Tooltip>
             )}
-            <Tooltip title="View all">
+            <Tooltip title="Expand to side panel">
               <Button
                 type="text"
                 size="small"
+                className="text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800"
                 icon={<EyeOutlined />}
                 onClick={handleOpenDrawer}
               />
@@ -112,17 +114,20 @@ const NotificationDropdown = ({ maxItems = 5 }) => {
           </Space>
         </div>
         {unreadCount > 0 && (
-          <Tag color="blue" className="mb-0">
-            {unreadCount} unread
-          </Tag>
+          <div className="flex items-center gap-2">
+            <Tag color="blue" className="m-0 rounded-full border-0 font-bold px-2 py-0 text-[10px] uppercase tracking-wider">
+              {unreadCount} New
+            </Tag>
+          </div>
         )}
       </div>
 
       {/* Notification List */}
-      <div className="max-h-[360px] overflow-y-auto flex flex-col">
+      <div className="max-h-[380px] overflow-y-auto flex flex-col bg-white dark:bg-slate-900">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spin />
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Spin size="small" />
+            <Text className="text-gray-400 text-xs font-medium">Checking for updates...</Text>
           </div>
         ) : notifications.length > 0 ? (
           notifications.slice(0, maxItems).map((item) => (
@@ -135,19 +140,25 @@ const NotificationDropdown = ({ maxItems = 5 }) => {
             />
           ))
         ) : (
-          <Empty
-            image={<InboxOutlined className="text-5xl text-text-tertiary" />}
-            description={<Text type="secondary">No notifications yet</Text>}
-            className="py-10"
-          />
+          <div className="py-16 flex flex-col items-center justify-center px-6">
+            <div className="w-16 h-16 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+              <InboxOutlined className="text-3xl text-gray-300 dark:text-slate-600" />
+            </div>
+            <Text className="text-gray-500 dark:text-slate-400 font-medium">All caught up!</Text>
+            <Text className="text-gray-400 dark:text-slate-500 text-xs text-center mt-1">No new notifications at the moment.</Text>
+          </div>
         )}
       </div>
 
       {/* Footer */}
-      {notifications.length > maxItems && (
-        <div className="px-5 py-3 border-t border-border/50 text-center">
-          <Button type="link" onClick={handleViewAll}>
-            View all {notifications.length} notifications
+      {notifications.length > 0 && (
+        <div className="px-5 py-3 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 text-center">
+          <Button 
+            type="link" 
+            onClick={handleViewAll}
+            className="text-blue-600 font-semibold text-xs"
+          >
+            View all notifications
           </Button>
         </div>
       )}
@@ -162,12 +173,18 @@ const NotificationDropdown = ({ maxItems = 5 }) => {
         open={open}
         onOpenChange={setOpen}
         placement="bottomRight"
+        overlayClassName="notification-dropdown-overlay"
       >
-        <Badge count={unreadCount} size="small" offset={[-2, 2]}>
+        <Badge 
+          count={unreadCount} 
+          size="small" 
+          offset={[-4, 4]}
+          className="hover:scale-110 transition-transform"
+        >
           <Button
             type="text"
-            icon={<BellOutlined className="text-lg" />}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-text-secondary shadow-sm hover:bg-surface-hover hover:scale-105 active:scale-95 transition-all duration-200"
+            icon={<BellOutlined className="text-xl" />}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-600 dark:text-gray-300 shadow-sm hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-100 dark:hover:border-blue-900/50 transition-all duration-200"
           />
         </Badge>
       </Dropdown>
@@ -175,76 +192,94 @@ const NotificationDropdown = ({ maxItems = 5 }) => {
       {/* Full Notification Drawer */}
       <Drawer
         title={
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between w-full pr-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                <BellOutlined />
+              </div>
+              <span className="font-bold text-gray-900 dark:text-white">Recent Activity</span>
+            </div>
             <div className="flex items-center gap-2">
-              <span>All Notifications</span>
-              {isConnected && (
-                <Tooltip title="Real-time connected">
-                  <WifiOutlined className="text-green-500 text-sm" />
-                </Tooltip>
+              {notifications.length > 0 && (
+                <Popconfirm
+                  title="Clear all?"
+                  description="This will remove all notifications."
+                  onConfirm={clearAll}
+                  okText="Yes"
+                  cancelText="No"
+                  placement="bottomRight"
+                >
+                  <Button type="text" danger size="small" className="text-xs font-semibold px-2">
+                    Clear All
+                  </Button>
+                </Popconfirm>
               )}
             </div>
-            <Space>
-              {notifications.length > 0 && (
-                <>
-                  <Button type="link" onClick={handleViewAll} size="small">
-                    Open Full Page
-                  </Button>
-                  <Popconfirm
-                    title="Clear all notifications?"
-                    onConfirm={clearAll}
-                    okText="Yes"
-                    cancelText="No"
-                  >
-                    <Button type="text" danger icon={<ClearOutlined />} size="small">
-                      Clear All
-                    </Button>
-                  </Popconfirm>
-                </>
-              )}
-            </Space>
           </div>
         }
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        styles={{ wrapper: { width: 420 } }}
+        width={420}
         placement="right"
+        className="notification-drawer"
+        styles={{ 
+          header: { borderBottom: '1px solid #f3f4f6', padding: '20px 24px' },
+          body: { padding: 0, background: darkMode ? '#0f172a' : '#ffffff' },
+          content: { background: darkMode ? '#0f172a' : '#ffffff', borderRadius: '24px 0 0 24px' }
+        }}
       >
-        <Input
-          placeholder="Search notifications..."
-          prefix={<SearchOutlined />}
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          allowClear
-          className="mb-4"
-        />
-
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spin />
-          </div>
-        ) : filteredNotifications.length > 0 ? (
-          <div className="flex flex-col">
-            {filteredNotifications.map((item) => (
-              <NotificationItem
-                key={item.id}
-                notification={item}
-                onMarkAsRead={markAsRead}
-                onDelete={deleteNotification}
-              />
-            ))}
-          </div>
-        ) : (
-          <Empty
-            image={<InboxOutlined className="text-5xl text-text-tertiary" />}
-            description={
-              <Text type="secondary">
-                {searchText ? 'No matching notifications' : 'No notifications yet'}
-              </Text>
-            }
-            className="py-10"
+        <div className="p-5 bg-gray-50/50 dark:bg-slate-900 sticky top-0 z-10 border-b border-gray-100 dark:border-slate-800">
+          <Input
+            placeholder="Search notifications..."
+            prefix={<SearchOutlined className="text-gray-400" />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            allowClear
+            className="rounded-xl h-10 bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
           />
-        )}
+        </div>
+
+        <div className="flex flex-col bg-white dark:bg-slate-900 min-h-full">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Spin />
+              <Text className="text-gray-400 font-medium">Loading notifications...</Text>
+            </div>
+          ) : filteredNotifications.length > 0 ? (
+            <div className="flex flex-col">
+              {filteredNotifications.map((item) => (
+                <NotificationItem
+                  key={item.id}
+                  notification={item}
+                  onMarkAsRead={markAsRead}
+                  onDelete={deleteNotification}
+                />
+              ))}
+              <div className="p-6 text-center">
+                <Button 
+                  type="primary" 
+                  block 
+                  onClick={handleViewAll}
+                  className="rounded-xl h-11 bg-blue-600 font-bold shadow-lg shadow-blue-200"
+                >
+                  Go to Inbox
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-24 flex flex-col items-center justify-center px-8 text-center">
+              <div className="w-20 h-20 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                <InboxOutlined className="text-4xl text-gray-300 dark:text-slate-600" />
+              </div>
+              <Title level={5} className="!mb-2 dark:!text-white">
+                {searchText ? 'No results found' : 'No notifications'}
+              </Title>
+              <Text className="text-gray-500 dark:text-slate-400">
+                {searchText ? `No notifications matching "${searchText}"` : "We'll notify you when something important happens."}
+              </Text>
+            </div>
+          )}
+        </div>
       </Drawer>
     </>
   );

@@ -1,53 +1,56 @@
 import React from 'react';
-import { Typography, Button, Tooltip, Tag } from 'antd';
+import { Typography, Button, Tooltip } from 'antd';
 import {
-  UserOutlined,
   ReloadOutlined,
   ReadOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 
 const { Title, Paragraph, Text } = Typography;
 
-const DashboardHeader = ({ studentName, instituteName, mentorName, onRefresh, loading }) => {
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+const DashboardHeader = ({ studentName, instituteName, mentorName, onRefresh, loading, isRevalidating }) => {
+  const currentDate = dayjs().format('dddd, MMMM D, YYYY');
 
   return (
-    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-6">
-      <div className="flex items-center">
-        <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-primary shadow-sm mr-3">
-          <ReadOutlined className="text-lg" />
+    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8 animate-fade-in">
+      <div className="flex items-center group">
+        <div className="w-14 h-14 flex items-center justify-center rounded-2xl bg-white border border-gray-100 text-blue-600 shadow-sm mr-5 group-hover:scale-105 group-hover:shadow-md transition-all duration-300">
+          <ReadOutlined className="text-2xl" />
         </div>
         <div>
-          <Title level={2} className="mb-0 text-text-primary text-2xl">
+          <Title level={2} className="!mb-1 !text-gray-900 !text-2xl lg:!text-3xl tracking-tight">
             Student Dashboard
           </Title>
-          <Paragraph className="text-text-secondary text-sm mb-0">
-            Welcome back, <span className="font-semibold text-primary">{studentName || 'Student'}</span> • {currentDate}
+          <Paragraph className="!text-gray-500 !text-sm lg:!text-base !mb-0 font-medium">
+            Welcome back, <span className="font-bold text-blue-600">{studentName || 'Student'}</span> • {currentDate}
           </Paragraph>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4 w-full lg:w-auto">
         {mentorName && (
-          <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl bg-surface border border-border shadow-sm">
-            <UserOutlined className="text-text-tertiary" />
+          <div className="hidden md:flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex-1 lg:flex-none">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+              <UserOutlined />
+            </div>
             <div>
-              <Text className="text-xs text-text-tertiary block leading-none mb-1">Assigned Mentor</Text>
-              <Text className="text-sm font-medium text-text-primary leading-none">{mentorName}</Text>
+              <Text className="text-[10px] uppercase font-bold text-gray-400 block leading-none mb-1 tracking-wider">
+                Assigned Mentor
+              </Text>
+              <Text className="text-sm font-bold text-gray-800 leading-none block">
+                {mentorName}
+              </Text>
             </div>
           </div>
         )}
 
-        <Tooltip title="Refresh Data">
+        <Tooltip title="Refresh Dashboard">
           <Button
-            icon={<ReloadOutlined spin={loading} />}
+            icon={<ReloadOutlined spin={loading || isRevalidating} />}
             onClick={onRefresh}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border text-text-secondary shadow-sm hover:bg-surface-hover hover:scale-105 active:scale-95 transition-all duration-200"
+            size="large"
+            className="w-12 h-12 flex items-center justify-center rounded-xl border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 shadow-sm hover:shadow-md transition-all duration-300"
           />
         </Tooltip>
       </div>

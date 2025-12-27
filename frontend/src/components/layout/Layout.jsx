@@ -123,7 +123,7 @@ const Layouts = () => {
       <Layout
         className={`
           transition-all duration-300 ease-in-out
-          bg-background-secondary
+          !bg-background-secondary
           min-h-screen
         `}
       >

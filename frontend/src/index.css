@@ -143,6 +143,29 @@ body {
 
 .ant-drawer-content {
   border-radius: 16px 0 0 16px;
+  background-color: rgb(var(--color-background)) !important;
+}
+
+.ant-drawer-header {
+  background-color: rgb(var(--color-background)) !important;
+  border-bottom: 1px solid rgb(var(--color-border)) !important;
+}
+
+.dark .ant-drawer-content,
+.dark .ant-drawer-header {
+  background-color: #0f172a !important; /* slate-950/900 area */
+}
+
+/* Force Ant Design Layout to use our theme colors */
+.ant-layout {
+  background-color: rgb(var(--color-background-secondary)) !important;
+}
+
+.ant-layout-header {
+  background: transparent !important;
+  height: auto !important;
+  padding: 0 !important;
+  line-height: normal !important;
 }
 
 /* ============================================

@@ -126,7 +126,8 @@
       "Bash(docker ps:*)",
       "Bash(xargs:*)",
       "Bash(docker inspect:*)",
-      "Bash(node scripts/cleanup-and-verify.js:*)"
+      "Bash(node scripts/cleanup-and-verify.js:*)",
+      "Bash(chmod:*)"
     ]
   }
 }
